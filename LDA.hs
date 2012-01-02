@@ -6,6 +6,7 @@ import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
 import Control.Monad
 import Data.Random.List (randomElement)
+import qualified Data.Random (sample)
 
 import BayesStack.Core
 import BayesStack.Categorical
@@ -41,16 +42,19 @@ model priors nodes items topics nodeItems =
                    return (t, phi)
   
      itemUnits <- forM nodeItems $ \(n,x) ->
-       do t <- randomShared topics
-          return $ ItemUnit { iuNodes = nodes
-                            , iuTopics = topics
-                            , iuItems = items
-                            , iuN = n
-                            , iuT = t
-                            , iuX = x
-                            , iuTheta = thetas EM.! n
-                            , iuPhis = phis
-                            }
+       do t <- Data.Random.sample $ randomElement topics
+          t_ <- newShared t
+          let unit = ItemUnit { iuNodes = nodes
+                              , iuTopics = topics
+                              , iuItems = items
+                              , iuN = n
+                              , iuT = t_
+                              , iuX = x
+                              , iuTheta = thetas EM.! n
+                              , iuPhis = phis
+                              }
+          set unit t
+          return unit
   
      forM_ itemUnits $ sample
      return (itemUnits, thetas, phis)
