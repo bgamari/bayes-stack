@@ -1,9 +1,10 @@
-{-# LANGUAGE TypeFamilies, ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies, KindSignatures, ConstraintKinds #-}
 
 module BayesStack.Core( GatedPlate, gate
                       , Shared, newShared, setShared
-                      , Thing.Core.sample
+                      , BayesStack.Core.sample
                       , Probability
+		      , ProbDist(..)
                       , Sampleable(..)
                       ) where
 
@@ -16,10 +17,11 @@ import Data.IORef
 import Control.Monad
 import Control.Monad.IO.Class
   
+import GHC.Prim (Constraint)
+
 import qualified Data.Random.Distribution.Categorical as C
 
-import Thing.ModelMonad
-import Thing.DirMulti
+import BayesStack.ModelMonad
   
 data GatedPlate control dist =
   GatedPlate (EnumMap control (Shared dist))
@@ -41,7 +43,7 @@ setShared :: Shared a -> a -> ModelMonad ()
 (Shared a) `setShared` x = liftIO $ writeIORef a x
                            
 getShared :: Shared a -> ModelMonad a
-getShared a = liftIO $ readIORef a
+getShared (Shared a) = liftIO $ readIORef a
 
 sample :: Sampleable unit => unit -> ModelMonad ()
 sample unit = 
@@ -55,13 +57,14 @@ sample unit =
 type Probability = Double
 
 class Sampleable unit where
-  type Value unit :: *
+  type SValue unit :: *
   unset :: unit -> ModelMonad ()
-  range :: unit -> ModelMonad [Value unit]
-  sampleProb :: unit -> Value unit -> ModelMonad Probability
-  set :: unit -> Value unit -> ModelMonad ()
+  range :: unit -> ModelMonad [SValue unit]
+  sampleProb :: unit -> SValue unit -> ModelMonad Probability
+  set :: unit -> SValue unit -> ModelMonad ()
 
 class ProbDist p where
-  type ProbDist p a :: *
-  type ProbDist p a = ()
-  prob :: ProbDist p a => p -> a -> Probability
+  type PdContext p a :: Constraint
+  type PdContext p a = ()
+  prob :: PdContext p a => p a -> a -> Probability
+

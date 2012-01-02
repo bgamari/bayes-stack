@@ -49,7 +49,7 @@ model priors nodes nodeItems topics =
      forM_ itemUnits $ sample
 
 instance Sampleable ItemUnit where
-  type Value = Topic
+  type SValue = Topic
   sampleProb unit t =
     do th <- prob (iuTheta unit) t
        ph <- prob (iuPhis unit `gate` t) (iuX unit) 

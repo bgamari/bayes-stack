@@ -1,8 +1,7 @@
-{-# LANGUAGE FlexibleInstances, ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds #-}
 
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                              DirMulti, dirMulti
-                           , probability
                            , probabilities
                            , decDirMulti, incDirMulti
                                           
@@ -23,6 +22,8 @@ import Data.List (sortBy)
 import Data.Function (on)
  
 import Data.Random.Distribution.Categorical
+
+import BayesStack.Core
 
 maybeInc, maybeDec :: Maybe Int -> Maybe Int
 maybeInc Nothing = Just 1
@@ -56,21 +57,17 @@ dirMulti alpha range = DirMulti { dmAlpha = alpha
                                 , dmRange = range
                                 }
 
-{-# INLINEABLE probability #-}
 instance ProbDist DirMulti where
-  type ProbDistContext p a = (Ord a, Enum a)
-  prob dm k = 
-    
-probability :: (Ord a, Enum a) => DirMulti a -> a -> Double
-probability dm k =
-  let c = realToFrac $ EM.findWithDefault 0 k counts
-      DirMulti { dmAlpha=alpha, dmCounts=counts, dmTotal=total } = dm
-      range = realToFrac $ SQ.length $ dmRange dm
-  in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
+  type PdContext DirMulti a = (Ord a, Enum a)
+  prob dm k = let c = realToFrac $ EM.findWithDefault 0 k counts
+                  DirMulti { dmAlpha=alpha, dmCounts=counts, dmTotal=total } = dm
+                  range = realToFrac $ SQ.length $ dmRange dm
+              in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
+  {-# INLINEABLE prob #-}
 
 {-# INLINEABLE probabilities #-}
 probabilities :: (Ord a, Enum a) => DirMulti a -> Seq (Double, a)
-probabilities dm = fmap (\a->(probability dm a, a)) $ dmRange dm
+probabilities dm = fmap (\a->(prob dm a, a)) $ dmRange dm
 
 
 -- FIXME Unnecessary constraints

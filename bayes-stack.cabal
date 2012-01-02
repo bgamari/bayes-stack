@@ -14,5 +14,5 @@ Cabal-version:       >=1.2
 
 Library
   Exposed-modules:     BayesStack.ModelMonad, BayesStack.Categorical, BayesStack.DirMulti, BayesStack.Core
-  Build-depends:       base, random-fu, transformers
+  Build-depends:       base, transformers, random-source, random-fu, rvar, containers, enummapset, ghc-prim
   
