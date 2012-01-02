@@ -1,0 +1,18 @@
+Name:                bayes-stack
+
+Version:             0.1
+Synopsis:            Framework for inferring generative probabilistic models with Gibbs sampling
+License:             BSD3
+License-file:        LICENSE
+Author:              Ben Gamari
+Maintainer:          bgamari.foss@gmail.com
+Category:            Math
+
+Build-type:          Simple
+Cabal-version:       >=1.2
+
+
+Library
+  Exposed-modules:     BayesStack.ModelMonad, BayesStack.Categorical, BayesStack.DirMulti, BayesStack.Core
+  Build-depends:       base, random-fu, transformers
+  
