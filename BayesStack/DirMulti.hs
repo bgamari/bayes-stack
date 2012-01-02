@@ -2,12 +2,7 @@
 
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                              DirMulti, symDirMulti
-                           , probabilities
                            , decDirMulti, incDirMulti
-                                          
-                             -- * Categorical distributions
-                           , CategoricalDist
-                           , categoricalProbs, sortedCategoricalProbs
                            ) where
 
 import qualified Data.Foldable 
@@ -20,8 +15,6 @@ import qualified Data.Sequence as SQ
 
 import Data.List (sortBy)
 import Data.Function (on)
- 
-import Data.Random.Distribution.Categorical
 
 import BayesStack.Core
 
@@ -73,15 +66,3 @@ probabilities :: (Ord a, Enum a) => DirMulti a -> Seq (Double, a)
 probabilities dm = fmap (\a->(prob dm a, a)) $ dmRange dm
 
 
--- FIXME Unnecessary constraints
-class CategoricalDist d where
-  categoricalProbs :: (Enum a, Ord a) => d a -> [(Double, a)]
-  sortedCategoricalProbs :: (Enum a, Ord a) => d a -> [(Double, a)]
-  sortedCategoricalProbs = sortBy (flip (compare `on` fst)) . categoricalProbs
-
-instance CategoricalDist (Categorical Double) where
-  categoricalProbs = toList
-
-instance CategoricalDist DirMulti where
-  categoricalProbs = Data.Foldable.toList . probabilities
-    
