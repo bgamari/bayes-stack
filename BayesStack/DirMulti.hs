@@ -3,6 +3,7 @@
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                              DirMulti, symDirMulti
                            , decDirMulti, incDirMulti
+                           , prettyDirMulti
                            ) where
 
 import qualified Data.Foldable 
@@ -16,6 +17,8 @@ import qualified Data.Sequence as SQ
 import Data.List (sortBy)
 import Data.Function (on)
 
+import Text.PrettyPrint
+ 
 import BayesStack.Core
 
 maybeInc, maybeDec :: Maybe Int -> Maybe Int
@@ -65,4 +68,10 @@ instance ProbDist DirMulti where
 probabilities :: (Ord a, Enum a) => DirMulti a -> Seq (Double, a)
 probabilities dm = fmap (\a->(prob dm a, a)) $ dmRange dm
 
+prettyDirMulti :: (Ord a, Enum a, Show a) => Int -> DirMulti a -> Doc
+prettyDirMulti n dm =
+  text "DirMulti" <+> text "alpha=" <> text (show $ dmAlpha dm)
+  <+> hsep (punctuate comma
+            $ map (\(p,a)->text (show a) <> parens (text $ show p))
+            $ take n $ Data.Foldable.toList $ probabilities dm)
 
