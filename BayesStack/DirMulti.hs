@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds #-}
 
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
-                             DirMulti, dirMulti
+                             DirMulti, symDirMulti
                            , probabilities
                            , decDirMulti, incDirMulti
                                           
@@ -43,26 +43,29 @@ incDirMulti k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
 -- | 'DirMulti a' represents collapsed Dirichlet/multinomial pair over a domain 'a'.
 -- 'DirMulti alpha count total' is a multinomial with Dirichlet prior
 -- with symmetric parameter 'alpha', ...
-data DirMulti a = DirMulti { dmAlpha :: Double 
-                           , dmCounts :: EnumMap a Int
-                           , dmTotal :: Int
-                           , dmRange :: Seq a
-                           }
+data DirMulti a = SymDirMulti { dmAlpha :: Double 
+                              , dmCounts :: EnumMap a Int
+                              , dmTotal :: Int
+                              , dmRange :: Seq a
+                              }
                   deriving (Show, Eq)                           
 
-dirMulti :: Double -> Seq a -> DirMulti a
-dirMulti alpha range = DirMulti { dmAlpha = alpha
-                                , dmCounts = EM.empty
-                                , dmTotal = 0
-                                , dmRange = range
-                                }
+type Alpha = Double
+
+symDirMulti :: Alpha -> [a] -> DirMulti a
+symDirMulti alpha range = SymDirMulti { dmAlpha = alpha
+                                      , dmCounts = EM.empty
+                                      , dmTotal = 0
+                                      , dmRange = SQ.fromList range
+                                      }
+
 
 instance ProbDist DirMulti where
   type PdContext DirMulti a = (Ord a, Enum a)
-  prob dm k = let c = realToFrac $ EM.findWithDefault 0 k counts
-                  DirMulti { dmAlpha=alpha, dmCounts=counts, dmTotal=total } = dm
-                  range = realToFrac $ SQ.length $ dmRange dm
-              in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
+  prob dm@(SymDirMulti {dmAlpha=alpha, dmCounts=counts, dmTotal=total}) k =
+  	let c = realToFrac $ EM.findWithDefault 0 k counts
+            range = realToFrac $ SQ.length $ dmRange dm
+        in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
   {-# INLINEABLE prob #-}
 
 {-# INLINEABLE probabilities #-}

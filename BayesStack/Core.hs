@@ -1,49 +1,27 @@
 {-# LANGUAGE TypeFamilies, KindSignatures, ConstraintKinds #-}
 
-module BayesStack.Core( GatedPlate, gate
-                      , Shared, newShared, setShared
+module BayesStack.Core( GatedPlate
                       , BayesStack.Core.sample
                       , Probability
-		      , ProbDist(..)
+                      , ProbDist(..)
                       , Sampleable(..)
+                      , module BayesStack.Core.Shared
+                      , module BayesStack.Core.ModelMonad
                       ) where
 
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
   
 import Data.Random hiding (Sampleable)
-import Data.IORef
-
-import Control.Monad
-import Control.Monad.IO.Class
-  
-import GHC.Prim (Constraint)
-
 import qualified Data.Random.Distribution.Categorical as C
 
-import BayesStack.ModelMonad
+import Control.Monad
+import GHC.Prim (Constraint)
+
+import BayesStack.Core.ModelMonad
+import BayesStack.Core.Shared
   
-data GatedPlate control dist =
-  GatedPlate (EnumMap control (Shared dist))
-
-gate :: (Enum c) => GatedPlate c dist -> c -> Shared dist 
-gate (GatedPlate e) c = e EM.! c
-
-newtype Shared a = Shared (IORef a)
-
-newShared :: a -> ModelMonad (Shared a)
-newShared a = liftM Shared $ liftIO $ newIORef a
-
-updateShared :: Shared a -> (a -> a) -> ModelMonad ()
-updateShared (Shared a) f = liftIO $ atomicModifyIORef a (\x -> (f x, ()))
-  
--- | Set a shared variable
-infix 1 `setShared`
-setShared :: Shared a -> a -> ModelMonad ()
-(Shared a) `setShared` x = liftIO $ writeIORef a x
-                           
-getShared :: Shared a -> ModelMonad a
-getShared (Shared a) = liftIO $ readIORef a
+type GatedPlate control dist = EnumMap control (Shared dist)
 
 sample :: Sampleable unit => unit -> ModelMonad ()
 sample unit = 

@@ -1,5 +1,8 @@
-module BayesStack.ModelMonad ( ModelMonad(..)
-                             , liftRVar) where
+{-# LANGUAGE FlexibleContexts #-}
+
+module BayesStack.Core.ModelMonad ( ModelMonad(..)
+				  , runModel
+                                  , liftRVar) where
 
 import Data.Random.Internal.Source
 import Data.RVar
@@ -9,14 +12,18 @@ import Control.Monad.IO.Class
 import Control.Applicative
 
 -- | GibbsMonad?
-newtype ModelMonad a = ModelMonad { runModel :: (RVarT IO a) }
+newtype ModelMonad a = ModelMonad { unMM :: (RVarT IO a) }
+
+runModel :: RandomSource IO s => ModelMonad a -> s -> IO a
+runModel m s = runRVarT (unMM m) s
+
 instance Functor ModelMonad where
   fmap = liftM
   
 instance Monad ModelMonad where
   return x = ModelMonad (return $! x)
   fail s = ModelMonad (fail s)
-  (ModelMonad m) >>= k = ModelMonad (m >>= \x -> x `seq` runModel (k x))
+  (ModelMonad m) >>= k = ModelMonad (m >>= \x -> x `seq` unMM (k x))
   
 instance Applicative ModelMonad where
   pure = return

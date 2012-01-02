@@ -1,15 +1,16 @@
-module Main where
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving #-}
+
+module LDA where
 
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
 import Control.Monad
+import Data.Random.List (randomElement)
 
 import BayesStack.Core
-import BayesStack.ModelMonad
 import BayesStack.Categorical
 import BayesStack.DirMulti
 
-main = runModel model
 
 data Priors = Priors { alphaTheta :: Double
                      , alphaPhi :: Double
@@ -23,52 +24,61 @@ newtype Topic = Topic Int deriving (Show, Eq, Ord, Enum)
 data ItemUnit = ItemUnit { iuNodes :: [Node]
                          , iuTopics :: [Topic]
                          , iuItems :: [Item]
-                         , iuN :: Categorical Node
-                         , iuT :: Shared (Categorical Topic)
-                         , iuX :: Categorical Item
+                         , iuN :: Node
+                         , iuT :: Shared Topic
+                         , iuX :: Item
                          , iuTheta :: Shared (DirMulti Topic)
-                         , iuPhis :: Shared (GatedPlate Topic (DirMulti Item))
+                         , iuPhis :: GatedPlate Topic (DirMulti Item)
                          }
 
-model :: Priors -> [Node] -> [(Node, Item)] -> [Topic] -> ModelMonad ()
-model priors nodes nodeItems topics =
-  do thetas <- EM.fromList $ forM nodes $ \n -> (n, dirMulti $ alphaTheta priors)
-     phis <- EM.fromList $ forM topics $ \t -> (t, dirMulti $ alphaPhi priors)
+model :: Priors -> [Node] -> [Item] -> [Topic] -> [(Node, Item)] -> ModelMonad ([ItemUnit], GatedPlate Node (DirMulti Topic), GatedPlate Topic (DirMulti Item))
+model priors nodes items topics nodeItems =
+  do thetas <- liftM EM.fromList $ forM nodes
+        $ \n -> do theta <- newShared $ symDirMulti (alphaTheta priors) topics
+                   return (n, theta)
+     phis <- liftM EM.fromList $ forM topics
+        $ \t -> do phi <- newShared $ symDirMulti (alphaPhi priors) items
+                   return (t, phi)
   
      itemUnits <- forM nodeItems $ \(n,x) ->
-       do n_ <- observedCategorical n
-          t_ <- categorical
-          x_ <- observedCategorical x
-          return $ ItemUnit { iuN = n_
-                            , iuT = t_
-                            , iuX = x_
+       do t <- randomShared topics
+          return $ ItemUnit { iuNodes = nodes
+                            , iuTopics = topics
+                            , iuItems = items
+                            , iuN = n
+                            , iuT = t
+                            , iuX = x
                             , iuTheta = thetas EM.! n
                             , iuPhis = phis
                             }
   
      forM_ itemUnits $ sample
+     return (itemUnits, thetas, phis)
 
 instance Sampleable ItemUnit where
-  type SValue = Topic
+  type SValue ItemUnit = Topic
   sampleProb unit t =
-    do th <- prob (iuTheta unit) t
-       ph <- prob (iuPhis unit `gate` t) (iuX unit) 
+    do phi <- getShared $ iuPhis unit EM.! t 
+       theta <- getShared $ iuTheta unit
+       let th = prob theta t
+       let ph = prob phi (iuX unit) 
        return $ th * ph
   
-  range = iuTopics
+  range = return . iuTopics
   
   unset unit =
     do t <- getShared $ iuT unit 
        let x = iuX unit
-           phi = iuPhis unit `gate` t
            theta = iuTheta unit
+           phi = iuPhis unit EM.! t
        theta `updateShared` decDirMulti t
        phi `updateShared` decDirMulti x
   
   set unit t =
     do iuT unit `setShared` t
-       let theta = iuTheta unit
-           phi = iuPhis unit `gate` t
-           x = iuX unit
+       let x = iuX unit
+           theta = iuTheta unit
+           phi = iuPhis unit EM.! t
        theta `updateShared` incDirMulti t
        phi `updateShared` incDirMulti x
+
