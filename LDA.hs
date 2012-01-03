@@ -40,10 +40,10 @@ model priors nodes items topics nodeItems =
      phis <- liftM EM.fromList $ forM topics
         $ \t -> do phi <- newShared $ symDirMulti (alphaPhi priors) items
                    return (t, phi)
+     initTs <- forM nodeItems $ const $ Data.Random.sample $ randomElement topics
   
-     itemUnits <- forM nodeItems $ \(n,x) ->
-       do t <- Data.Random.sample $ randomElement topics
-          t_ <- newShared t
+     itemUnits <- forM (zip nodeItems initTs) $ \((n,x), t) ->
+       do t_ <- newShared t
           let unit = ItemUnit { iuNodes = nodes
                               , iuTopics = topics
                               , iuItems = items
