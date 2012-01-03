@@ -27,7 +27,7 @@ nodeItems = [ (Node 1, Item 1)
 
 main = withSystemRandom $ runModel run
 run = do (ius, thetas, phis) <- model priors nodes items topics nodeItems
-         let iterate = do forM_ ius sample
+         let iterate = do forM_ ius gibbsUpdate
                           forM_ (take 5 nodes) $ \n ->
                                 do th <- getShared (thetas EM.! n)
                                    liftIO $ print $ text (show n) <+> prettyDirMulti 5 th

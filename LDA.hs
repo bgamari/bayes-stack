@@ -53,22 +53,22 @@ model priors nodes items topics nodeItems =
                               , iuTheta = thetas EM.! n
                               , iuPhis = phis
                               }
-          set unit t
+          guSet unit t
           return unit
      return (itemUnits, thetas, phis)
 
-instance Sampleable ItemUnit where
-  type SValue ItemUnit = Topic
-  sampleProb unit t =
+instance GibbsUpdateUnit ItemUnit where
+  type GUValue ItemUnit = Topic
+  guProb unit t =
     do phi <- getShared $ iuPhis unit EM.! t 
        theta <- getShared $ iuTheta unit
        let th = prob theta t
        let ph = prob phi (iuX unit) 
        return $ th * ph
   
-  range = return . iuTopics
+  guDomain = return . iuTopics
   
-  unset unit =
+  guUnset unit =
     do t <- getShared $ iuT unit 
        let x = iuX unit
            theta = iuTheta unit
@@ -76,7 +76,7 @@ instance Sampleable ItemUnit where
        theta `updateShared` decDirMulti t
        phi `updateShared` decDirMulti x
   
-  set unit t =
+  guSet unit t =
     do iuT unit `setShared` t
        let x = iuX unit
            theta = iuTheta unit

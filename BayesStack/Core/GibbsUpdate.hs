@@ -16,11 +16,11 @@ import BayesStack.Core.Types
 import BayesStack.Core.Concurrent
 
 class GibbsUpdateUnit unit where
-  type GValue unit :: *
+  type GUValue unit :: *
   guUnset :: unit -> ModelMonad ()
-  guDomain :: unit -> ModelMonad [GValue unit]
-  guProb :: unit -> GValue unit -> ModelMonad Probability
-  guSet :: unit -> GValue unit -> ModelMonad ()
+  guDomain :: unit -> ModelMonad [GUValue unit]
+  guProb :: unit -> GUValue unit -> ModelMonad Probability
+  guSet :: unit -> GUValue unit -> ModelMonad ()
 
 gibbsUpdate :: GibbsUpdateUnit unit => unit -> ModelMonad ()
 gibbsUpdate unit = 
