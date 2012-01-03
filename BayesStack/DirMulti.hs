@@ -18,6 +18,7 @@ import Data.List (sortBy)
 import Data.Function (on)
 
 import Text.PrettyPrint
+import Text.Printf
  
 import BayesStack.Core
 
@@ -70,8 +71,8 @@ probabilities dm = fmap (\a->(prob dm a, a)) $ dmRange dm
 
 prettyDirMulti :: (Ord a, Enum a, Show a) => Int -> DirMulti a -> Doc
 prettyDirMulti n dm =
-  text "DirMulti" <+> text "alpha=" <> text (show $ dmAlpha dm)
+  text "DirMulti" <+> parens (text "alpha=" <> text (show $ dmAlpha dm))
   <+> hsep (punctuate comma
-            $ map (\(p,a)->text (show a) <> parens (text $ show p))
+            $ map (\(p,a)->text (show a) <> parens (text $ printf "%1.2f" p))
             $ take n $ Data.Foldable.toList $ probabilities dm)
 

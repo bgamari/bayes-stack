@@ -55,8 +55,6 @@ model priors nodes items topics nodeItems =
                               }
           set unit t
           return unit
-  
-     forM_ itemUnits $ sample
      return (itemUnits, thetas, phis)
 
 instance Sampleable ItemUnit where
