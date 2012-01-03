@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module BayesStack.Core.ModelMonad ( ModelMonad(..)
-				  , runModel
+                                  , runModel
                                   , liftRVar) where
 
 import Data.Random.Internal.Source
