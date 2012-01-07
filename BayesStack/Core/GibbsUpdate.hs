@@ -7,6 +7,11 @@ module BayesStack.Core.GibbsUpdate ( GibbsUpdateUnit(..)
 
 import Data.Random
 import qualified Data.Random.Distribution.Categorical as C
+import Data.Random.Sequence
+
+import Data.Sequence (Seq)
+import qualified Data.Sequence as SQ
+import Data.Foldable
 
 import Control.Monad
 import Control.Monad.IO.Class
@@ -32,14 +37,15 @@ gibbsUpdate unit =
      guSet unit new
     
 -- | Randomly sample one of a group of units
-gibbsUpdateOne :: GibbsUpdateUnit unit => [unit] -> ModelMonad ()
+gibbsUpdateOne :: GibbsUpdateUnit unit => Seq unit -> ModelMonad ()
 gibbsUpdateOne units =
-  do a <- sample $ randomElement units
+  do a <- liftRVar $ randomElementT units
      gibbsUpdate a
 
-concurrentGibbsUpdate :: GibbsUpdateUnit unit => Int -> [unit] -> ModelMonad ()
+concurrentGibbsUpdate :: GibbsUpdateUnit unit => Int -> Seq unit -> ModelMonad ()
 concurrentGibbsUpdate nIter units =
    do let chunks = chunk numCapabilities units
       concurrentRunModel $ map (\c->do replicateM nIter $ gibbsUpdateOne c
                                        return ()
-                               ) chunks
+                               ) $ toList chunks
+

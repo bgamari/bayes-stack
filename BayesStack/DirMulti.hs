@@ -62,8 +62,16 @@ instance ProbDist DirMulti where
   prob dm@(SymDirMulti {dmAlpha=alpha, dmCounts=counts, dmTotal=total}) k =
   	let c = realToFrac $ EM.findWithDefault 0 k counts
             range = realToFrac $ SQ.length $ dmRange dm
-        in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
+        in (c + alpha) / (realToFrac total + range * alpha)
   {-# INLINEABLE prob #-}
+
+instance PretendableProbDist DirMulti where
+  type PpdContext DirMulti a = (Ord a, Enum a)
+  probPretend dm@(SymDirMulti {dmAlpha=alpha, dmCounts=counts, dmTotal=total}) k =
+  	let c = realToFrac $ EM.findWithDefault 0 k counts
+            range = realToFrac $ SQ.length $ dmRange dm
+        in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
+  {-# INLINEABLE probPretend #-}
 
 {-# INLINEABLE probabilities #-}
 probabilities :: (Ord a, Enum a) => DirMulti a -> Seq (Double, a)

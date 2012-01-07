@@ -5,6 +5,7 @@ module BayesStack.Core.ModelMonad ( ModelMonad(..)
                                   , liftRVar) where
 
 import Data.Random.Internal.Source
+import qualified Data.Random.Lift
 import Data.RVar
 
 import Control.Monad
@@ -35,5 +36,8 @@ instance MonadIO ModelMonad where
 instance MonadRandom ModelMonad where
   getRandomPrim = ModelMonad . getRandomPrim
   
-liftRVar :: RVarT IO a -> ModelMonad a
-liftRVar = ModelMonad
+liftRVarT :: RVarT IO a -> ModelMonad a
+liftRVarT = ModelMonad
+
+liftRVar :: RVar a -> ModelMonad a
+liftRVar = ModelMonad . Data.Random.Lift.lift
