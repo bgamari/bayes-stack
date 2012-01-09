@@ -1,7 +1,7 @@
-{-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds #-}
+{-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds, DeriveGeneric, DefaultSignatures #-}
 
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
-                             DirMulti, symDirMulti
+                             DirMulti(..), symDirMulti
                            , decDirMulti, incDirMulti
                            , prettyDirMulti
                            ) where
@@ -19,6 +19,10 @@ import Data.Function (on)
 
 import Text.PrettyPrint
 import Text.Printf
+
+import GHC.Generics
+import Data.Serialize
+import Data.Serialize.EnumMap
  
 import BayesStack.Core
 
@@ -40,14 +44,16 @@ incDirMulti k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
 -- | 'DirMulti a' represents collapsed Dirichlet/multinomial pair over a domain 'a'.
 -- 'DirMulti alpha count total' is a multinomial with Dirichlet prior
 -- with symmetric parameter 'alpha', ...
-data DirMulti a = SymDirMulti { dmAlpha :: Double 
+data DirMulti a = SymDirMulti { dmAlpha :: Alpha
                               , dmCounts :: EnumMap a Int
                               , dmTotal :: Int
                               , dmRange :: Seq a
                               }
-                  deriving (Show, Eq)                           
+                  deriving (Show, Eq, Generic)
 
 type Alpha = Double
+
+instance (Enum a, Serialize a) => Serialize (DirMulti a)
 
 symDirMulti :: Alpha -> [a] -> DirMulti a
 symDirMulti alpha range = SymDirMulti { dmAlpha = alpha
@@ -77,10 +83,11 @@ instance PretendableProbDist DirMulti where
 probabilities :: (Ord a, Enum a) => DirMulti a -> Seq (Double, a)
 probabilities dm = fmap (\a->(prob dm a, a)) $ dmRange dm
 
-prettyDirMulti :: (Ord a, Enum a, Show a) => Int -> DirMulti a -> Doc
-prettyDirMulti n dm =
+prettyDirMulti :: (Ord a, Enum a, Show a) => Int -> (a -> String) -> DirMulti a -> Doc
+prettyDirMulti n showA dm =
   text "DirMulti" <+> parens (text "alpha=" <> text (show $ dmAlpha dm))
   <+> hsep (punctuate comma
-            $ map (\(p,a)->text (show a) <> parens (text $ printf "%1.2f" p))
-            $ take n $ Data.Foldable.toList $ probabilities dm)
+            $ map (\(p,a)->text (showA a) <> parens (text $ printf "%1.2e" p))
+            $ take n $ Data.Foldable.toList
+            $ SQ.sortBy (flip (compare `on` fst)) $ probabilities dm)
 

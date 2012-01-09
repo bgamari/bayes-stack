@@ -107,8 +107,7 @@ likelihood model =
 instance GibbsUpdateUnit ItemUnit where
   type GUValue ItemUnit = Topic
   guProb unit t =
-    do when (t `EM.notMember` iuPhis unit) $ liftIO $ putStrLn "unset"
-       phi <- getShared $ iuPhis unit EM.! t 
+    do phi <- getShared $ iuPhis unit EM.! t 
        theta <- getShared $ iuTheta unit
        let th = probPretend theta t
        let ph = probPretend phi (iuX unit) 
@@ -121,7 +120,6 @@ instance GibbsUpdateUnit ItemUnit where
        let x = iuX unit
            theta = iuTheta unit
            phi = iuPhis unit EM.! t
-       when (t `EM.notMember` iuPhis unit) $ liftIO $ putStrLn "unset"
        theta `updateShared` decDirMulti t
        phi `updateShared` decDirMulti x
   
@@ -130,7 +128,6 @@ instance GibbsUpdateUnit ItemUnit where
        let x = iuX unit
            theta = iuTheta unit
            phi = iuPhis unit EM.! t
-       when (t `EM.notMember` iuPhis unit) $ liftIO $ putStrLn "unset"
        theta `updateShared` incDirMulti t
        phi `updateShared` incDirMulti x
 

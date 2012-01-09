@@ -54,7 +54,7 @@ run =
   
      liftIO $ putStrLn "Starting inference"
      f <- liftIO $ openFile "log" WriteMode
-     forM_ [1..10000] $ \i ->
+     forM_ [1..] $ \i ->
        do l <- likelihood vars
           liftIO $ putStr $ printf "Sweep %d: %f\n" (i::Int) (logFromLogFloat l :: Double)
           liftIO $ hPutStr f $ printf "%d\t%f\n" (i::Int) (logFromLogFloat l :: Double)
@@ -62,7 +62,7 @@ run =
           --forM (take 3 $ EM.toList $ mThetas vars ) $ \(c,d) -> do d' <- getShared d
           --                                                         liftIO $ print c
           --                                                         liftIO $ print d'
-          concurrentGibbsUpdate 100 ius
+          concurrentGibbsUpdate (SQ.length ius) ius
      liftIO $ hClose f
      liftIO $ putStrLn "Finished"
  
