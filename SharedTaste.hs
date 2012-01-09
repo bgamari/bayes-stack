@@ -193,9 +193,10 @@ likelihood model =
 instance GibbsUpdateUnit ItemUnit where
   type GUValue ItemUnit = (Topic, Node)
   guProb unit (t,f) =
-    do phi <- getShared $ iuPhis unit EM.! t 
+    do psi <- getShared $ iuPsi unit
+       phi <- getShared $ iuPhis unit EM.! t 
        lambda <- getShared $ iuLambdas unit EM.! Friendship (iuN unit, f)
-       return $ probPretend lambda t * probPretend phi (iuX unit) 
+       return $ probPretend psi f * probPretend lambda t * probPretend phi (iuX unit) 
   
   guDomain unit = return $ do t <- S.toList $ iuTopics unit
                               f <- S.toList $ iuFriends unit
@@ -225,8 +226,8 @@ instance GibbsUpdateUnit ItemUnit where
 
 getSharedEnumMap :: Enum a => SharedEnumMap a b -> ModelMonad (EnumMap a b)
 getSharedEnumMap = liftM EM.fromList . mapM (\(k,v)->do v' <- getShared v
-                                                     return (k,v')
-                                         ) . EM.toList
+                                                        return (k,v')
+                                            ) . EM.toList
 
 getModelState :: STModel -> ModelMonad STModelState
 getModelState model =
