@@ -67,7 +67,7 @@ run =
      forM_ [0..10] $ const $
        do l <- likelihood model
           liftIO $ putStr $ printf "Likelihood: %f\n" (logFromLogFloat l :: Double)
-          concurrentGibbsUpdate (SQ.length ius) ius
+          concurrentGibbsUpdate 1 ius
 
      liftIO $ putStrLn "Starting inference"
      f <- liftIO $ openFile "log" WriteMode
@@ -80,7 +80,7 @@ run =
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
               liftIO $ hPutStr f $ printf "%d\t%f\n" sweepN (logFromLogFloat l :: Double)
               liftIO $ hFlush f
-              lift $ concurrentGibbsUpdate (SQ.length ius) ius
+              lift $ concurrentGibbsUpdate 10 ius
 
      S.runStateT (forM_ [0..] gibbsUpdate) 0
 

@@ -62,7 +62,7 @@ run =
           --forM (take 3 $ EM.toList $ mThetas vars ) $ \(c,d) -> do d' <- getShared d
           --                                                         liftIO $ print c
           --                                                         liftIO $ print d'
-          concurrentGibbsUpdate (SQ.length ius) ius
+          concurrentGibbsUpdate 10 ius
      liftIO $ hClose f
      liftIO $ putStrLn "Finished"
  

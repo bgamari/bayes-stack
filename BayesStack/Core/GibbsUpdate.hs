@@ -42,9 +42,9 @@ gibbsUpdateOne :: GibbsUpdateUnit unit => Seq unit -> ModelMonad ()
 gibbsUpdateOne units = liftRVar (randomElementT units) >>= gibbsUpdate
 
 concurrentGibbsUpdate :: GibbsUpdateUnit unit => Int -> Seq unit -> ModelMonad ()
-concurrentGibbsUpdate nIter units =
+concurrentGibbsUpdate nSweeps units =
    do let chunks = chunk numCapabilities units
-      concurrentRunModels $ map (\c->do replicateM nIter $ gibbsUpdateOne c
+      concurrentRunModels $ map (\c->do replicateM (nSweeps*SQ.length c) $ gibbsUpdateOne c
                                         return ()
                                 ) $ toList chunks
 

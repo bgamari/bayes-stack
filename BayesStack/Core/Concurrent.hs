@@ -25,7 +25,7 @@ concurrentRun ms =
   do syncs <- forM ms $ const newEmptyMVar
      forM (zip ms syncs) $ uncurry worker
      forM syncs takeMVar
-  where worker m sync = forkIO $ do m >>= putMVar sync
+  where worker m sync = forkIO $ m >>= putMVar sync
 
 -- | Generate a new seed for MWC RNG
 genSeed :: ModelMonad Seed

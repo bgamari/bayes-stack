@@ -133,7 +133,7 @@ model d =
          nis = EM.fromList $ zipWith (\idx (n,i)->(NodeItem idx, (n,i))) [0..] (toList nodeItems)
          friends :: EnumMap Node (Set Node)
          --friends = map (\n->(n, S.map (otherFriend n) $ S.filter (isFriend n) friendships)) nodes
-         friends = EM.fromList $ map (\n->(n, S.fromList $ mapMaybe (otherFriend n) $ S.toList friendships)) $ S.toList nodes
+         friends = EM.fromList $ map (\n->(n, S.fromList $ getFriends (S.toList friendships) n)) $ S.toList nodes
      psis <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ symDirMulti (stAlphaPsi d) (S.toList nodes)
      lambdas <- newSharedEnumMap (S.toList friendships) $ \n ->
