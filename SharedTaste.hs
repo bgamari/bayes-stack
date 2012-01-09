@@ -92,11 +92,11 @@ data STModel = STModel { mNodes :: Set Node
                        , mItems :: Set Item
                        , mFriendships :: Set Friendship
                        , mNodeItems :: EnumMap NodeItem (Node, Item)
-                       , mPsis :: GatedPlate Node (DirMulti Node)
-                       , mLambdas :: GatedPlate Friendship (DirMulti Topic)
-                       , mPhis :: GatedPlate Topic (DirMulti Item)
-                       , mFs :: GatedPlate NodeItem Node
-                       , mTs :: GatedPlate NodeItem Topic
+                       , mPsis :: SharedEnumMap Node (DirMulti Node)
+                       , mLambdas :: SharedEnumMap Friendship (DirMulti Topic)
+                       , mPhis :: SharedEnumMap Topic (DirMulti Item)
+                       , mFs :: SharedEnumMap NodeItem Node
+                       , mTs :: SharedEnumMap NodeItem Topic
                        }
 
 data STModelState = STModelState { msNodes :: Set Node
@@ -121,8 +121,8 @@ data ItemUnit = ItemUnit { iuTopics :: Set Topic
                          , iuT :: Shared Topic
                          , iuX :: Item
                          , iuPsi :: Shared (DirMulti Node)
-                         , iuLambdas :: GatedPlate Friendship (DirMulti Topic)
-                         , iuPhis :: GatedPlate Topic (DirMulti Item)
+                         , iuLambdas :: SharedEnumMap Friendship (DirMulti Topic)
+                         , iuPhis :: SharedEnumMap Topic (DirMulti Item)
                          }
 
 model :: STData -> ModelMonad (Seq ItemUnit, STModel)
@@ -134,15 +134,15 @@ model d =
          friends :: EnumMap Node (Set Node)
          --friends = map (\n->(n, S.map (otherFriend n) $ S.filter (isFriend n) friendships)) nodes
          friends = EM.fromList $ map (\n->(n, S.fromList $ mapMaybe (otherFriend n) $ S.toList friendships)) $ S.toList nodes
-     psis <- newGatedPlate (S.toList nodes) $ \n ->
+     psis <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ symDirMulti (stAlphaPsi d) (S.toList nodes)
-     lambdas <- newGatedPlate (S.toList friendships) $ \n ->
+     lambdas <- newSharedEnumMap (S.toList friendships) $ \n ->
        return $ symDirMulti (stAlphaLambda d) (S.toList topics)
-     phis <- newGatedPlate (S.toList topics) $ \t ->
+     phis <- newSharedEnumMap (S.toList topics) $ \t ->
        return $ symDirMulti (stAlphaPhi d) (S.toList items)
-     ts <- newGatedPlate (EM.keys nis) $ \ni ->
+     ts <- newSharedEnumMap (EM.keys nis) $ \ni ->
        liftRVar $ randomElementT $ SQ.fromList $ S.toList topics
-     fs <- newGatedPlate (EM.keys nis) $ \ni ->
+     fs <- newSharedEnumMap (EM.keys nis) $ \ni ->
        let (n,i) = nis EM.! ni
        in liftRVar $ randomElementT $ SQ.fromList $ S.toList $ friends EM.! n
   
@@ -223,18 +223,18 @@ instance GibbsUpdateUnit ItemUnit where
        lambda `updateShared` incDirMulti t
        phi `updateShared` incDirMulti x
 
-getGatedPlate :: Enum a => GatedPlate a b -> ModelMonad (EnumMap a b)
-getGatedPlate = liftM EM.fromList . mapM (\(k,v)->do v' <- getShared v
+getSharedEnumMap :: Enum a => SharedEnumMap a b -> ModelMonad (EnumMap a b)
+getSharedEnumMap = liftM EM.fromList . mapM (\(k,v)->do v' <- getShared v
                                                      return (k,v')
                                          ) . EM.toList
 
 getModelState :: STModel -> ModelMonad STModelState
 getModelState model =
-  do psis <- getGatedPlate $ mPsis model
-     lambdas <- getGatedPlate $ mLambdas model
-     phis <- getGatedPlate $ mPhis model
-     fs <- getGatedPlate $ mFs model
-     ts <- getGatedPlate $ mTs model
+  do psis <- getSharedEnumMap $ mPsis model
+     lambdas <- getSharedEnumMap $ mLambdas model
+     phis <- getSharedEnumMap $ mPhis model
+     fs <- getSharedEnumMap $ mFs model
+     ts <- getSharedEnumMap $ mTs model
      l <- likelihood model
      return $ STModelState { msNodes = mNodes model
                            , msTopics = mTopics model

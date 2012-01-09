@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, KindSignatures, ConstraintKinds #-}
 
-module BayesStack.Core.Types ( GatedPlate, newGatedPlate, forPlate
+module BayesStack.Core.Types ( SharedEnumMap, newSharedEnumMap
                              , Probability
                              , ProbDist(..)
                              , PretendableProbDist(..)
@@ -16,23 +16,12 @@ import Control.Monad
 import BayesStack.Core.ModelMonad
 import BayesStack.Core.Shared
 
-type GatedPlate control dist = EnumMap control (Shared dist)
+type SharedEnumMap control dist = EnumMap control (Shared dist)
 
-newGatedPlate :: Enum control => [control] -> (control -> ModelMonad dist) -> ModelMonad (GatedPlate control dist)
-newGatedPlate domain f =
+newSharedEnumMap :: Enum control => [control] -> (control -> ModelMonad dist) -> ModelMonad (SharedEnumMap control dist)
+newSharedEnumMap domain f =
   liftM EM.fromList $ forM domain $ \c -> do d <- f c >>= newShared
                                              return (c, d)
-
-forPlate :: Enum control => GatedPlate control dist -> (control -> dist -> ModelMonad a) -> ModelMonad [(control,a)]
-forPlate gp m = forM (EM.toList gp) $ \(c,d) -> do d' <- getShared d
-                                                   r <- m c d'
-                                                   return (c,r)
-
--- TODO: think through this
---plateIndex :: GatedPlate control dist -> control -> ModelMonad dist
---plateIndex a b = getShared . plateIndex a b
---plateIndex' :: GatedPlate control dist -> control -> ModelMonad (Shared dist)
---plateIndex' = (EM.!)
 
 type Probability = Double
 

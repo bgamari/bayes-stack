@@ -47,9 +47,9 @@ newtype Topic = Topic Int deriving (Show, Eq, Ord, Enum)
 newtype NodeItem = NodeItem Int deriving (Show, Eq, Ord, Enum)
 
 data LDAModel = LDAModel { mNodeItems :: EnumMap NodeItem (Node, Item)
-                         , mThetas :: GatedPlate Node (DirMulti Topic)
-                         , mPhis :: GatedPlate Topic (DirMulti Item)
-                         , mTs :: GatedPlate NodeItem Topic
+                         , mThetas :: SharedEnumMap Node (DirMulti Topic)
+                         , mPhis :: SharedEnumMap Topic (DirMulti Item)
+                         , mTs :: SharedEnumMap NodeItem Topic
                          }
 
 data ItemUnit = ItemUnit { iuNodes :: [Node]
@@ -60,18 +60,18 @@ data ItemUnit = ItemUnit { iuNodes :: [Node]
                          , iuT :: Shared Topic
                          , iuX :: Item
                          , iuTheta :: Shared (DirMulti Topic)
-                         , iuPhis :: GatedPlate Topic (DirMulti Item)
+                         , iuPhis :: SharedEnumMap Topic (DirMulti Item)
                          }
 
 model :: LDAData -> ModelMonad (Seq ItemUnit, LDAModel)
 model d =
   do let LDAData {ldaTopics=topics, ldaNodes=nodes, ldaItems=items, ldaNodeItems=nodeItems} = d
          nis = EM.fromList $ zipWith (\idx (n,i)->(NodeItem idx, (n,i))) [0..] (toList nodeItems)
-     thetas <- newGatedPlate (S.toList nodes) $ \n ->
+     thetas <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ symDirMulti (ldaAlphaTheta d) (S.toList topics)
-     phis <- newGatedPlate (S.toList topics) $ \t ->
+     phis <- newSharedEnumMap (S.toList topics) $ \t ->
        return $ symDirMulti (ldaAlphaPhi d) (S.toList items)
-     ts <- newGatedPlate (EM.keys nis) $ \ni ->
+     ts <- newSharedEnumMap (EM.keys nis) $ \ni ->
        liftRVar $ randomElementT $ SQ.fromList $ S.toList topics
   
      itemUnits <- forM (EM.toList ts) $ \(ni, t) ->
