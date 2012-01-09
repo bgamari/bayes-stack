@@ -1,5 +1,5 @@
 module BayesStack.Core.Concurrent ( concurrentRun
-                                  , concurrentRunModel
+                                  , concurrentRunModels
                                   , chunk
                                   , numCapabilities
                                   ) where
@@ -31,11 +31,11 @@ concurrentRun ms =
 genSeed :: ModelMonad Seed
 genSeed = liftM (toSeed . V.fromList) $ replicateM 256 $ Data.Random.sample stdUniform 
 
-concurrentRunModel :: [ModelMonad ()] -> ModelMonad ()
-concurrentRunModel as =
-  do seeds <- replicateM numCapabilities genSeed 
-     let runChunk (a,seed) = do mwc <- restore seed
-                                runModel a mwc
-     liftIO $ concurrentRun $ map runChunk $ zip as seeds
+concurrentRunModels :: [ModelMonad ()] -> ModelMonad ()
+concurrentRunModels chunks =
+  do seeds <- replicateM (length chunks) genSeed 
+     let runChunk chunk seed = do mwc <- restore seed
+                                  runModel chunk mwc
+     liftIO $ concurrentRun $ zipWith runChunk chunks seeds
      return ()
 

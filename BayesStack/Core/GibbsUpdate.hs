@@ -20,6 +20,7 @@ import BayesStack.Core.ModelMonad
 import BayesStack.Core.Types
 import BayesStack.Core.Concurrent
 
+
 class GibbsUpdateUnit unit where
   type GUValue unit :: *
   guUnset :: unit -> ModelMonad ()
@@ -38,14 +39,12 @@ gibbsUpdate unit =
     
 -- | Randomly sample one of a group of units
 gibbsUpdateOne :: GibbsUpdateUnit unit => Seq unit -> ModelMonad ()
-gibbsUpdateOne units =
-  do a <- liftRVar $ randomElementT units
-     gibbsUpdate a
+gibbsUpdateOne units = liftRVar (randomElementT units) >>= gibbsUpdate
 
 concurrentGibbsUpdate :: GibbsUpdateUnit unit => Int -> Seq unit -> ModelMonad ()
 concurrentGibbsUpdate nIter units =
    do let chunks = chunk numCapabilities units
-      concurrentRunModel $ map (\c->do replicateM nIter $ gibbsUpdateOne c
-                                       return ()
-                               ) $ toList chunks
+      concurrentRunModels $ map (\c->do replicateM nIter $ gibbsUpdateOne c
+                                        return ()
+                                ) $ toList chunks
 
