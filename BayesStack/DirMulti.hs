@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds, DeriveGeneric, DefaultSignatures #-}
 
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
-                             DirMulti(..), symDirMulti
+                             DirMulti(..), dirMulti, symDirMulti
                            , decDirMulti, incDirMulti
                            , prettyDirMulti
                            ) where
@@ -49,12 +49,18 @@ data DirMulti a = SymDirMulti { dmAlpha :: Alpha
                               , dmTotal :: Int
                               , dmRange :: Seq a
                               }
+                | DirMulti { dmAlphas :: EnumMap a Alpha
+                           , dmCounts :: EnumMap a Int
+                           , dmTotal :: Int
+                           , dmRange :: Seq a
+                           }
                   deriving (Show, Eq, Generic)
 
 type Alpha = Double
 
 instance (Enum a, Serialize a) => Serialize (DirMulti a)
 
+-- | Create a symmetric Dirichlet/multinomial pair
 symDirMulti :: Alpha -> [a] -> DirMulti a
 symDirMulti alpha range = SymDirMulti { dmAlpha = alpha
                                       , dmCounts = EM.empty
@@ -62,19 +68,43 @@ symDirMulti alpha range = SymDirMulti { dmAlpha = alpha
                                       , dmRange = SQ.fromList range
                                       }
 
+-- | Create an asymmetric Dirichlet/multinomial pair
+dirMulti :: Enum a => [(a,Alpha)] -> [a] -> DirMulti a
+dirMulti alpha range 
+  | length alpha /= length range = error "Length of dirMulti prior must equal dimensionality of distribution"
+  | otherwise = DirMulti { dmAlphas = EM.fromList alpha
+                         , dmCounts = EM.empty
+                         , dmTotal = 0
+                         , dmRange = SQ.fromList range
+                         }
+
 
 instance ProbDist DirMulti where
   type PdContext DirMulti a = (Ord a, Enum a)
+
   prob dm@(SymDirMulti {dmAlpha=alpha, dmCounts=counts, dmTotal=total}) k =
   	let c = realToFrac $ EM.findWithDefault 0 k counts
+            range = realToFrac $ SQ.length $ dmRange dm
+        in (c + alpha) / (realToFrac total + range * alpha)
+
+  prob dm@(DirMulti {dmCounts=counts, dmTotal=total}) k =
+  	let alpha = dmAlphas dm EM.! k
+            c = realToFrac $ EM.findWithDefault 0 k counts
             range = realToFrac $ SQ.length $ dmRange dm
         in (c + alpha) / (realToFrac total + range * alpha)
   {-# INLINEABLE prob #-}
 
 instance PretendableProbDist DirMulti where
   type PpdContext DirMulti a = (Ord a, Enum a)
+
   probPretend dm@(SymDirMulti {dmAlpha=alpha, dmCounts=counts, dmTotal=total}) k =
   	let c = realToFrac $ EM.findWithDefault 0 k counts
+            range = realToFrac $ SQ.length $ dmRange dm
+        in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
+
+  probPretend dm@(DirMulti {dmCounts=counts, dmTotal=total}) k =
+  	let alpha = dmAlphas dm EM.! k
+            c = realToFrac $ EM.findWithDefault 0 k counts
             range = realToFrac $ SQ.length $ dmRange dm
         in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
   {-# INLINEABLE probPretend #-}
