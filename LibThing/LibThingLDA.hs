@@ -22,7 +22,6 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Class (lift)
 import Control.Monad
   
-import Control.Arrow (second)
 import Data.List
 import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import Data.Function (on)
@@ -44,27 +43,29 @@ import Text.CSV
 
 topics = S.fromList $ map Topic [1..10]
 
+serializeState :: STModel -> FilePath -> ModelMonad ()
+serializeState model fname =
+  do s <- getModelState model
+     liftIO $ BS.writeFile fname $ runPut $ put s
+
 main = withSystemRandom $ runModel run
 run = 
   do let topics = [Topic i | i <- [0..10]]
      (d, wordMap) <- liftIO getTags
      liftIO $ putStrLn "Finished creating network"
-     (ius, vars) <- model d
-     --liftIO $ printf "%d update units\n" (SQ.length ius)
+     (ius, model) <- model d
   
      liftIO $ putStrLn "Starting inference"
-     f <- liftIO $ openFile "log" WriteMode
-     forM_ [1..] $ \i ->
-       do l <- likelihood vars
-          liftIO $ putStr $ printf "Sweep %d: %f\n" (i::Int) (logFromLogFloat l :: Double)
-          liftIO $ hPutStr f $ printf "%d\t%f\n" (i::Int) (logFromLogFloat l :: Double)
-          liftIO $ hFlush f
-          --forM (take 3 $ EM.toList $ mThetas vars ) $ \(c,d) -> do d' <- getShared d
-          --                                                         liftIO $ print c
-          --                                                         liftIO $ print d'
-          concurrentGibbsUpdate 10 ius
-     liftIO $ hClose f
-     liftIO $ putStrLn "Finished"
+     let gibbsUpdate :: Int -> S.StateT LogFloat ModelMonad ()
+         gibbsUpdate sweepN =
+           do l <- lift $ likelihood model
+              lastMax <- S.get
+              when (l > lastMax) $ do lift $ serializeState model $ printf "sweeps/%05d" sweepN
+                                      S.put l
+              liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
+              lift $ concurrentGibbsUpdate 10 ius
+
+     S.runStateT (forM_ [0..] gibbsUpdate) 0
  
 maybeRead :: Read a => String -> Maybe a
 maybeRead = fmap fst . listToMaybe . filter (null . snd) . reads 

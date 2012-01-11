@@ -2,7 +2,7 @@
 
 import BayesStack.Core
 import BayesStack.UniqueKey
-import SharedTaste
+import SharedTasteOwn
 
 import Data.List ((\\))
 
@@ -70,7 +70,6 @@ run =
           concurrentGibbsUpdate 1 ius
 
      liftIO $ putStrLn "Starting inference"
-     f <- liftIO $ openFile "log" WriteMode
      let gibbsUpdate :: Int -> S.StateT LogFloat ModelMonad ()
          gibbsUpdate sweepN =
            do l <- lift $ likelihood model
@@ -78,14 +77,9 @@ run =
               when (l > lastMax) $ do lift $ serializeState model $ printf "sweeps/%05d" sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
-              liftIO $ hPutStr f $ printf "%d\t%f\n" sweepN (logFromLogFloat l :: Double)
-              liftIO $ hFlush f
               lift $ concurrentGibbsUpdate 10 ius
 
      S.runStateT (forM_ [0..] gibbsUpdate) 0
-
-     liftIO $ hClose f
-     liftIO $ putStrLn "Finished"
  
 maybeRead :: Read a => String -> Maybe a
 maybeRead = fmap fst . listToMaybe . filter (null . snd) . reads 
@@ -108,9 +102,11 @@ getTags =
                                             return $ Friendship (Node a, Node b))
                        $ tail csv'
 
-     let d = STData { stAlphaPsi = 0.1
+     let d = STData { stAlphaGamma = [(True, 45.0), (False, 5.0)]
+                    , stAlphaOmega = 1.0
+                    , stAlphaPsi = 1.0
                     , stAlphaLambda = 0.1
-                    , stAlphaPhi = 0.1
+                    , stAlphaPhi = 0.01
                     , stNodes = S.fromList $ nub $ sort $ map fst userTags
                     , stFriendships = S.fromList friendships
                     , stItems = S.fromList $ nub $ sort $ map snd userTags
