@@ -2,7 +2,7 @@
 
 import BayesStack.Core
 import BayesStack.UniqueKey
-import SharedTasteOwn
+import BayesStack.Models.SharedTasteOwn
 
 import Data.List ((\\))
 

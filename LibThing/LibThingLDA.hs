@@ -2,7 +2,7 @@
 
 import BayesStack.Core
 import BayesStack.UniqueKey
-import LDA
+import BayesStack.Models.LDA
 
 import Data.List ((\\))
 
@@ -63,8 +63,8 @@ run =
          gibbsUpdate sweepN =
            do l <- lift $ likelihood model
               lastMax <- S.get
-              when (l > lastMax) $ do lift $ serializeState model $ printf "sweeps/%05d" sweepN
-                                      S.put l
+              --when (l > lastMax) $ do lift $ serializeState model $ printf "sweeps/%05d" sweepN
+              --                        S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
               lift $ concurrentGibbsUpdate 10 ius
 
