@@ -224,11 +224,6 @@ instance GibbsUpdateUnit ItemUnit where
        lambda `updateShared` incDirMulti t
        phi `updateShared` incDirMulti x
 
-getSharedEnumMap :: Enum a => SharedEnumMap a b -> ModelMonad (EnumMap a b)
-getSharedEnumMap = liftM EM.fromList . mapM (\(k,v)->do v' <- getShared v
-                                                        return (k,v')
-                                            ) . EM.toList
-
 getModelState :: STModel -> ModelMonad STModelState
 getModelState model =
   do psis <- getSharedEnumMap $ mPsis model

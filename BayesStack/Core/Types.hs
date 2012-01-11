@@ -1,27 +1,14 @@
 {-# LANGUAGE TypeFamilies, KindSignatures, ConstraintKinds #-}
 
-module BayesStack.Core.Types ( SharedEnumMap, newSharedEnumMap
-                             , Probability
+module BayesStack.Core.Types ( Probability
                              , ProbDist(..)
                              , PretendableProbDist(..)
                              ) where
 
-import Data.EnumMap (EnumMap)
-import qualified Data.EnumMap as EM
-
 import GHC.Prim (Constraint)
-
-import Control.Monad
 
 import BayesStack.Core.ModelMonad
 import BayesStack.Core.Shared
-
-type SharedEnumMap control dist = EnumMap control (Shared dist)
-
-newSharedEnumMap :: Enum control => [control] -> (control -> ModelMonad dist) -> ModelMonad (SharedEnumMap control dist)
-newSharedEnumMap domain f =
-  liftM EM.fromList $ forM domain $ \c -> do d <- f c >>= newShared
-                                             return (c, d)
 
 type Probability = Double
 
