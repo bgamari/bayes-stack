@@ -3,7 +3,7 @@
 module LDA ( LDAData(..)
            , Node(..), Item(..), Topic(..)
            , LDAModel(..), ItemUnit
-           , LDAModelState(..)
+           , LDAModelState(..), getModelState
            , model, likelihood
            ) where
 

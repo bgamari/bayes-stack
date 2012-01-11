@@ -3,7 +3,7 @@ import Control.Monad.Trans.State
 import Data.Function (on)
 
 import Data.Traversable
-import Data.Foldable hiding (elem)
+import Data.Foldable hiding (elem, sum)
 import Data.List (nub)
 import Data.Maybe
 import qualified Data.Set as S

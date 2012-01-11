@@ -19,6 +19,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
 import Control.Monad.IO.Class
+import qualified Control.Monad.Trans.State as S
 import Control.Monad.Trans.Class (lift)
 import Control.Monad
   
@@ -33,7 +34,9 @@ import System.Random.MWC (GenIO, withSystemRandom)
 import System.IO
 
 import Control.Concurrent
-import Control.Concurrent.MVar
+
+import qualified Data.ByteString as BS
+import Data.Serialize
 
 import Data.Number.LogFloat hiding (realToFrac)
 import Text.Printf
@@ -43,7 +46,7 @@ import Text.CSV
 
 topics = S.fromList $ map Topic [1..10]
 
-serializeState :: STModel -> FilePath -> ModelMonad ()
+serializeState :: LDAModel -> FilePath -> ModelMonad ()
 serializeState model fname =
   do s <- getModelState model
      liftIO $ BS.writeFile fname $ runPut $ put s
