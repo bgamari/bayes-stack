@@ -1,13 +1,13 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric #-}
 
-module SharedTaste ( STData(..)
-                   , Node(..), Item(..), Topic(..)
-                   , Friendship(..), otherFriend, isFriend, getFriends
-                   , STModel(..), ItemUnit
-                   , model, likelihood
-                   , STModelState (..), getModelState
-                   ) where
-
+module BayesStack.Models.SharedTasteOwn ( STData(..)
+                                        , Node(..), Item(..), Topic(..)
+                                        , Friendship(..), otherFriend, isFriend, getFriends
+                                        , STModel(..), ItemUnit
+                                        , model, likelihood
+                                        , STModelState (..), getModelState
+                                        ) where
+import Debug.Trace
 import Prelude hiding (mapM)
 
 import Data.EnumMap (EnumMap)
@@ -41,7 +41,9 @@ import Control.Monad.IO.Class
 import Data.Serialize
 import GHC.Generics
 
-data STData = STData { stAlphaPsi :: Double
+data STData = STData { stAlphaGamma :: [(Bool,Double)]
+                     , stAlphaOmega :: Double
+                     , stAlphaPsi :: Double
                      , stAlphaLambda :: Double
                      , stAlphaPhi :: Double
                      , stNodes :: Set Node
@@ -92,9 +94,12 @@ data STModel = STModel { mNodes :: Set Node
                        , mItems :: Set Item
                        , mFriendships :: Set Friendship
                        , mNodeItems :: EnumMap NodeItem (Node, Item)
+                       , mGammas :: SharedEnumMap Node (DirMulti Bool)
+                       , mOmegas :: SharedEnumMap Node (DirMulti Topic)
                        , mPsis :: SharedEnumMap Node (DirMulti Node)
                        , mLambdas :: SharedEnumMap Friendship (DirMulti Topic)
                        , mPhis :: SharedEnumMap Topic (DirMulti Item)
+                       , mSs :: SharedEnumMap NodeItem Bool
                        , mFs :: SharedEnumMap NodeItem Node
                        , mTs :: SharedEnumMap NodeItem Topic
                        }
@@ -104,9 +109,12 @@ data STModelState = STModelState { msNodes :: Set Node
                                  , msItems :: Set Item
                                  , msFriendships :: Set Friendship
                                  , msNodeItems :: EnumMap NodeItem (Node, Item)
+                                 , msGammas :: EnumMap Node (DirMulti Bool)
+                                 , msOmegas :: EnumMap Node (DirMulti Topic)
                                  , msPsis :: EnumMap Node (DirMulti Node)
                                  , msLambdas :: EnumMap Friendship (DirMulti Topic)
                                  , msPhis :: EnumMap Topic (DirMulti Item)
+                                 , msSs :: EnumMap NodeItem Bool
                                  , msFs :: EnumMap NodeItem Node
                                  , msTs :: EnumMap NodeItem Topic
                                  , msLogLikelihood :: Double
@@ -117,12 +125,16 @@ data ItemUnit = ItemUnit { iuTopics :: Set Topic
                          , iuNodeItem :: NodeItem
                          , iuFriends :: Set Node
                          , iuN :: Node
+                         , iuS :: Shared Bool
                          , iuF :: Shared Node
                          , iuT :: Shared Topic
                          , iuX :: Item
+                         , iuGamma :: Shared (DirMulti Bool)
+                         , iuOmega :: Shared (DirMulti Topic)
                          , iuPsi :: Shared (DirMulti Node)
                          , iuLambdas :: SharedEnumMap Friendship (DirMulti Topic)
                          , iuPhis :: SharedEnumMap Topic (DirMulti Item)
+                         , iuNormalizer :: Shared Double
                          }
 
 model :: STData -> ModelMonad (Seq ItemUnit, STModel)
@@ -134,12 +146,18 @@ model d =
          friends :: EnumMap Node (Set Node)
          --friends = map (\n->(n, S.map (otherFriend n) $ S.filter (isFriend n) friendships)) nodes
          friends = EM.fromList $ map (\n->(n, S.fromList $ getFriends (S.toList friendships) n)) $ S.toList nodes
+     gammas <- newSharedEnumMap (S.toList nodes) $ \n ->
+       return $ dirMulti (stAlphaGamma d) [True, False]
+     omegas <- newSharedEnumMap (S.toList nodes) $ \n ->
+       return $ symDirMulti (stAlphaOmega d) (S.toList topics)
      psis <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ symDirMulti (stAlphaPsi d) (S.toList nodes)
      lambdas <- newSharedEnumMap (S.toList friendships) $ \n ->
        return $ symDirMulti (stAlphaLambda d) (S.toList topics)
      phis <- newSharedEnumMap (S.toList topics) $ \t ->
        return $ symDirMulti (stAlphaPhi d) (S.toList items)
+     ss <- newSharedEnumMap (EM.keys nis) $ \ni ->
+       liftRVar $ randomElementT $ SQ.fromList [True,False]
      ts <- newSharedEnumMap (EM.keys nis) $ \ni ->
        liftRVar $ randomElementT $ SQ.fromList $ S.toList topics
      fs <- newSharedEnumMap (EM.keys nis) $ \ni ->
@@ -147,32 +165,42 @@ model d =
        in liftRVar $ randomElementT $ SQ.fromList $ S.toList $ friends EM.! n
   
      itemUnits <- forM (EM.keys nis) $ \ni ->
-       do let t = ts EM.! ni
+       do let (n,x) = nis EM.! ni
+              s = ss EM.! ni
+              t = ts EM.! ni
               f = fs EM.! ni
-              (n,x) = nis EM.! ni
+          norm <- newShared 0
           let unit = ItemUnit { iuTopics = topics
                               , iuNodeItem = ni
                               , iuFriends = friends EM.! n
                               , iuN = n
+                              , iuS = s
                               , iuF = f
                               , iuT = t
                               , iuX = x
+                              , iuGamma = gammas EM.! n
+                              , iuOmega = omegas EM.! n
                               , iuPsi = psis EM.! n
                               , iuLambdas = EM.filterWithKey (\k _->isFriend n k) lambdas
                               , iuPhis = phis
+                              , iuNormalizer = norm
                               }
+          s' <- getShared s
           t' <- getShared t
           f' <- getShared f
-          guSet unit (t',f')
+          guSet unit (s',t',f')
           return unit
      let model = STModel { mNodes = nodes
                          , mTopics = topics
                          , mItems = items
                          , mFriendships = friendships
                          , mNodeItems = nis
+                         , mGammas = gammas
+                         , mOmegas = omegas
                          , mPsis = psis
                          , mLambdas = lambdas
                          , mPhis = phis
+                         , mSs = ss
                          , mFs = fs
                          , mTs = ts }
      return (SQ.fromList itemUnits, model)
@@ -182,53 +210,81 @@ likelihood model =
   do a <- forM (EM.toList $ mNodeItems model) $ \(ni, (n,x)) ->
        do t <- getShared $ mTs model EM.! ni 
           f <- getShared $ mFs model EM.! ni 
+          s <- getShared $ mSs model EM.! ni 
+          gamma <- getShared $ mGammas model EM.! n
+          omega <- getShared $ mOmegas model EM.! n
           psi <- getShared $ mPsis model EM.! n
           lambda <- getShared $ mLambdas model EM.! Friendship (n,f)
           phi <- getShared $ mPhis model EM.! t
-          return $ Product $ logFloat (prob psi f)
-                           * logFloat (prob lambda t)
-                           * logFloat (prob phi x)
+          if s then return $ Product $ logFloat (prob gamma s)
+                                     * logFloat (prob psi f)
+                                     * logFloat (prob lambda t)
+                                     * logFloat (prob phi x)
+               else return $ Product $ logFloat (prob gamma s)
+                                     * logFloat (prob omega t)
+                                     * logFloat (prob phi x)
      return $ getProduct $ mconcat a
 
 instance GibbsUpdateUnit ItemUnit where
-  type GUValue ItemUnit = (Topic, Node)
-  guProb unit (t,f) =
-    do psi <- getShared $ iuPsi unit
+  type GUValue ItemUnit = (Bool, Topic, Node)
+  guProb unit (s,t,f) =
+    do gamma <- getShared $ iuGamma unit
+       omega <- getShared $ iuOmega unit
+       psi <- getShared $ iuPsi unit
        phi <- getShared $ iuPhis unit EM.! t 
        lambda <- getShared $ iuLambdas unit EM.! Friendship (iuN unit, f)
-       return $ probPretend psi f * probPretend lambda t * probPretend phi (iuX unit) 
+       if s then return $ probPretend gamma s * probPretend psi f * probPretend lambda t * probPretend phi (iuX unit) 
+            else return $ probPretend gamma s * probPretend omega t * probPretend phi (iuX unit)
   
-  guDomain unit = return $ do t <- S.toList $ iuTopics unit
-                              f <- S.toList $ iuFriends unit
-                              return (t,f)
+  guNormalizer = iuNormalizer
+  guDomain unit = return $ (do t <- S.toList $ iuTopics unit
+                               f <- S.toList $ iuFriends unit
+                               return (True,t,f))
+                        ++ (do t <- S.toList $ iuTopics unit
+                               let f = head $ S.toList $ iuFriends unit
+                               return (False,t,f))
   
   guUnset unit =
-    do t <- getShared $ iuT unit 
+    do s <- getShared $ iuS unit 
+       t <- getShared $ iuT unit 
        f <- getShared $ iuF unit 
        let x = iuX unit
+           gamma = iuGamma unit
+           omega = iuOmega unit
            psi = iuPsi unit
            lambda = iuLambdas unit EM.! Friendship (iuN unit, f)
            phi = iuPhis unit EM.! t
-       psi `updateShared` decDirMulti f
-       lambda `updateShared` decDirMulti t
-       phi `updateShared` decDirMulti x
+       gamma `updateShared` decDirMulti s
+       if s then do psi `updateShared` decDirMulti f
+                    lambda `updateShared` decDirMulti t
+                    phi `updateShared` decDirMulti x
+            else do omega `updateShared` decDirMulti t
+       return (s,t,f)
   
-  guSet unit (t,f) =
-    do iuT unit `setShared` t
+  guSet unit (s,t,f) =
+    do iuS unit `setShared` s
+       iuT unit `setShared` t
        iuF unit `setShared` f
        let x = iuX unit
+           gamma = iuGamma unit
+           omega = iuOmega unit
            psi = iuPsi unit
            lambda = iuLambdas unit EM.! Friendship (iuN unit, f)
            phi = iuPhis unit EM.! t
-       psi `updateShared` incDirMulti f
-       lambda `updateShared` incDirMulti t
-       phi `updateShared` incDirMulti x
+       gamma `updateShared` incDirMulti s
+       if s then do psi `updateShared` incDirMulti f
+                    lambda `updateShared` incDirMulti t
+                    phi `updateShared` incDirMulti x
+            else do omega `updateShared` incDirMulti t
 
 getModelState :: STModel -> ModelMonad STModelState
 getModelState model =
-  do psis <- getSharedEnumMap $ mPsis model
+  do gammas <- getSharedEnumMap $ mGammas model
+     omegas <- getSharedEnumMap $ mOmegas model
+     psis <- getSharedEnumMap $ mPsis model
      lambdas <- getSharedEnumMap $ mLambdas model
      phis <- getSharedEnumMap $ mPhis model
+     ss <- getSharedEnumMap $ mSs model
      fs <- getSharedEnumMap $ mFs model
      ts <- getSharedEnumMap $ mTs model
      l <- likelihood model
@@ -237,10 +293,14 @@ getModelState model =
                            , msItems = mItems model
                            , msFriendships = mFriendships model
                            , msNodeItems = mNodeItems model
+                           , msGammas = gammas
+                           , msOmegas = omegas
                            , msPsis = psis
                            , msLambdas = lambdas
                            , msPhis = phis
+                           , msSs = ss
                            , msFs = fs
                            , msTs = ts
                            , msLogLikelihood = logFromLogFloat l
                            }
+
