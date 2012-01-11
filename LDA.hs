@@ -1,8 +1,9 @@
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric #-}
 
 module LDA ( LDAData(..)
            , Node(..), Item(..), Topic(..)
            , LDAModel(..), ItemUnit
+           , LDAModelState(..)
            , model, likelihood
            ) where
 
@@ -29,6 +30,9 @@ import BayesStack.Categorical
 import BayesStack.DirMulti
 import BayesStack.TupleEnum
 
+import GHC.Generics
+import Data.Serialize
+
 import Control.Monad (when)
 import Control.Monad.IO.Class
 
@@ -39,22 +43,37 @@ data LDAData = LDAData { ldaAlphaTheta :: Double
                        , ldaTopics :: Set Topic
                        , ldaNodeItems :: Seq (Node, Item)
                        }
-               deriving (Show, Eq)
+               deriving (Show, Eq, Generic)
+instance Serialize LDAData
 
-newtype Node = Node Int deriving (Show, Eq, Ord, Enum)
-newtype Item = Item Int deriving (Show, Eq, Ord, Enum)
-newtype Topic = Topic Int deriving (Show, Eq, Ord, Enum)
-newtype NodeItem = NodeItem Int deriving (Show, Eq, Ord, Enum)
+newtype Node = Node Int deriving (Show, Eq, Ord, Enum, Generic)
+newtype Item = Item Int deriving (Show, Eq, Ord, Enum, Generic)
+newtype Topic = Topic Int deriving (Show, Eq, Ord, Enum, Generic)
+newtype NodeItem = NodeItem Int deriving (Show, Eq, Ord, Enum, Generic)
 
-data LDAModel = LDAModel { mNodeItems :: EnumMap NodeItem (Node, Item)
+instance Serialize Node
+instance Serialize Item
+instance Serialize Topic
+instance Serialize NodeItem
+
+data LDAModel = LDAModel { mData :: LDAData
+                         , mNodeItems :: EnumMap NodeItem (Node, Item)
                          , mThetas :: SharedEnumMap Node (DirMulti Topic)
                          , mPhis :: SharedEnumMap Topic (DirMulti Item)
                          , mTs :: SharedEnumMap NodeItem Topic
-                         }
+                         } deriving (Generic)
 
-data ItemUnit = ItemUnit { iuNodes :: [Node]
-                         , iuTopics :: [Topic]
-                         , iuItems :: [Item]
+data LDAModelState = LDAModelState { msData :: LDAData
+                                   , msNodeItems :: EnumMap NodeItem (Node, Item)
+                                   , msThetas :: EnumMap Node (DirMulti Topic)
+                                   , msPhis :: EnumMap Topic (DirMulti Item)
+                                   , msTs :: EnumMap NodeItem Topic
+                                   , msLogLikelihood :: Double
+                                   }
+                     deriving (Show, Generic)
+instance Serialize LDAModelState
+
+data ItemUnit = ItemUnit { iuData :: LDAData
                          , iuNodeItem :: NodeItem
                          , iuN :: Node
                          , iuT :: Shared Topic
@@ -76,9 +95,7 @@ model d =
   
      itemUnits <- forM (EM.toList ts) $ \(ni, t) ->
        do let (n,x) = nis EM.! ni
-          let unit = ItemUnit { iuNodes = S.toList nodes
-                              , iuTopics = S.toList topics
-                              , iuItems = S.toList items
+          let unit = ItemUnit { iuData = d 
                               , iuNodeItem = ni
                               , iuN = n
                               , iuT = t
@@ -88,7 +105,8 @@ model d =
                               }
           getShared t >>= guSet unit
           return unit
-     let model = LDAModel { mNodeItems = nis
+     let model = LDAModel { mData = d
+                          , mNodeItems = nis
                           , mThetas = thetas
                           , mPhis = phis
                           , mTs = ts }
@@ -113,7 +131,7 @@ instance GibbsUpdateUnit ItemUnit where
        let ph = probPretend phi (iuX unit) 
        return $ th * ph
   
-  guDomain = return . iuTopics
+  guDomain = return . S.toList . ldaTopics . iuData
   
   guUnset unit =
     do t <- getShared $ iuT unit 
@@ -131,3 +149,16 @@ instance GibbsUpdateUnit ItemUnit where
        theta `updateShared` incDirMulti t
        phi `updateShared` incDirMulti x
 
+getModelState :: LDAModel -> ModelMonad LDAModelState
+getModelState model =
+  do thetas <- getSharedEnumMap $ mThetas model
+     phis <- getSharedEnumMap $ mPhis model
+     ts <- getSharedEnumMap $ mTs model
+     l <- likelihood model
+     return $ LDAModelState { msData = mData model 
+                            , msNodeItems = mNodeItems model
+                            , msThetas = thetas
+                            , msPhis = phis
+                            , msTs = ts
+                            , msLogLikelihood = logFromLogFloat l
+                            }
