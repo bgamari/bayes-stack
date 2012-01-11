@@ -63,12 +63,6 @@ run =
 
      liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
   
-     liftIO $ putStrLn "Burn-in"
-     forM_ [0..10] $ const $
-       do l <- likelihood model
-          liftIO $ putStr $ printf "Likelihood: %f\n" (logFromLogFloat l :: Double)
-          concurrentGibbsUpdate 1 ius
-
      liftIO $ putStrLn "Starting inference"
      let gibbsUpdate :: Int -> S.StateT LogFloat ModelMonad ()
          gibbsUpdate sweepN =
