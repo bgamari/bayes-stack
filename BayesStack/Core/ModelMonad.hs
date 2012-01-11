@@ -2,7 +2,8 @@
 
 module BayesStack.Core.ModelMonad ( ModelMonad(..)
                                   , runModel
-                                  , liftRVar) where
+                                  , liftRVar, liftRVarT
+                                  ) where
 
 import Data.Random.Internal.Source
 import qualified Data.Random.Lift
