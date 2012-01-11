@@ -47,12 +47,12 @@ incDirMulti k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
 data DirMulti a = SymDirMulti { dmAlpha :: Alpha
                               , dmCounts :: EnumMap a Int
                               , dmTotal :: Int
-                              , dmRange :: Seq a
+                              , dmDomain :: Seq a
                               }
                 | DirMulti { dmAlphas :: EnumMap a Alpha
                            , dmCounts :: EnumMap a Int
                            , dmTotal :: Int
-                           , dmRange :: Seq a
+                           , dmDomain :: Seq a
                            }
                   deriving (Show, Eq, Generic)
 
@@ -65,7 +65,7 @@ symDirMulti :: Alpha -> [a] -> DirMulti a
 symDirMulti alpha range = SymDirMulti { dmAlpha = alpha
                                       , dmCounts = EM.empty
                                       , dmTotal = 0
-                                      , dmRange = SQ.fromList range
+                                      , dmDomain = SQ.fromList range
                                       }
 
 -- | Create an asymmetric Dirichlet/multinomial pair
@@ -75,7 +75,7 @@ dirMulti alpha range
   | otherwise = DirMulti { dmAlphas = EM.fromList alpha
                          , dmCounts = EM.empty
                          , dmTotal = 0
-                         , dmRange = SQ.fromList range
+                         , dmDomain = SQ.fromList range
                          }
 
 
@@ -84,13 +84,13 @@ instance ProbDist DirMulti where
 
   prob dm@(SymDirMulti {dmAlpha=alpha, dmCounts=counts, dmTotal=total}) k =
   	let c = realToFrac $ EM.findWithDefault 0 k counts
-            range = realToFrac $ SQ.length $ dmRange dm
+            range = realToFrac $ SQ.length $ dmDomain dm
         in (c + alpha) / (realToFrac total + range * alpha)
 
   prob dm@(DirMulti {dmCounts=counts, dmTotal=total}) k =
   	let alpha = dmAlphas dm EM.! k
             c = realToFrac $ EM.findWithDefault 0 k counts
-            range = realToFrac $ SQ.length $ dmRange dm
+            range = realToFrac $ SQ.length $ dmDomain dm
         in (c + alpha) / (realToFrac total + range * alpha)
   {-# INLINEABLE prob #-}
 
@@ -99,19 +99,19 @@ instance PretendableProbDist DirMulti where
 
   probPretend dm@(SymDirMulti {dmAlpha=alpha, dmCounts=counts, dmTotal=total}) k =
   	let c = realToFrac $ EM.findWithDefault 0 k counts
-            range = realToFrac $ SQ.length $ dmRange dm
+            range = realToFrac $ SQ.length $ dmDomain dm
         in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
 
   probPretend dm@(DirMulti {dmCounts=counts, dmTotal=total}) k =
   	let alpha = dmAlphas dm EM.! k
             c = realToFrac $ EM.findWithDefault 0 k counts
-            range = realToFrac $ SQ.length $ dmRange dm
+            range = realToFrac $ SQ.length $ dmDomain dm
         in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
   {-# INLINEABLE probPretend #-}
 
 {-# INLINEABLE probabilities #-}
 probabilities :: (Ord a, Enum a) => DirMulti a -> Seq (Double, a)
-probabilities dm = fmap (\a->(prob dm a, a)) $ dmRange dm
+probabilities dm = fmap (\a->(prob dm a, a)) $ dmDomain dm
 
 prettyDirMulti :: (Ord a, Enum a, Show a) => Int -> (a -> String) -> DirMulti a -> Doc
 prettyDirMulti n showA dm =
