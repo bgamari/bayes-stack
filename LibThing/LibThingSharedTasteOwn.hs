@@ -2,7 +2,7 @@
 
 import BayesStack.Core
 import BayesStack.UniqueKey
-import BayesStack.Models.SharedTaste
+import BayesStack.Models.SharedTasteOwn
 
 import Data.List ((\\))
 
@@ -95,7 +95,9 @@ getTags =
                                             return $ Friendship (Node a, Node b))
                        $ tail csv'
 
-     let d = STData { stAlphaPsi = 5.0
+     let d = STData { stAlphaGamma = [(True, 45.0), (False, 5.0)]
+                    , stAlphaOmega = 1.0
+                    , stAlphaPsi = 1.0
                     , stAlphaLambda = 0.1
                     , stAlphaPhi = 0.01
                     , stNodes = S.fromList $ nub $ sort $ map fst userTags
