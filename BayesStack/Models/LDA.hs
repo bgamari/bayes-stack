@@ -27,7 +27,7 @@ import Data.Number.LogFloat
 
 import BayesStack.Core
 import BayesStack.Categorical
-import BayesStack.SortedDirMulti
+import BayesStack.DirMulti
 import BayesStack.TupleEnum
 
 import GHC.Generics
@@ -80,7 +80,6 @@ data ItemUnit = ItemUnit { iuData :: LDAData
                          , iuX :: Item
                          , iuTheta :: Shared (DirMulti Topic)
                          , iuPhis :: SharedEnumMap Topic (DirMulti Item)
-                         , iuNormalizer :: Shared Double
                          }
 
 model :: LDAData -> ModelMonad (Seq ItemUnit, LDAModel)
@@ -104,7 +103,6 @@ model d =
                               , iuX = x
                               , iuTheta = thetas EM.! n
                               , iuPhis = phis
-                              , iuNormalizer = norm
                               }
           getShared t >>= guSet unit
           return unit
@@ -134,8 +132,7 @@ instance GibbsUpdateUnit ItemUnit where
        let ph = probPretend phi (iuX unit) 
        return $ th * ph
   
-  guNormalizer = iuNormalizer
-  guDomain unit = getShared (iuTheta unit) >>= return . descDomain
+  guDomain = return . S.toList . ldaTopics . iuData
   
   guUnset unit =
     do t <- getShared $ iuT unit 
@@ -144,7 +141,6 @@ instance GibbsUpdateUnit ItemUnit where
            phi = iuPhis unit EM.! t
        theta `updateShared` decDirMulti t
        phi `updateShared` decDirMulti x
-       return t
   
   guSet unit t =
     do iuT unit `setShared` t
