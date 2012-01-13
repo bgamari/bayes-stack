@@ -1,4 +1,4 @@
-{-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE OverlappingInstances, DeriveDataTypeable #-}
 
 import BayesStack.Core
 import BayesStack.UniqueKey
@@ -46,7 +46,21 @@ import Text.Printf
 import Data.Hashable
 import Text.CSV
 
-topics = S.fromList $ map Topic [1..10]
+import System.Console.CmdArgs
+
+data LibThingST = LibThingST { psi :: Double
+                             , lambda :: Double
+                             , phi :: Double
+                             , topics :: Int
+                             , sweeps_dir :: FilePath
+                             } deriving (Show, Data, Typeable)
+
+libThingST = LibThingST { psi = 0.1 &= help "Alpha psi"
+                        , lambda = 0.1 &= help "Alpha lambda"
+                        , phi = 0.1 &= help "Alpha phi"
+                        , topics = 10 &= help "Number of topics"
+                        , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
+                        }
 
 serializeState :: STModel -> FilePath -> ModelMonad ()
 serializeState model fname =
@@ -55,7 +69,13 @@ serializeState model fname =
 
 main = withSystemRandom $ runModel run
 run = 
-  do (d, wordMap) <- liftIO getTags
+  do args <- liftIO $ cmdArgs libThingST
+     (d', wordMap) <- liftIO getTags
+     let d = d' { stAlphaPsi = psi args
+                , stAlphaLambda = lambda args
+                , stAlphaPhi = phi args
+                , stTopics = S.fromList $ map Topic [1..topics args]
+                }
      liftIO $ putStrLn "Finished creating network"
      (ius, model) <- model d
      liftIO $ putStr $ printf "%d update units\n" (SQ.length ius)
@@ -67,7 +87,7 @@ run =
          gibbsUpdate sweepN =
            do l <- lift $ likelihood model
               lastMax <- S.get
-              when (l > lastMax) $ do lift $ serializeState model $ printf "sweeps/%05d" sweepN
+              when (l > lastMax) $ do lift $ serializeState model $ printf "%s/%05d" (sweeps_dir args) sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
               lift $ concurrentGibbsUpdate 10 ius
@@ -101,7 +121,7 @@ getTags =
                     , stNodes = S.fromList $ nub $ sort $ map fst userTags
                     , stFriendships = S.fromList friendships
                     , stItems = S.fromList $ nub $ sort $ map snd userTags
-                    , stTopics = topics
+                    , stTopics = S.empty
                     , stNodeItems = SQ.fromList userTags
                     }
      return (d, wordMap)
