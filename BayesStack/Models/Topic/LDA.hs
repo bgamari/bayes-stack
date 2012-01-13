@@ -1,11 +1,12 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric #-}
 
-module BayesStack.Models.LDA ( LDAData(..)
-                             , Node(..), Item(..), Topic(..)
-                             , LDAModel(..), ItemUnit
-                             , LDAModelState(..), getModelState
-                             , model, likelihood
-                             ) where
+module BayesStack.Models.Topic.LDA
+  ( LDAData(..)
+  , Node(..), Item(..), Topic(..)
+  , LDAModel(..), ItemUnit
+  , LDAModelState(..), getModelState
+  , model, likelihood
+  ) where
 
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
@@ -29,6 +30,7 @@ import BayesStack.Core
 import BayesStack.Categorical
 import BayesStack.DirMulti
 import BayesStack.TupleEnum
+import BayesStack.Models.Topic.Types
 
 import GHC.Generics
 import Data.Serialize
@@ -45,16 +47,6 @@ data LDAData = LDAData { ldaAlphaTheta :: Double
                        }
                deriving (Show, Eq, Generic)
 instance Serialize LDAData
-
-newtype Node = Node Int deriving (Show, Eq, Ord, Enum, Generic)
-newtype Item = Item Int deriving (Show, Eq, Ord, Enum, Generic)
-newtype Topic = Topic Int deriving (Show, Eq, Ord, Enum, Generic)
-newtype NodeItem = NodeItem Int deriving (Show, Eq, Ord, Enum, Generic)
-
-instance Serialize Node
-instance Serialize Item
-instance Serialize Topic
-instance Serialize NodeItem
 
 data LDAModel = LDAModel { mData :: LDAData
                          , mNodeItems :: EnumMap NodeItem (Node, Item)

@@ -15,7 +15,7 @@ import Data.Serialize
 import BayesStack.Core
 import BayesStack.DirMulti
 import System.Environment
-import BayesStack.Models.LDA
+import BayesStack.Models.Topic.LDA
 
 import Text.CSV
 import Text.PrettyPrint

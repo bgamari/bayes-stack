@@ -13,7 +13,7 @@ import qualified Data.ByteString as BS
 import Text.Dot 
 import Text.Printf
 
-import BayesStack.Models.SharedTaste
+import BayesStack.Models.Topic.SharedTaste
 import BayesStack.UniqueKey
 import BayesStack.Core
 

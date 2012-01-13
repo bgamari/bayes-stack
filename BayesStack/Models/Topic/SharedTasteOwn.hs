@@ -1,13 +1,14 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric #-}
 
-module BayesStack.Models.SharedTasteOwn ( STData(..)
-                                        , Node(..), Item(..), Topic(..)
-                                        , Friendship(..), otherFriend, isFriend, getFriends
-                                        , STModel(..), ItemUnit
-                                        , model, likelihood
-                                        , STModelState (..), getModelState
-                                        ) where
-import Debug.Trace
+module BayesStack.Models.Topic.SharedTasteOwn
+  ( STData(..)
+  , Node(..), Item(..), Topic(..)
+  , Friendship(..), otherFriend, isFriend, getFriends
+  , STModel(..), ItemUnit
+  , model, likelihood
+  , STModelState (..), getModelState
+  ) where
+
 import Prelude hiding (mapM)
 
 import Data.EnumMap (EnumMap)
@@ -34,6 +35,7 @@ import BayesStack.Core
 import BayesStack.Categorical
 import BayesStack.DirMulti
 import BayesStack.TupleEnum
+import BayesStack.Models.Topic.Types
 
 import Control.Monad (when)
 import Control.Monad.IO.Class
@@ -53,41 +55,6 @@ data STData = STData { stAlphaGamma :: [(Bool,Double)]
                      , stNodeItems :: Seq (Node, Item)
                      }
                deriving (Show, Eq)
-
-newtype Node = Node Int deriving (Show, Eq, Ord, Enum, Generic)
-newtype Item = Item Int deriving (Show, Eq, Ord, Enum, Generic)
-newtype Topic = Topic Int deriving (Show, Eq, Ord, Enum, Generic)
-newtype NodeItem = NodeItem Int deriving (Show, Eq, Ord, Enum, Generic)
-newtype Friendship = Friendship (Node, Node) deriving (Show, Generic)
-
-instance Serialize Node
-instance Serialize Item
-instance Serialize Topic
-instance Serialize NodeItem
-instance Serialize Friendship
-
-instance Eq Friendship where
-  (Friendship (a,b)) == (Friendship (c,d)) = (a == c && b == d) || (a == d && b == c)
-instance Enum Friendship where
-  fromEnum (Friendship (a,b)) = let a' = min a b
-                                    b' = max a b
-                                in 2^32 * fromEnum a' + fromEnum b'
-  toEnum n = let (na, nb) = n `quotRem` (2^32)
-             in Friendship (toEnum na, toEnum nb)
-instance Ord Friendship where
-  compare = compare `on` fromEnum
-
-otherFriend :: Node -> Friendship -> Maybe Node
-otherFriend u (Friendship (a,b))
-  | u == a     = Just b
-  | u == b     = Just a
-  | otherwise  = Nothing
-
-isFriend :: Node -> Friendship -> Bool
-isFriend u fs = isJust $ otherFriend u fs
-
-getFriends :: [Friendship] -> Node -> [Node]
-getFriends fs u = mapMaybe (otherFriend u) fs
 
 data STModel = STModel { mNodes :: Set Node
                        , mTopics :: Set Topic

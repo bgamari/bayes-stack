@@ -2,7 +2,7 @@
 
 import BayesStack.Core
 import BayesStack.UniqueKey
-import BayesStack.Models.LDA
+import BayesStack.Models.Topic.LDA
 
 import Data.List ((\\))
 
