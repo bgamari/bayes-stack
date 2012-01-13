@@ -1,10 +1,10 @@
 {-# LANGUAGE OverlappingInstances #-}
 
 import BayesStack.Core
-import BayesStack.UniqueKey
 import BayesStack.Models.Topic.SharedTasteOwn
+import LibThing.Data
 
-import Data.List ((\\))
+import Data.List ((\\), nub, sort)
 
 import Data.Set (Set)
 import qualified Data.Set as S
@@ -23,28 +23,18 @@ import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State as S
 import Control.Monad
   
-import Control.Arrow (second)
-import Data.List
-import Data.Maybe (catMaybes, fromMaybe, listToMaybe, mapMaybe)
-import Data.Function (on)
-import Data.Char (toLower)
-  
 import Data.Random
 import System.Random.MWC (GenIO, withSystemRandom)
 
 import System.IO
 
 import Control.Concurrent
-import Control.Concurrent.MVar
 
 import qualified Data.ByteString as BS
 import Data.Serialize
 
 import Data.Number.LogFloat hiding (realToFrac)
 import Text.Printf
-  
-import Data.Hashable
-import Text.CSV
 
 topics = S.fromList $ map Topic [1..10]
 
@@ -74,27 +64,10 @@ run =
 
      S.runStateT (forM_ [0..] gibbsUpdate) 0
  
-maybeRead :: Read a => String -> Maybe a
-maybeRead = fmap fst . listToMaybe . filter (null . snd) . reads 
-
 getTags :: IO (STData, Map Item String)
 getTags =
-  do f <- parseCSVFromFile "tags_for_users.csv"
-     let csv = either (error . show) id f
-         records = mapMaybe (\rec -> do a <- maybeRead $ rec !! 0
-                                        return (a, map toLower $ rec !! 6))
-                   $ tail csv
-         (userTags, wordMap) = runUniqueKey $ forM records $ \(n,i) -> do k <- uniqueKey Item i
-                                                                          return (Node n, k)
-
-     f' <- parseCSVFromFile "edges_with_profile.csv"
-     let csv' = either (error . show) id f'
-         friendships = mapMaybe (\rec -> do when (length rec < 10) Nothing
-                                            a <- maybeRead $ rec !! 8
-                                            b <- maybeRead $ rec !! 9
-                                            return $ Friendship (Node a, Node b))
-                       $ tail csv'
-
+  do friendships <- readFriendships
+     (userTags, wordMap) <- readTags
      let d = STData { stAlphaGamma = [(True, 45.0), (False, 5.0)]
                     , stAlphaOmega = 1.0
                     , stAlphaPsi = 1.0
