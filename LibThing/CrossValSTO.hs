@@ -42,7 +42,7 @@ main =
         otherwise -> return ()
      let Right state = s
 
-     userGroups <- getUserGroups state
+     userGroups <- readUserGroups
      let groups = nub $ map snd userGroups
      forM_ groups $ \g@(Group n) ->
        do f <- openFile (printf "group%d" n) WriteMode
