@@ -11,31 +11,17 @@ import qualified Data.ByteString as BS
 import qualified Data.EnumMap as EM
 
 import System.IO
+import System.Environment
 import Data.Serialize
+
 import BayesStack.Core
 import BayesStack.DirMulti
-import System.Environment
 import BayesStack.Models.Topic.LDA
+import LibThing.Data
 
 import Text.CSV
 import Text.PrettyPrint
 import Text.Printf
-
-maybeInc Nothing = Just 1
-maybeInc (Just n) = Just (n+1)
-
-newtype Group = Group Int deriving (Show, Eq)
-
-maybeRead :: Read a => String -> Maybe a
-maybeRead = fmap fst . listToMaybe . filter (null . snd) . reads 
-
-getUserGroups :: LDAModelState -> IO [(Node, Group)]
-getUserGroups state =
-  do csv <- liftM (either (error . show) id) $ parseCSVFromFile "r_usergroups_members.csv"
-     return $ mapMaybe (\rec -> do u <- maybeRead $ rec !! 0
-                                   g <- maybeRead $ rec !! 2
-                                   return (Node u, Group g))
-              $ tail csv
 
 main =
   do f:_ <- getArgs
