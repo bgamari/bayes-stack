@@ -15,7 +15,7 @@ import Data.Serialize
 import BayesStack.Core
 import BayesStack.DirMulti
 import System.Environment
-import SharedTasteOwn
+import BayesStack.Models.SharedTasteOwn
 
 import Text.CSV
 import Text.PrettyPrint

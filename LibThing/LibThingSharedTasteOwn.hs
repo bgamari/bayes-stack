@@ -1,8 +1,8 @@
-{-# LANGUAGE OverlappingInstances, DeriveDataTypeable #-}
+{-# LANGUAGE OverlappingInstances #-}
 
 import BayesStack.Core
 import BayesStack.UniqueKey
-import BayesStack.Models.SharedTaste
+import BayesStack.Models.SharedTasteOwn
 
 import Data.List ((\\))
 
@@ -46,21 +46,7 @@ import Text.Printf
 import Data.Hashable
 import Text.CSV
 
-import System.Console.CmdArgs
-
-data LibThingST = LibThingST { psi :: Double
-                             , lambda :: Double
-                             , phi :: Double
-                             , topics :: Int
-                             , sweeps_dir :: FilePath
-                             } deriving (Show, Data, Typeable)
-
-libThingST = LibThingST { psi = 0.1 &= help "Alpha psi"
-                        , lambda = 0.1 &= help "Alpha lambda"
-                        , phi = 0.1 &= help "Alpha phi"
-                        , topics = 10 &= help "Number of topics"
-                        , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
-                        }
+topics = S.fromList $ map Topic [1..10]
 
 serializeState :: STModel -> FilePath -> ModelMonad ()
 serializeState model fname =
@@ -69,13 +55,7 @@ serializeState model fname =
 
 main = withSystemRandom $ runModel run
 run = 
-  do args <- liftIO $ cmdArgs libThingST
-     (d', wordMap) <- liftIO getTags
-     let d = d' { stAlphaPsi = psi args
-                , stAlphaLambda = lambda args
-                , stAlphaPhi = phi args
-                , stTopics = S.fromList $ map Topic [1..topics args]
-                }
+  do (d, wordMap) <- liftIO getTags
      liftIO $ putStrLn "Finished creating network"
      (ius, model) <- model d
      liftIO $ putStr $ printf "%d update units\n" (SQ.length ius)
@@ -87,7 +67,7 @@ run =
          gibbsUpdate sweepN =
            do l <- lift $ likelihood model
               lastMax <- S.get
-              when (l > lastMax) $ do lift $ serializeState model $ printf "%s/%05d" (sweeps_dir args) sweepN
+              when (l > lastMax) $ do lift $ serializeState model $ printf "sweeps/%05d" sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
               lift $ concurrentGibbsUpdate 10 ius
@@ -115,13 +95,15 @@ getTags =
                                             return $ Friendship (Node a, Node b))
                        $ tail csv'
 
-     let d = STData { stAlphaPsi = 5.0
+     let d = STData { stAlphaGamma = [(True, 45.0), (False, 5.0)]
+                    , stAlphaOmega = 1.0
+                    , stAlphaPsi = 1.0
                     , stAlphaLambda = 0.1
                     , stAlphaPhi = 0.01
                     , stNodes = S.fromList $ nub $ sort $ map fst userTags
                     , stFriendships = S.fromList friendships
                     , stItems = S.fromList $ nub $ sort $ map snd userTags
-                    , stTopics = S.empty
+                    , stTopics = topics
                     , stNodeItems = SQ.fromList userTags
                     }
      return (d, wordMap)

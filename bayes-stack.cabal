@@ -13,10 +13,10 @@ Cabal-version:       >=1.2
 
 
 Library
-  Exposed-modules:     BayesStack.Core, BayesStack.Core.GibbsUpdate, BayesStack.Core.ModelMonad,
+  Exposed-modules:     BayesStack.Core, BayesStack.Core.Types, BayesStack.Core.GibbsUpdate, BayesStack.Core.ModelMonad,
                        BayesStack.Core.Shared, BayesStack.Core.Concurrent,
                        BayesStack.Categorical, BayesStack.DirMulti, BayesStack.UniqueKey,
-                       BayesStack.TupleEnum, BayesStack.SortedDirMulti, 
+                       BayesStack.TupleEnum,
                        Data.Serialize.EnumMap,
                        Data.Random.Sequence, Data.Sequence.Chunk,
                        BayesStack.Models.LDA, BayesStack.Models.SharedTaste, BayesStack.Models.SharedTasteOwn

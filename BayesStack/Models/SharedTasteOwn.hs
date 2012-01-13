@@ -236,7 +236,6 @@ instance GibbsUpdateUnit ItemUnit where
        if s then return $ probPretend gamma s * probPretend psi f * probPretend lambda t * probPretend phi (iuX unit) 
             else return $ probPretend gamma s * probPretend omega t * probPretend phi (iuX unit)
   
-  guNormalizer = iuNormalizer
   guDomain unit = return $ (do t <- S.toList $ iuTopics unit
                                f <- S.toList $ iuFriends unit
                                return (True,t,f))
@@ -259,7 +258,6 @@ instance GibbsUpdateUnit ItemUnit where
                     lambda `updateShared` decDirMulti t
                     phi `updateShared` decDirMulti x
             else do omega `updateShared` decDirMulti t
-       return (s,t,f)
   
   guSet unit (s,t,f) =
     do iuS unit `setShared` s
