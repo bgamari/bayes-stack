@@ -38,14 +38,13 @@ main =
         otherwise -> return ()
      let Right state = s
 
-     userGroups <- getUserGroups state
-     let groups = nub $ map snd userGroups
-     forM_ groups $ \g@(Group n) ->
-       do f <- openFile (printf "group%d" n) WriteMode
+     groups <- getGroups
+     forM_ (EM.toList groups) $ \(Group i, members) ->
+       do f <- openFile (printf "group%d" i) WriteMode
           forM_ (msNodes state) $ \u ->
-            do let isMember = (u,g) `elem` userGroups
+            do let isMember = u `elem` members
                hPrintf f "%d" (if isMember then 1 else 0 :: Int)
-               forM_ (zip [1..] $ S.toList $ msTopics state) $ \(i,t) ->
-                 hPrintf f " %d:%f" (i::Int) (theta state u t)
+               forM_ (zip [1..] $ S.toList $ msTopics state) $ \(j,t) ->
+                 hPrintf f " %d:%f" (j::Int) (theta state u t)
                hPutStr f "\n"
 
