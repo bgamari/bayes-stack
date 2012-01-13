@@ -28,7 +28,7 @@ theta state u t =
   prob gamma True * prob omega t
   + sum (map (\f->let lambda = msLambdas state EM.! Friendship (u,f)
                   in prob psi f * prob lambda t * prob gamma False
-             ) $ getFriends (S.toList $ msFriendships state) u
+             ) $ getFriends (S.toList $ stFriendships $ msData state) u
         )
   where psi = msPsis state EM.! u
         gamma = msGammas state EM.! u
@@ -46,10 +46,10 @@ main =
      let groups = nub $ map snd userGroups
      forM_ groups $ \g@(Group n) ->
        do f <- openFile (printf "group%d" n) WriteMode
-          forM_ (msNodes state) $ \u ->
+          forM_ (stNodes $ msData state) $ \u ->
             do let isMember = (u,g) `elem` userGroups
                hPrintf f "%d" (if isMember then 1 else 0 :: Int)
-               forM_ (zip [1..] $ S.toList $ msTopics state) $ \(i,t) ->
+               forM_ (zip [1..] $ S.toList $ stTopics $ msData state) $ \(i,t) ->
                  hPrintf f " %d:%f" (i::Int) (theta state u t)
                hPutStr f "\n"
 

@@ -54,12 +54,10 @@ data STData = STData { stAlphaGamma :: [(Bool,Double)]
                      , stTopics :: Set Topic
                      , stNodeItems :: Seq (Node, Item)
                      }
-               deriving (Show, Eq)
+              deriving (Show, Eq, Generic)
+instance Serialize STData
 
-data STModel = STModel { mNodes :: Set Node
-                       , mTopics :: Set Topic
-                       , mItems :: Set Item
-                       , mFriendships :: Set Friendship
+data STModel = STModel { mData :: STData
                        , mNodeItems :: EnumMap NodeItem (Node, Item)
                        , mGammas :: SharedEnumMap Node (DirMulti Bool)
                        , mOmegas :: SharedEnumMap Node (DirMulti Topic)
@@ -71,10 +69,7 @@ data STModel = STModel { mNodes :: Set Node
                        , mTs :: SharedEnumMap NodeItem Topic
                        }
 
-data STModelState = STModelState { msNodes :: Set Node
-                                 , msTopics :: Set Topic
-                                 , msItems :: Set Item
-                                 , msFriendships :: Set Friendship
+data STModelState = STModelState { msData :: STData
                                  , msNodeItems :: EnumMap NodeItem (Node, Item)
                                  , msGammas :: EnumMap Node (DirMulti Bool)
                                  , msOmegas :: EnumMap Node (DirMulti Topic)
@@ -85,7 +80,8 @@ data STModelState = STModelState { msNodes :: Set Node
                                  , msFs :: EnumMap NodeItem Node
                                  , msTs :: EnumMap NodeItem Topic
                                  , msLogLikelihood :: Double
-                                 } deriving (Show, Generic)
+                                 }
+                    deriving (Show, Generic)
 instance Serialize STModelState
 
 data ItemUnit = ItemUnit { iuTopics :: Set Topic
@@ -157,10 +153,7 @@ model d =
           f' <- getShared f
           guSet unit (s',t',f')
           return unit
-     let model = STModel { mNodes = nodes
-                         , mTopics = topics
-                         , mItems = items
-                         , mFriendships = friendships
+     let model = STModel { mData = d
                          , mNodeItems = nis
                          , mGammas = gammas
                          , mOmegas = omegas
@@ -253,10 +246,7 @@ getModelState model =
      fs <- getSharedEnumMap $ mFs model
      ts <- getSharedEnumMap $ mTs model
      l <- likelihood model
-     return $ STModelState { msNodes = mNodes model
-                           , msTopics = mTopics model
-                           , msItems = mItems model
-                           , msFriendships = mFriendships model
+     return $ STModelState { msData = mData model
                            , msNodeItems = mNodeItems model
                            , msGammas = gammas
                            , msOmegas = omegas

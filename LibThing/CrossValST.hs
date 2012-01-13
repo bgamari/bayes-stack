@@ -27,7 +27,7 @@ theta :: STModelState -> Node -> Topic -> Probability
 theta state u t =
   sum $ map (\f->let lambda = msLambdas state EM.! Friendship (u,f)
                  in prob psi f * prob lambda t
-            ) $ getFriends (S.toList $ msFriendships state) u
+            ) $ getFriends (S.toList $ stFriendships $ msData state) u
   where psi = msPsis state EM.! u
 
 main =
@@ -41,10 +41,10 @@ main =
      groups <- getGroups
      forM_ (EM.toList groups) $ \(Group i, members) ->
        do f <- openFile (printf "group%d" i) WriteMode
-          forM_ (msNodes state) $ \u ->
+          forM_ (stNodes $ msData state) $ \u ->
             do let isMember = u `elem` members
                hPrintf f "%d" (if isMember then 1 else 0 :: Int)
-               forM_ (zip [1..] $ S.toList $ msTopics state) $ \(j,t) ->
+               forM_ (zip [1..] $ S.toList $ stTopics $ msData state) $ \(j,t) ->
                  hPrintf f " %d:%f" (j::Int) (theta state u t)
                hPutStr f "\n"
 
