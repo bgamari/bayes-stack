@@ -15,7 +15,7 @@ import Data.Hashable
 import Control.Monad
 import Text.CSV
 
-newtype Group = Group Int deriving (Show, Eq, Enum)
+newtype Group = Group Int deriving (Show, Ord, Eq, Enum)
 
 maybeRead :: Read a => String -> Maybe a
 maybeRead = fmap fst . listToMaybe . filter (null . snd) . reads 
