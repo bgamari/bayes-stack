@@ -84,7 +84,7 @@ data STModelState = STModelState { msData :: STData
                     deriving (Show, Generic)
 instance Serialize STModelState
 
-data ItemUnit = ItemUnit { iuTopics :: Set Topic
+data ItemUnit = ItemUnit { iuModel :: STModel
                          , iuNodeItem :: NodeItem
                          , iuFriends :: Set Node
                          , iuN :: Node
@@ -97,7 +97,6 @@ data ItemUnit = ItemUnit { iuTopics :: Set Topic
                          , iuPsi :: Shared (DirMulti Node)
                          , iuLambdas :: SharedEnumMap Friendship (DirMulti Topic)
                          , iuPhis :: SharedEnumMap Topic (DirMulti Item)
-                         , iuNormalizer :: Shared Double
                          }
 
 model :: STData -> ModelMonad (Seq ItemUnit, STModel)
@@ -127,13 +126,23 @@ model d =
        let (n,i) = nis EM.! ni
        in liftRVar $ randomElementT $ SQ.fromList $ S.toList $ friends EM.! n
   
+     let model = STModel { mData = d
+                         , mNodeItems = nis
+                         , mGammas = gammas
+                         , mOmegas = omegas
+                         , mPsis = psis
+                         , mLambdas = lambdas
+                         , mPhis = phis
+                         , mSs = ss
+                         , mFs = fs
+                         , mTs = ts }
+
      itemUnits <- forM (EM.keys nis) $ \ni ->
        do let (n,x) = nis EM.! ni
               s = ss EM.! ni
               t = ts EM.! ni
               f = fs EM.! ni
-          norm <- newShared 0
-          let unit = ItemUnit { iuTopics = topics
+          let unit = ItemUnit { iuModel = model
                               , iuNodeItem = ni
                               , iuFriends = friends EM.! n
                               , iuN = n
@@ -146,23 +155,12 @@ model d =
                               , iuPsi = psis EM.! n
                               , iuLambdas = EM.filterWithKey (\k _->isFriend n k) lambdas
                               , iuPhis = phis
-                              , iuNormalizer = norm
                               }
           s' <- getShared s
           t' <- getShared t
           f' <- getShared f
           guSet unit (s',t',f')
           return unit
-     let model = STModel { mData = d
-                         , mNodeItems = nis
-                         , mGammas = gammas
-                         , mOmegas = omegas
-                         , mPsis = psis
-                         , mLambdas = lambdas
-                         , mPhis = phis
-                         , mSs = ss
-                         , mFs = fs
-                         , mTs = ts }
      return (SQ.fromList itemUnits, model)
 
 likelihood :: STModel -> ModelMonad LogFloat
@@ -196,10 +194,10 @@ instance GibbsUpdateUnit ItemUnit where
        if s then return $ probPretend gamma s * probPretend psi f * probPretend lambda t * probPretend phi (iuX unit) 
             else return $ probPretend gamma s * probPretend omega t * probPretend phi (iuX unit)
   
-  guDomain unit = return $ (do t <- S.toList $ iuTopics unit
+  guDomain unit = return $ (do t <- S.toList $ stTopics $ mData $ iuModel unit
                                f <- S.toList $ iuFriends unit
                                return (True,t,f))
-                        ++ (do t <- S.toList $ iuTopics unit
+                        ++ (do t <- S.toList $ stTopics $ mData $ iuModel unit
                                let f = head $ S.toList $ iuFriends unit
                                return (False,t,f))
   
