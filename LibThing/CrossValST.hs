@@ -16,7 +16,7 @@ import Data.Serialize
 
 import BayesStack.Core
 import BayesStack.DirMulti
-import BayesStack.Models.Topic.SharedTaste
+import BayesStack.Models.Topic.SharedTasteSync
 import LibThing.Data
 
 import Text.CSV
@@ -40,11 +40,21 @@ main =
 
      groups <- getGroups
      forM_ (EM.toList groups) $ \(Group i, members) ->
-       do f <- openFile (printf "group%d" i) WriteMode
+       do f <- openFile (printf "group%d-nodes" i) WriteMode
           forM_ (stNodes $ msData state) $ \u ->
             do let isMember = u `elem` members
                hPrintf f "%d" (if isMember then 1 else 0 :: Int)
                forM_ (zip [1..] $ S.toList $ stTopics $ msData state) $ \(j,t) ->
                  hPrintf f " %d:%f" (j::Int) (theta state u t)
+               hPutStr f "\n"
+
+     forM_ (EM.toList groups) $ \(Group i, members) ->
+       do f <- openFile (printf "group%d-edges" i) WriteMode
+          forM_ (stFriendships $ msData state) $ \(Friendship (a,b)) ->
+            do let isMember = a `elem` members && b `elem` members
+               hPrintf f "%d" (if isMember then 1 else 0 :: Int)
+               forM_ (zip [1..] $ S.toList $ stTopics $ msData state) $ \(j,t) ->
+                 let lambda = msLambdas state EM.! Friendship (a,b)
+                 in hPrintf f " %d:%f" (j::Int) (prob lambda t)
                hPutStr f "\n"
 
