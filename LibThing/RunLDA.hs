@@ -1,4 +1,4 @@
-{-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE OverlappingInstances, DeriveDataTypeable #-}
 
 import BayesStack.Core
 import BayesStack.Models.Topic.LDA
@@ -36,6 +36,20 @@ import Data.Serialize
 import Data.Number.LogFloat hiding (realToFrac)
 import Text.Printf
   
+import System.Console.CmdArgs
+
+data LibThingLDA = LibThingLDA { theta :: Double
+                               , phi :: Double
+                               , topics :: Int
+                               , sweeps_dir :: FilePath
+                               } deriving (Show, Data, Typeable)
+
+libThingLDA = LibThingLDA { theta = 0.1 &= help "Alpha theta"
+                          , phi = 0.1 &= help "Alpha phi"
+                          , topics = 10 &= help "Number of topics"
+                          , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
+                          }
+
 
 serializeState :: LDAModel -> FilePath -> ModelMonad ()
 serializeState model fname =
@@ -44,8 +58,12 @@ serializeState model fname =
 
 main = withSystemRandom $ runModel run
 run = 
-  do let topics = [Topic i | i <- [0..10]]
-     (d, wordMap) <- liftIO getTags
+  do args <- liftIO $ cmdArgs libThingLDA
+     (d', wordMap) <- liftIO getTags
+     let d = d' { ldaAlphaTheta = theta args
+                , ldaAlphaPhi = phi args
+                , ldaTopics = S.fromList $ map Topic [1..topics args]
+                }
      liftIO $ putStrLn "Finished creating network"
      (ius, model) <- model d
   
