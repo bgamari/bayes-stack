@@ -216,8 +216,8 @@ instance GibbsUpdateUnit ItemUnit where
        gamma `updateShared` decDirMulti s
        if s then do psi `updateShared` decDirMulti f
                     lambda `updateShared` decDirMulti t
-                    phi `updateShared` decDirMulti x
             else do omega `updateShared` decDirMulti t
+       phi `updateShared` decDirMulti x
   
   guSet unit (s,t,f) =
     do iuS unit `setShared` s
@@ -232,8 +232,8 @@ instance GibbsUpdateUnit ItemUnit where
        gamma `updateShared` incDirMulti s
        if s then do psi `updateShared` incDirMulti f
                     lambda `updateShared` incDirMulti t
-                    phi `updateShared` incDirMulti x
             else do omega `updateShared` incDirMulti t
+       phi `updateShared` incDirMulti x
 
 getModelState :: STModel -> ModelMonad STModelState
 getModelState model =
