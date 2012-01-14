@@ -31,7 +31,7 @@ main =
         otherwise -> return ()
      let Right state = s
 
-     userGroups <- getUserGroups state
+     userGroups <- readUserGroups
      let groups = nub $ map snd userGroups
          nodes = ldaNodes $ msData state
          topics = ldaTopics $ msData state
