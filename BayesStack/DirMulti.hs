@@ -2,7 +2,7 @@
 
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                              DirMulti, Alpha, dirMulti, symDirMulti
-                           , estimatePrior
+                           , reestimatePriors, reestimateSymPriors
                            , decDirMulti, incDirMulti
                            , prettyDirMulti
                            ) where
