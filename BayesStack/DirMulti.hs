@@ -134,13 +134,17 @@ instance PretendableProbDist DirMulti where
 probabilities :: (Ord a, Enum a) => DirMulti a -> Seq (Double, a)
 probabilities dm = fmap (\a->(prob dm a, a)) $ dmDomain dm
 
-prettyDirMulti :: (Ord a, Enum a, Show a) => Int -> (a -> String) -> DirMulti a -> Doc
+prettyDirMulti :: (Ord a, Enum a) => Int -> (a -> String) -> DirMulti a -> Doc
 prettyDirMulti n showA dm =
-  text "DirMulti" <+> parens (text "alpha=" <> text (show $ dmAlpha dm))
-  <+> hsep (punctuate comma
+  text "DirMulti" <+> parens (text "alpha=" <> prettyAlpha showA (dmAlpha dm))
+  $$ nest 5 (fsep $ punctuate comma
             $ map (\(p,a)->text (showA a) <> parens (text $ printf "%1.2e" p))
             $ take n $ Data.Foldable.toList
             $ SQ.sortBy (flip (compare `on` fst)) $ probabilities dm)
+
+prettyAlpha :: (a -> String) -> Alpha a -> Doc
+prettyAlpha showA (SymAlpha _ alpha) = text "Symmetric" <+> double alpha
+prettyAlpha showA (Alpha alpha) = text "Assymmetric"
 
 reestimatePriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimatePriors dms =
