@@ -1,10 +1,14 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds, DeriveGeneric, DefaultSignatures #-}
 
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
-                             DirMulti, Alpha, dirMulti, symDirMulti
-                           , reestimatePriors, reestimateSymPriors
+                             DirMulti(..), dirMulti, symDirMulti
                            , decDirMulti, incDirMulti
                            , prettyDirMulti
+                             -- * Prior parameter
+                           , Alpha(..)
+                           , alphaToMeanPrecision, meanPrecisionToAlpha, symmetrizeAlpha
+                             -- * Parameter estimation
+                           , estimatePrior, reestimatePriors, reestimateSymPriors
                            ) where
 
 import qualified Data.Foldable 
@@ -15,7 +19,7 @@ import qualified Data.EnumMap as EM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
-import Data.Foldable (toList)
+import Data.Foldable (toList, Foldable)
 import Data.List (sortBy)
 import Data.Function (on)
 
@@ -138,15 +142,15 @@ prettyDirMulti n showA dm =
             $ take n $ Data.Foldable.toList
             $ SQ.sortBy (flip (compare `on` fst)) $ probabilities dm)
 
-reestimatePriors :: Enum a => [DirMulti a] -> [DirMulti a]
+reestimatePriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimatePriors dms =
-  let alpha = estimatePrior dms
-  in map (\dm->dm {dmAlpha=alpha}) dms
+  let alpha = estimatePrior $ toList dms
+  in fmap (\dm->dm {dmAlpha=alpha}) dms
 
-reestimateSymPriors :: Enum a => [DirMulti a] -> [DirMulti a]
+reestimateSymPriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimateSymPriors dms =
-  let alpha = symmetrizeAlpha $ estimatePrior dms
-  in map (\dm->dm {dmAlpha=alpha}) dms
+  let alpha = symmetrizeAlpha $ estimatePrior $ toList dms
+  in fmap (\dm->dm {dmAlpha=alpha}) dms
 
 nEstimationIters = 1000
 
