@@ -152,11 +152,12 @@ reestimateSymPriors dms =
   let alpha = symmetrizeAlpha $ estimatePrior $ toList dms
   in fmap (\dm->dm {dmAlpha=alpha}) dms
 
+-- | Number of iterations to run in prior estimation
 nEstimationIters = 1000
 
 -- | Estimate the prior alpha from a Dirichlet/multinomial
 -- Based on Andrew Mccallum's interpretation of Tom Minka's implementation
-estimatePrior :: Enum a => [DirMulti a] -> Alpha a
+estimatePrior :: (Enum a) => [DirMulti a] -> Alpha a
 estimatePrior dms =
   let domain = toList $ dmDomain $ head dms
       --binHist :: Enum a => EnumMap a (EnumMap Int Int)
@@ -168,16 +169,21 @@ estimatePrior dms =
       lengthHist = EM.fromListWith (+) $ do dm <- dms
                                             return (dmTotal dm, 1)
       --f :: Enum a => EnumMap a Alpha -> EnumMap a Alpha
-      f alphas = let newAlpha :: EnumMap Int Int -> Double
-                     newAlpha hist = let (n,_) = EM.findMax hist
-                                         digammas n = scanl (\digamma i -> digamma + 1/(sum (EM.elems alphas) + realToFrac i - 1)) 0 [1..n]
-                                     in realToFrac $ sum
-                                        $ zipWith (\digamma i->realToFrac (EM.findWithDefault 0 i hist)
-                                                               * realToFrac digamma)
-                                        (digammas n) [1..n]
-                     --alpha' :: Enum a => a -> Alpha -> Alpha
-                     alpha' k alpha = alpha * newAlpha (binHist EM.! k) / newAlpha lengthHist
-                  in EM.mapWithKey alpha' alphas
+      f alphas =
+        let newAlpha :: EnumMap Int Int -> Double -> Double
+            newAlpha hist x =
+              let (n,_) = EM.findMax hist
+                  digammas n = tail $ scanl (\digamma i -> digamma + 1/(x + realToFrac i - 1)) 0 [1..n]
+              in realToFrac $ sum
+                 $ zipWith (\digamma i->realToFrac (EM.findWithDefault 0 i hist)
+                                        * realToFrac digamma)
+                 (digammas n) [1..n]
+            --alpha' :: Enum a => a -> Alpha -> Alpha
+            alpha' k alpha = let num = newAlpha (binHist EM.! k) (alphas EM.! k)
+                                 denom = newAlpha lengthHist (sum $ EM.elems alphas)
+                             in alpha * num /  denom
+        in EM.mapWithKey alpha' alphas
       alphas0 = EM.fromList $ zip domain $ map (alphaOf (dmAlpha $ head dms)) domain
   in Alpha $ head $ drop nEstimationIters $ iterate f alphas0
+{-# INLINEABLE estimatePrior #-}
 
