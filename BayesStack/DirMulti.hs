@@ -1,8 +1,7 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds, DeriveGeneric, DefaultSignatures #-}
 
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
-                             DirMulti(..), dirMulti, symDirMulti
-                           , dirMultiAlpha
+                             DirMulti, Alpha, dirMulti, symDirMulti
                            , estimatePrior
                            , decDirMulti, incDirMulti
                            , prettyDirMulti
@@ -47,97 +46,71 @@ incDirMulti k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
 -- | 'DirMulti a' represents collapsed Dirichlet/multinomial pair over a domain 'a'.
 -- 'DirMulti alpha count total' is a multinomial with Dirichlet prior
 -- with symmetric parameter 'alpha', ...
-data DirMulti a = SymDirMulti { dmAlpha :: Alpha
-                              , dmCounts :: EnumMap a Int
-                              , dmTotal :: Int
-                              , dmDomain :: Seq a
-                              }
-                | DirMulti { dmAlphas :: EnumMap a Alpha
+data DirMulti a = DirMulti { dmAlpha :: Alpha a
                            , dmCounts :: EnumMap a Int
                            , dmTotal :: Int
                            , dmDomain :: Seq a
                            }
                   deriving (Show, Eq, Generic)
+instance (Enum a, Serialize a) => Serialize (DirMulti a)
 
-type Alpha = Double
-type Alphas a = EnumMap a Alpha
+data Alpha a = SymAlpha (Seq a) Double
+             | Alpha (EnumMap a Double)
+             deriving (Show, Eq, Generic)
+instance (Enum a, Serialize a) => Serialize (Alpha a)
+
 type Mean a = EnumMap a Double
 type Precision = Double
 
-instance (Enum a, Serialize a) => Serialize (DirMulti a)
+alphaOf :: Enum a => Alpha a -> a -> Double
+alphaOf (SymAlpha _ alpha) = const $ alpha
+alphaOf (Alpha alpha) = (alpha EM.!)
 
-dirMultiAlpha :: Enum a => DirMulti a -> a -> Alpha
-dirMultiAlpha (SymDirMulti {dmAlpha=alpha}) = const $ alpha
-dirMultiAlpha (DirMulti {dmAlphas=alphas}) = (alphas EM.!)
+alphaToMeanPrecision :: Enum a => Alpha a -> (Mean a, Precision)
+alphaToMeanPrecision (SymAlpha domain alpha) =
+  let prec = realToFrac (SQ.length domain) * alpha
+  in (EM.fromList $ map (\a->(a, alpha/prec)) $ toList domain, prec)
+alphaToMeanPrecision (Alpha alpha) = let prec = sum $ EM.elems alpha
+                                     in (fmap (/prec) alpha, prec)
 
-alphasToMeanPrecision :: Alphas a -> (Mean a, Precision)
-alphasToMeanPrecision alphas = let prec = sum $ EM.elems alphas
-                               in (fmap (/prec) alphas, prec)
+meanPrecisionToAlpha :: (Mean a, Precision) -> Alpha a
+meanPrecisionToAlpha (mean,prec) = Alpha $ fmap (*prec) mean
 
-meanPrecisionToAlphas :: (Mean a, Precision) -> Alphas a
-meanPrecisionToAlphas (mean,prec) = fmap (*prec) mean
+symmetrizeAlpha :: Enum a => Alpha a -> Alpha a
+symmetrizeAlpha alpha@(SymAlpha {}) = alpha
+symmetrizeAlpha (Alpha a) = SymAlpha domain alpha
+  where domain = SQ.fromList $ EM.keys a
+        alpha = sum (EM.elems a) / realToFrac (EM.size a)
 
 symDirMultiFromPrecision :: [a] -> Precision -> DirMulti a
 symDirMultiFromPrecision domain prec = symDirMulti (0.5*prec) domain
 
 -- | Create a symmetric Dirichlet/multinomial pair
-symDirMulti :: Alpha -> [a] -> DirMulti a
-symDirMulti alpha range = SymDirMulti { dmAlpha = alpha
-                                      , dmCounts = EM.empty
-                                      , dmTotal = 0
-                                      , dmDomain = SQ.fromList range
-                                      }
+symDirMulti :: Double -> [a] -> DirMulti a
+symDirMulti alpha domain = let domain' = SQ.fromList domain
+                           in DirMulti { dmAlpha = SymAlpha domain' alpha
+                                       , dmCounts = EM.empty
+                                       , dmTotal = 0
+                                       , dmDomain = domain'
+                                       }
 
-nEstimationIters = 1000
-
--- | Estimate the prior alpha from a Dirichlet/multinomial
--- Based on Andrew Mccallum's interpretation of Tom Minka's implementation
-estimatePrior :: Enum a => [DirMulti a] -> Alphas a
-estimatePrior dms =
-  let domain = toList $ dmDomain $ head dms
-      --binHist :: Enum a => EnumMap a (EnumMap Int Int)
-      binHist = EM.map (EM.fromListWith (+))
-                $ EM.fromListWith (++) $ do dm <- dms
-                                            (a,c) <- EM.toList $ dmCounts dm
-                                            return (a, [(c, 1)])
-      lengthHist :: EnumMap Int Int
-      lengthHist = EM.fromListWith (+) $ do dm <- dms
-                                            return (dmTotal dm, 1)
-      --f :: Enum a => EnumMap a Alpha -> EnumMap a Alpha
-      f alphas = let newAlpha :: EnumMap Int Int -> Alpha
-                     newAlpha hist = let (n,_) = EM.findMax hist
-                                         digammas n = scanl (\digamma i -> digamma + 1/(sum (EM.elems alphas) + realToFrac i - 1)) 0 [1..n]
-                                     in realToFrac $ sum
-                                        $ zipWith (\digamma i->realToFrac (EM.findWithDefault 0 i hist)
-                                                               * realToFrac digamma)
-                                        (digammas n) [1..n]
-                     --alpha' :: Enum a => a -> Alpha -> Alpha
-                     alpha' k alpha = alpha * newAlpha (binHist EM.! k) / newAlpha lengthHist
-                  in EM.mapWithKey alpha' alphas
-      alphas0 = EM.fromList $ zip domain $ map (dirMultiAlpha $ head dms) domain
-  in head $ drop nEstimationIters $ iterate f alphas0
 
 -- | Create an asymmetric Dirichlet/multinomial pair
-dirMulti :: Enum a => [(a,Alpha)] -> [a] -> DirMulti a
-dirMulti alpha range 
-  | length alpha /= length range = error "Length of dirMulti prior must equal dimensionality of distribution"
-  | otherwise = DirMulti { dmAlphas = EM.fromList alpha
+dirMulti :: Enum a => [(a,Double)] -> [a] -> DirMulti a
+dirMulti alpha domain
+  | length alpha /= length domain = error "Length of dirMulti prior must equal dimensionality of distribution"
+  | otherwise = DirMulti { dmAlpha = Alpha $ EM.fromList alpha
                          , dmCounts = EM.empty
                          , dmTotal = 0
-                         , dmDomain = SQ.fromList range
+                         , dmDomain = SQ.fromList domain
                          }
 
 
 instance ProbDist DirMulti where
   type PdContext DirMulti a = (Ord a, Enum a)
 
-  prob dm@(SymDirMulti {dmAlpha=alpha, dmCounts=counts, dmTotal=total}) k =
-  	let c = realToFrac $ EM.findWithDefault 0 k counts
-            range = realToFrac $ SQ.length $ dmDomain dm
-        in (c + alpha) / (realToFrac total + range * alpha)
-
   prob dm@(DirMulti {dmCounts=counts, dmTotal=total}) k =
-  	let alpha = dmAlphas dm EM.! k
+  	let alpha = (dmAlpha dm) `alphaOf` k
             c = realToFrac $ EM.findWithDefault 0 k counts
             range = realToFrac $ SQ.length $ dmDomain dm
         in (c + alpha) / (realToFrac total + range * alpha)
@@ -146,13 +119,8 @@ instance ProbDist DirMulti where
 instance PretendableProbDist DirMulti where
   type PpdContext DirMulti a = (Ord a, Enum a)
 
-  probPretend dm@(SymDirMulti {dmAlpha=alpha, dmCounts=counts, dmTotal=total}) k =
-  	let c = realToFrac $ EM.findWithDefault 0 k counts
-            range = realToFrac $ SQ.length $ dmDomain dm
-        in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
-
   probPretend dm@(DirMulti {dmCounts=counts, dmTotal=total}) k =
-  	let alpha = dmAlphas dm EM.! k
+  	let alpha = (dmAlpha dm) `alphaOf` k
             c = realToFrac $ EM.findWithDefault 0 k counts
             range = realToFrac $ SQ.length $ dmDomain dm
         in (c + alpha + 1) / (realToFrac total + range * alpha + 1)
@@ -169,4 +137,43 @@ prettyDirMulti n showA dm =
             $ map (\(p,a)->text (showA a) <> parens (text $ printf "%1.2e" p))
             $ take n $ Data.Foldable.toList
             $ SQ.sortBy (flip (compare `on` fst)) $ probabilities dm)
+
+reestimatePriors :: Enum a => [DirMulti a] -> [DirMulti a]
+reestimatePriors dms =
+  let alpha = estimatePrior dms
+  in map (\dm->dm {dmAlpha=alpha}) dms
+
+reestimateSymPriors :: Enum a => [DirMulti a] -> [DirMulti a]
+reestimateSymPriors dms =
+  let alpha = symmetrizeAlpha $ estimatePrior dms
+  in map (\dm->dm {dmAlpha=alpha}) dms
+
+nEstimationIters = 1000
+
+-- | Estimate the prior alpha from a Dirichlet/multinomial
+-- Based on Andrew Mccallum's interpretation of Tom Minka's implementation
+estimatePrior :: Enum a => [DirMulti a] -> Alpha a
+estimatePrior dms =
+  let domain = toList $ dmDomain $ head dms
+      --binHist :: Enum a => EnumMap a (EnumMap Int Int)
+      binHist = EM.map (EM.fromListWith (+))
+                $ EM.fromListWith (++) $ do dm <- dms
+                                            (a,c) <- EM.toList $ dmCounts dm
+                                            return (a, [(c, 1)])
+      lengthHist :: EnumMap Int Int
+      lengthHist = EM.fromListWith (+) $ do dm <- dms
+                                            return (dmTotal dm, 1)
+      --f :: Enum a => EnumMap a Alpha -> EnumMap a Alpha
+      f alphas = let newAlpha :: EnumMap Int Int -> Double
+                     newAlpha hist = let (n,_) = EM.findMax hist
+                                         digammas n = scanl (\digamma i -> digamma + 1/(sum (EM.elems alphas) + realToFrac i - 1)) 0 [1..n]
+                                     in realToFrac $ sum
+                                        $ zipWith (\digamma i->realToFrac (EM.findWithDefault 0 i hist)
+                                                               * realToFrac digamma)
+                                        (digammas n) [1..n]
+                     --alpha' :: Enum a => a -> Alpha -> Alpha
+                     alpha' k alpha = alpha * newAlpha (binHist EM.! k) / newAlpha lengthHist
+                  in EM.mapWithKey alpha' alphas
+      alphas0 = EM.fromList $ zip domain $ map (alphaOf (dmAlpha $ head dms)) domain
+  in Alpha $ head $ drop nEstimationIters $ iterate f alphas0
 
