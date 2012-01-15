@@ -87,7 +87,6 @@ model d =
   
      itemUnits <- forM (EM.toList ts) $ \(ni, t) ->
        do let (n,x) = nis EM.! ni
-          norm <- newShared 0
           let unit = ItemUnit { iuData = d 
                               , iuNodeItem = ni
                               , iuN = n
