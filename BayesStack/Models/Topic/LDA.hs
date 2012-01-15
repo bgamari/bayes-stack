@@ -132,6 +132,7 @@ instance GibbsUpdateUnit ItemUnit where
            phi = iuPhis unit EM.! t
        theta `updateShared` decDirMulti t
        phi `updateShared` decDirMulti x
+       return t
   
   guSet unit t =
     do iuT unit `setShared` t
