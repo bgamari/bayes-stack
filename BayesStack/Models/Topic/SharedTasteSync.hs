@@ -25,10 +25,13 @@ import Data.Foldable
 import Data.Monoid
 import Data.Function (on)
 import Data.Maybe (mapMaybe, isJust)
+import Data.Tuple
 
 import Control.Monad (liftM)
+import Control.Monad.Trans.State
+import Control.Monad.Trans.Class
 import Data.Random
-import Data.Random.Sequence
+import Data.Random.List
 import Data.Number.LogFloat
 
 import BayesStack.Core
@@ -40,7 +43,7 @@ import BayesStack.Models.Topic.Types
 import Control.Monad (when)
 import Control.Monad.IO.Class
 
-import Data.Serialize
+import Data.Serialize (Serialize)
 import GHC.Generics
 
 data STData = STData { stAlphaPsi :: Double
@@ -92,6 +95,8 @@ model d =
          STData {stFriendships=friendships} = d
          nis :: EnumMap NodeItem (Node,Item)
          nis = EM.fromList $ zipWith (\idx (n,i)->(NodeItem idx, (n,i))) [0..] (toList nodeItems)
+         nisInv :: EnumMap (Node,Item) [NodeItem]
+         nisInv = EM.fromListWith (++) $ map (\(ni,(n,i))->((n,i),[ni])) $ EM.toList nis
          friends :: EnumMap Node (Set Node)
          --friends = map (\n->(n, S.map (otherFriend n) $ S.filter (isFriend n) friendships)) nodes
          friends = EM.fromList $ map (\n->(n, S.fromList $ getFriends (S.toList friendships) n))
@@ -102,11 +107,36 @@ model d =
        return $ symDirMulti (stAlphaLambda d) (S.toList topics)
      phis <- newSharedEnumMap (S.toList topics) $ \t ->
        return $ symDirMulti (stAlphaPhi d) (S.toList items)
+
+     let sharedTopics :: Friendship -> StateT (EnumMap Item Topic, EnumMap Friendship (Set Topic)) ModelMonad (EnumMap NodeItem (Topic,Node))
+         sharedTopics fs@(Friendship (a,b)) =
+           do let findItems n = S.fromList $ map snd $ filter (\(n',i)->n==n') $ toList nodeItems
+                  sharedItems = S.toList $ S.intersection (findItems a) (findItems b)
+              liftM mconcat $ forM sharedItems $ \x -> do
+                (itemTopics,_) <- get
+                t <- if x `EM.member` itemTopics
+                       then return $ itemTopics EM.! x
+                       else do (_, friendshipTopics) <- get
+                               --let possTopics = EM.findWithDefault topics fs friendshipTopics
+                               let possTopics = topics -- FIXME
+                               t <- lift $ liftRVar $ randomElement $ S.toList possTopics
+                               modify $ \(a,b)->(EM.insert x t a, b)
+                               return t
+                modify $ \(a,b)->(a, EM.insertWith S.union fs (S.singleton t) b)
+                return $ EM.fromList $ do ax <- nisInv EM.! (a,x)
+                                          return (ax, (t,b))
+                                    ++ do bx <- nisInv EM.! (b,x)
+                                          return (bx, (t,a))
+     sharedTfs <- liftM mconcat $ evalStateT (mapM sharedTopics $ S.toList friendships) (EM.empty, EM.empty)
+
      ts <- newSharedEnumMap (EM.keys nis) $ \ni ->
-       liftRVar $ randomElementT $ SQ.fromList $ S.toList topics
+       if ni `EM.member` sharedTfs then return $ fst $ sharedTfs EM.! ni
+                                   else liftRVar $ randomElement $ S.toList topics
+                                      
      fs <- newSharedEnumMap (EM.keys nis) $ \ni ->
-       let (n,i) = nis EM.! ni
-       in liftRVar $ randomElementT $ SQ.fromList $ S.toList $ friends EM.! n
+       if ni `EM.member` sharedTfs then return $ snd $ sharedTfs EM.! ni
+                                   else let (n,_) = nis EM.! ni
+                                        in liftRVar $ randomElement $ S.toList $ friends EM.! n
   
      let model = STModel { mData = d
                          , mNodeItems = nis
