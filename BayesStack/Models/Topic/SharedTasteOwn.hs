@@ -216,6 +216,7 @@ instance GibbsUpdateUnit ItemUnit where
                     lambda `updateShared` decDirMulti t
             else do omega `updateShared` decDirMulti t
        phi `updateShared` decDirMulti x
+       return (s,t,f)
   
   guSet unit (s,t,f) =
     do iuS unit `setShared` s

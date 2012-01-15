@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, FlexibleContexts #-}
 
 module BayesStack.Core.GibbsUpdate ( GibbsUpdateUnit(..)
                                    , gibbsUpdate, gibbsUpdateOne
@@ -23,7 +23,7 @@ import BayesStack.Core.Concurrent
 
 class GibbsUpdateUnit unit where
   type GUValue unit :: *
-  guUnset :: unit -> ModelMonad ()
+  guUnset :: unit -> ModelMonad (GUValue unit)
   guDomain :: unit -> ModelMonad [GUValue unit]
   guProb :: unit -> GUValue unit -> ModelMonad Probability
   guSet :: unit -> GUValue unit -> ModelMonad ()
