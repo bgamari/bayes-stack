@@ -185,7 +185,7 @@ instance GibbsUpdateUnit ItemUnit where
     do psi <- getShared $ mPsis (iuModel unit) EM.! iuN unit
        phi <- getShared $ iuPhis unit EM.! t 
        lambda <- getShared $ iuLambdas unit EM.! Friendship (iuN unit, f)
-       return $ probPretend psi f * probPretend lambda t * probPretend phi (iuX unit) 
+       return $ prob psi f * prob lambda t * prob phi (iuX unit) 
   
   guDomain unit = return $ do t <- S.toList $ stTopics $ mData $ iuModel unit
                               f <- S.toList $ iuFriends unit

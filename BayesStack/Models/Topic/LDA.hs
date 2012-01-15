@@ -119,8 +119,8 @@ instance GibbsUpdateUnit ItemUnit where
   guProb unit t =
     do phi <- getShared $ iuPhis unit EM.! t 
        theta <- getShared $ iuTheta unit
-       let th = probPretend theta t
-       let ph = probPretend phi (iuX unit) 
+       let th = prob theta t
+       let ph = prob phi (iuX unit) 
        return $ th * ph
   
   guDomain = return . S.toList . ldaTopics . iuData

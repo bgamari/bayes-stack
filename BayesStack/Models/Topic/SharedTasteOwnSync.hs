@@ -190,8 +190,8 @@ instance GibbsUpdateUnit ItemUnit where
        psi <- getShared $ mPsis (iuModel unit) EM.! iuN unit
        phi <- getShared $ iuPhis unit EM.! t 
        lambda <- getShared $ iuLambdas unit EM.! Friendship (iuN unit, f)
-       if s then return $ probPretend gamma s * probPretend psi f * probPretend lambda t * probPretend phi (iuX unit) 
-            else return $ probPretend gamma s * probPretend omega t * probPretend phi (iuX unit)
+       if s then return $ prob gamma s * prob psi f * prob lambda t * prob phi (iuX unit) 
+            else return $ prob gamma s * prob omega t * prob phi (iuX unit)
   
   guDomain unit = return $ (do t <- S.toList $ stTopics $ mData $ iuModel unit
                                f <- S.toList $ iuFriends unit
