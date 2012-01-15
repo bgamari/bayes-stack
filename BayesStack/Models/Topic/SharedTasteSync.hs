@@ -97,7 +97,7 @@ model d =
          friends = EM.fromList $ map (\n->(n, S.fromList $ getFriends (S.toList friendships) n))
                    $ S.toList nodes
      psis <- newSharedEnumMap (S.toList nodes) $ \n ->
-       return $ symDirMulti (stAlphaPsi d) (S.toList nodes)
+       return $ symDirMulti (stAlphaPsi d) (S.toList $ friends EM.! n)
      lambdas <- newSharedEnumMap (S.toList friendships) $ \n ->
        return $ symDirMulti (stAlphaLambda d) (S.toList topics)
      phis <- newSharedEnumMap (S.toList topics) $ \t ->
