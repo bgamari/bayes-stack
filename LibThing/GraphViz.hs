@@ -34,6 +34,9 @@ main =
      groups <- getGroups
      --print $ map (prob (msLambdas state EM.! head fs)) $ S.toList $ stTopics $ msData state
 
+     let topics = S.toList $ stTopics $ msData state
+         nTopics = realToFrac $ length topics
+
      let d :: Topic -> Dot ()
          d t = do attribute ("width", "1")
                   attribute ("height", "1")
@@ -61,13 +64,13 @@ main =
                                 , 0.5) --if topicWeight f > 1/3 && friendshipWeight f > 0.5 then 0 else 1)
 
                   forM_ fs $ \f@(Friendship (a,b)) ->
-                    do when (not $ topicWeight f > 1/3 && friendshipWeight f > 0.2) $
+                    do when (not $ topicWeight f > 1/nTopics && friendshipWeight f > 0.2) $
                           edge (enumNodeId a) (enumNodeId b) [ ("color", case color f of (h,s,v) -> printf "%1.3f %1.3f %1.3f" h (0.1::Double) (0.8::Double))
                                                              , ("penwidth", "1")
                                                              , ("len", "2")
                                                              , ("dirType", "none")
                                                              ]
-                       when (topicWeight f > 1/3 && friendshipWeight f > 0.2) $
+                       when (topicWeight f > 1/nTopics && friendshipWeight f > 0.2) $
                          do userNode (enumNodeId a) [ ("fillcolor", "black") ]
                             userNode (enumNodeId b) [ ("fillcolor", "black") ]
                             edge (enumNodeId a) (enumNodeId b) [ ("color", case color f of (h,s,v) -> printf "%1.3f %1.3f %1.3f" h s v)
@@ -75,6 +78,6 @@ main =
                                                                , ("len", "0.5")
                                                                , ("dirType", "none")
                                                                ]
-     forM_ (S.toList $ stTopics $ msData state) $ \t->
+     forM_ topics $ \t->
        writeFile (show t++".dot") $ showDot $ d t
      
