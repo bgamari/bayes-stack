@@ -152,7 +152,7 @@ reestimateSymPriors dms =
 -- | Estimate the prior alpha from a Dirichlet/multinomial
 -- Based on Andrew Mccallum's interpretation of Tom Minka's implementation
 estimatePrior :: (Enum a) => Int -> [DirMulti a] -> Alpha a
-estimatePrior nInter dms =
+estimatePrior nIter dms =
   let domain = toList $ dmDomain $ head dms
       --binHist :: Enum a => EnumMap a (EnumMap Int Int)
       binHist = EM.map (EM.fromListWith (+))
