@@ -5,6 +5,9 @@ module BayesStack.Models.Topic.LDA
     LDAData(..)
   , Node(..), Item(..), Topic(..)
   , NodeItem, setupNodeItems
+  -- * Initialization
+  , ModelInit
+  , randomInitialize
     -- * Model
   , LDAModel(..), ItemUnit
   , LDAModelState(..), getModelState
@@ -19,6 +22,8 @@ import qualified Data.Sequence as SQ
 
 import Data.Set (Set)
 import qualified Data.Set as S
+
+import qualified Data.EnumSet as ES
 
 import Data.Traversable
 import Data.Foldable
@@ -75,15 +80,28 @@ data ItemUnit = ItemUnit { iuData :: LDAData
                          , iuPhis :: SharedEnumMap Topic (DirMulti Item)
                          }
 
-model :: LDAData -> ModelMonad (Seq ItemUnit, LDAModel)
-model d =
+type ModelInit = EnumMap NodeItem Topic
+
+randomInitialize' :: LDAData -> ModelInit -> RVar ModelInit
+randomInitialize' d init = 
+  let unset = EM.keysSet (ldaNodeItems d) `ES.difference` EM.keysSet init
+      topics = S.toList $ ldaTopics d
+      randomInit :: NodeItem -> RVar ModelInit
+      randomInit ni = liftM (EM.singleton ni) $ randomElement topics
+  in liftM mconcat $ forM (ES.toList unset) randomInit
+
+randomInitialize :: LDAData -> RVar ModelInit
+randomInitialize = (flip randomInitialize') EM.empty
+
+model :: LDAData -> ModelInit -> ModelMonad (Seq ItemUnit, LDAModel)
+model d init =
   do let LDAData {ldaTopics=topics, ldaNodes=nodes, ldaItems=items, ldaNodeItems=nis} = d
      thetas <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ symDirMulti (ldaAlphaTheta d) (S.toList topics)
      phis <- newSharedEnumMap (S.toList topics) $ \t ->
        return $ symDirMulti (ldaAlphaPhi d) (S.toList items)
-     ts <- newSharedEnumMap (EM.keys nis) $ \ni ->
-       liftRVar $ randomElementT $ SQ.fromList $ S.toList topics
+
+     ts <- newSharedEnumMap (EM.keys nis) $ \ni -> return $ init EM.! ni
   
      itemUnits <- forM (EM.toList ts) $ \(ni, t) ->
        do let (n,x) = nis EM.! ni
