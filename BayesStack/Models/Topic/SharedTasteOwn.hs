@@ -52,7 +52,7 @@ import Control.Monad.IO.Class
 import Data.Serialize
 import GHC.Generics
 
-data STData = STData { stAlphaGamma :: [(Bool,Double)]
+data STData = STData { stAlphaGammaOwn, stAlphaGammaShared :: Double
                      , stAlphaOmega :: Double
                      , stAlphaPsi :: Double
                      , stAlphaLambda :: Double
@@ -132,7 +132,7 @@ model d init =
          friends :: EnumMap Node (Set Node)
          friends = foldMap (\n->EM.singleton n $ S.fromList $ getFriends (S.toList friendships) n) nodes
      gammas <- newSharedEnumMap (S.toList nodes) $ \n ->
-       return $ dirMulti (stAlphaGamma d) [True, False]
+       return $ dirMulti [(True, stAlphaGammaShared d), (False, stAlphaGammaOwn d)]
      omegas <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ symDirMulti (stAlphaOmega d) (S.toList topics)
      psis <- newSharedEnumMap (S.toList nodes) $ \n ->
