@@ -1,12 +1,15 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds, DeriveGeneric, DefaultSignatures #-}
 
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
-                             DirMulti(..), dirMulti, symDirMulti
+                             DirMulti, dirMulti, symDirMulti
                            , decDirMulti, incDirMulti
                            , prettyDirMulti
+                           , updatePrior
                              -- * Prior parameter
-                           , Alpha(..)
-                           , alphaToMeanPrecision, meanPrecisionToAlpha, symmetrizeAlpha
+                           , Alpha
+                           , alphaOf, setAlphaOf
+                           , alphaToMeanPrecision, meanPrecisionToAlpha
+                           , symmetrizeAlpha
                            , prettyAlpha
                              -- * Parameter estimation
                            , estimatePrior, reestimatePriors, reestimateSymPriors
@@ -20,7 +23,7 @@ import qualified Data.EnumMap as EM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
-import Data.Foldable (toList, Foldable)
+import Data.Foldable (toList, Foldable, fold)
 import Data.List (sortBy)
 import Data.Function (on)
 
@@ -32,6 +35,8 @@ import Data.Serialize
 import Data.Serialize.EnumMap
  
 import BayesStack.Core
+
+import Debug.Trace
 
 maybeInc, maybeDec :: Maybe Int -> Maybe Int
 maybeInc Nothing = Just 1
@@ -59,6 +64,7 @@ data DirMulti a = DirMulti { dmAlpha :: Alpha a
                   deriving (Show, Eq, Generic)
 instance (Enum a, Serialize a) => Serialize (DirMulti a)
 
+-- | A Dirichlet prior
 data Alpha a = SymAlpha (Seq a) Double
              | Alpha (EnumMap a Double)
              deriving (Show, Eq, Generic)
@@ -67,10 +73,22 @@ instance (Enum a, Serialize a) => Serialize (Alpha a)
 type Mean a = EnumMap a Double
 type Precision = Double
 
+-- | 'alphaDomain a' is the domain of prior 'a'
+alphaDomain :: Enum a => Alpha a -> Seq a
+alphaDomain (SymAlpha domain _) = domain
+alphaDomain (Alpha alpha) = SQ.fromList $ EM.keys alpha
+
+-- | 'alphaOf alpha k' is the value of element 'k' in prior 'alpha'
 alphaOf :: Enum a => Alpha a -> a -> Double
 alphaOf (SymAlpha _ alpha) = const $ alpha
 alphaOf (Alpha alpha) = (alpha EM.!)
 
+-- | Set a particular alpha element
+setAlphaOf :: Enum a => a -> Double -> Alpha a -> Alpha a
+setAlphaOf k a alpha@(SymAlpha {}) = setAlphaOf k a $ asymmetrizeAlpha alpha
+setAlphaOf k a (Alpha alpha) = Alpha $ EM.insert k a alpha
+
+-- | 'alphaToMeanPrecision a' is the mean/precision representation of the prior 'a'
 alphaToMeanPrecision :: Enum a => Alpha a -> (Mean a, Precision)
 alphaToMeanPrecision (SymAlpha domain alpha) =
   let prec = realToFrac (SQ.length domain) * alpha
@@ -78,34 +96,46 @@ alphaToMeanPrecision (SymAlpha domain alpha) =
 alphaToMeanPrecision (Alpha alpha) = let prec = sum $ EM.elems alpha
                                      in (fmap (/prec) alpha, prec)
 
-meanPrecisionToAlpha :: (Mean a, Precision) -> Alpha a
-meanPrecisionToAlpha (mean,prec) = Alpha $ fmap (*prec) mean
+-- | 'meanPrecisionToAlpha m p' is a prior with mean 'm' and precision 'p'
+meanPrecisionToAlpha :: Mean a -> Precision -> Alpha a
+meanPrecisionToAlpha mean prec = Alpha $ fmap (*prec) mean
 
+-- | Symmetrize a Dirichlet prior (such that mean=0) 
 symmetrizeAlpha :: Enum a => Alpha a -> Alpha a
 symmetrizeAlpha alpha@(SymAlpha {}) = alpha
-symmetrizeAlpha (Alpha a) = SymAlpha domain alpha
-  where domain = SQ.fromList $ EM.keys a
-        alpha = sum (EM.elems a) / realToFrac (EM.size a)
+symmetrizeAlpha alpha@(Alpha a) = SymAlpha (alphaDomain alpha) alpha'
+  where alpha' = sum (EM.elems a) / realToFrac (EM.size a)
 
-symDirMultiFromPrecision :: [a] -> Precision -> DirMulti a
+-- | Turn a symmetric alpha into an asymmetric alpha. For internal use.
+asymmetrizeAlpha :: Enum a => Alpha a -> Alpha a
+asymmetrizeAlpha (SymAlpha domain alpha) = Alpha $ fold $ fmap (\k->EM.singleton k alpha) domain
+asymmetrizeAlpha alpha@(Alpha {}) = alpha
+
+-- | 'symDirMultiFromPrecision d p' is a symmetric Dirichlet/multinomial over a
+-- domain 'd' with precision 'p'
+symDirMultiFromPrecision :: Enum a => [a] -> Precision -> DirMulti a
 symDirMultiFromPrecision domain prec = symDirMulti (0.5*prec) domain
 
--- | Create a symmetric Dirichlet/multinomial pair
-symDirMulti :: Double -> [a] -> DirMulti a
-symDirMulti alpha domain = let domain' = SQ.fromList domain
-                           in DirMulti { dmAlpha = SymAlpha domain' alpha
-                                       , dmCounts = EM.empty
-                                       , dmTotal = 0
-                                       , dmDomain = domain'
-                                       }
+-- | 'dirMultiFromMeanPrecision m p' is an asymmetric Dirichlet/multinomial
+-- over a domain 'd' with mean 'm' and precision 'p'
+dirMultiFromPrecision :: Enum a => Mean a -> Precision -> DirMulti a
+dirMultiFromPrecision m p = dirMultiFromAlpha $ meanPrecisionToAlpha m p
 
--- | Create an asymmetric Dirichlet/multinomial pair from items and alphas
+-- | Create a symmetric Dirichlet/multinomial
+symDirMulti :: Enum a => Double -> [a] -> DirMulti a
+symDirMulti alpha domain = dirMultiFromAlpha $ SymAlpha (SQ.fromList domain) alpha
+
+-- | Create an asymmetric Dirichlet/multinomial from items and alphas
 dirMulti :: Enum a => [(a,Double)] -> DirMulti a
-dirMulti domain = DirMulti { dmAlpha = Alpha $ EM.fromList domain
-                           , dmCounts = EM.empty
-                           , dmTotal = 0
-                           , dmDomain = SQ.fromList $ map fst domain
-                           }
+dirMulti domain = dirMultiFromAlpha $ Alpha (EM.fromList domain)
+
+-- | Create a Dirichlet/multinomial with a given prior
+dirMultiFromAlpha :: Enum a => Alpha a -> DirMulti a
+dirMultiFromAlpha alpha = DirMulti { dmAlpha = alpha
+                                   , dmCounts = EM.empty
+                                   , dmTotal = 0
+                                   , dmDomain = alphaDomain alpha
+                                   }
 
 instance ProbDist DirMulti where
   type PdContext DirMulti a = (Ord a, Enum a)
@@ -140,6 +170,10 @@ prettyAlpha showA (Alpha alpha) =
 -- | Number of iterations to run in prior estimation
 nEstimationIters = 1000
 
+-- | Update the prior of a Dirichlet/multinomial
+updatePrior :: (Alpha a -> Alpha a) -> DirMulti a -> DirMulti a
+updatePrior f dm = dm {dmAlpha=f $ dmAlpha dm}
+
 reestimatePriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimatePriors dms =
   let alpha = estimatePrior nEstimationIters $ toList dms
@@ -166,7 +200,7 @@ estimatePrior nIter dms =
       --f :: Enum a => EnumMap a Alpha -> EnumMap a Alpha
       f alphas =
         let newAlpha :: EnumMap Int Int -> Double -> Double
-            newAlpha hist _ | EM.null hist = 1e-5 -- Empty histogram
+            newAlpha hist _ | EM.null hist = trace "uh oh" 1e-5 -- Empty histogram
             newAlpha hist x =
               let (n,_) = EM.findMax hist
                   digammas n = tail $ scanl (\digamma i -> digamma + 1/(x + realToFrac i - 1)) 0 [1..n]
