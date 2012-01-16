@@ -99,17 +99,13 @@ symDirMulti alpha domain = let domain' = SQ.fromList domain
                                        , dmDomain = domain'
                                        }
 
-
--- | Create an asymmetric Dirichlet/multinomial pair
-dirMulti :: Enum a => [(a,Double)] -> [a] -> DirMulti a
-dirMulti alpha domain
-  | length alpha /= length domain = error "Length of dirMulti prior must equal dimensionality of distribution"
-  | otherwise = DirMulti { dmAlpha = Alpha $ EM.fromList alpha
-                         , dmCounts = EM.empty
-                         , dmTotal = 0
-                         , dmDomain = SQ.fromList domain
-                         }
-
+-- | Create an asymmetric Dirichlet/multinomial pair from items and alphas
+dirMulti :: Enum a => [(a,Double)] -> DirMulti a
+dirMulti domain = DirMulti { dmAlpha = Alpha $ EM.fromList domain
+                           , dmCounts = EM.empty
+                           , dmTotal = 0
+                           , dmDomain = SQ.fromList $ map fst domain
+                           }
 
 instance ProbDist DirMulti where
   type PdContext DirMulti a = (Ord a, Enum a)
