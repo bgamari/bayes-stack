@@ -144,12 +144,10 @@ initialize d =
 
 model :: STData -> ModelInit -> ModelMonad (Seq ItemUnit, STModel)
 model d init =
-  do let STData {stTopics=topics, stNodes=nodes, stItems=items, stNodeItems=nodeItems} = d
-         STData {stFriendships=friendships, stNodeItems=nis} = d
+  do let STData {stTopics=topics, stNodes=nodes, stItems=items, stNodeItems=nis} = d
+         STData {stFriendships=friendships} = d
          friends :: EnumMap Node (Set Node)
-         --friends = map (\n->(n, S.map (otherFriend n) $ S.filter (isFriend n) friendships)) nodes
-         friends = EM.fromList $ map (\n->(n, S.fromList $ getFriends (S.toList friendships) n))
-                   $ S.toList nodes
+         friends = foldMap (\n->EM.singleton n $ S.fromList $ getFriends (S.toList friendships) n) nodes
      psis <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ symDirMulti (stAlphaPsi d) (S.toList $ friends EM.! n)
      lambdas <- newSharedEnumMap (S.toList friendships) $ \n ->

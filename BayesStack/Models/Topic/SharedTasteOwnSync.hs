@@ -125,8 +125,8 @@ data ItemUnit = ItemUnit { iuModel :: STModel
 
 model :: STData -> ModelInit -> ModelMonad (Seq ItemUnit, STModel)
 model d init =
-  do let STData {stTopics=topics, stNodes=nodes, stItems=items, stNodeItems=nodeItems} = d
-         STData {stFriendships=friendships, stNodeItems=nis} = d
+  do let STData {stTopics=topics, stNodes=nodes, stItems=items, stNodeItems=nis} = d
+         STData {stFriendships=friendships} = d
          friends :: EnumMap Node (Set Node)
          friends = foldMap (\n->EM.singleton n $ S.fromList $ getFriends (S.toList friendships) n) nodes
      gammas <- newSharedEnumMap (S.toList nodes) $ \n ->
