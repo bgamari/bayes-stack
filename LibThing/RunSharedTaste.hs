@@ -11,7 +11,7 @@ import Data.List ((\\), nub, sort)
 
 import Data.Set (Set)
 import qualified Data.Set as S
-  
+
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
 
@@ -27,7 +27,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State as S
 import Control.Monad hiding (mapM)
-  
+
 import Data.Random
 import System.Random.MWC (GenIO, withSystemRandom)
 
@@ -40,7 +40,7 @@ import Data.Serialize
 
 import Data.Number.LogFloat hiding (realToFrac)
 import Text.Printf
-  
+
 import System.Console.CmdArgs
 
 data LibThingST = LibThingST { psi :: Double
@@ -78,13 +78,19 @@ reestimateParams model =
 main = withSystemRandom $ runModel run
 run = 
   do args <- liftIO $ cmdArgs libThingST
-     (d', wordMap) <- liftIO getTags
-     let d = d' { stAlphaPsi = psi args
-                , stAlphaLambda = lambda args
-                , stAlphaPhi = phi args
-                , stTopics = S.fromList $ map Topic [1..topics args]
-                }
+     (userTags, wordMap) <- liftIO readTags
+     friendships <- liftIO readFriendships
+     let d = STData { stAlphaPsi = psi args
+                    , stAlphaLambda = lambda args
+                    , stAlphaPhi = phi args
+                    , stNodes = S.fromList $ nub $ sort $ map fst userTags
+                    , stFriendships = S.fromList friendships
+                    , stItems = S.fromList $ nub $ sort $ map snd userTags
+                    , stTopics = S.fromList $ map Topic [1..topics args]
+                    , stNodeItems = setupNodeItems userTags
+                    }
      liftIO $ putStrLn "Finished creating network"
+
      init <- liftRVar $ randomInitialize d
      (ius, model) <- model d init
      liftIO $ putStr $ printf "%d update units\n" (SQ.length ius)
@@ -104,19 +110,4 @@ run =
               lift $ concurrentGibbsUpdate 10 ius
 
      S.runStateT (forM_ [0..] gibbsUpdate) 0
- 
-getTags :: IO (STData, Map Item String)
-getTags =
-  do (userTags, wordMap) <- readTags
-     friendships <- readFriendships
-     let d = STData { stAlphaPsi = 5.0
-                    , stAlphaLambda = 0.1
-                    , stAlphaPhi = 0.01
-                    , stNodes = S.fromList $ nub $ sort $ map fst userTags
-                    , stFriendships = S.fromList friendships
-                    , stItems = S.fromList $ nub $ sort $ map snd userTags
-                    , stTopics = S.empty
-                    , stNodeItems = setupNodeItems userTags
-                    }
-     return (d, wordMap)
 
