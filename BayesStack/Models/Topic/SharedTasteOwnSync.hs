@@ -1,9 +1,12 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric #-}
 
 module BayesStack.Models.Topic.SharedTasteOwnSync
-  ( STData(..)
+  ( -- * Primitives
+    STData(..)
   , Node(..), Item(..), Topic(..)
+  , NodeItem, setupNodeItems
   , Friendship(..), otherFriend, isFriend, getFriends
+    -- * Model
   , STModel(..), ItemUnit
   , model, likelihood
   , STModelState (..), getModelState
@@ -52,13 +55,12 @@ data STData = STData { stAlphaGamma :: [(Bool,Double)]
                      , stFriendships :: Set Friendship
                      , stItems :: Set Item
                      , stTopics :: Set Topic
-                     , stNodeItems :: Seq (Node, Item)
+                     , stNodeItems :: EnumMap NodeItem (Node, Item)
                      }
                deriving (Show, Eq, Generic)
 instance Serialize STData
 
 data STModel = STModel { mData :: STData
-                       , mNodeItems :: EnumMap NodeItem (Node, Item)
                        , mGammas :: SharedEnumMap Node (DirMulti Bool)
                        , mOmegas :: SharedEnumMap Node (DirMulti Topic)
                        , mPsis :: SharedEnumMap Node (DirMulti Node)
@@ -70,7 +72,6 @@ data STModel = STModel { mData :: STData
                        }
 
 data STModelState = STModelState { msData :: STData
-                                 , msNodeItems :: EnumMap NodeItem (Node, Item)
                                  , msGammas :: EnumMap Node (DirMulti Bool)
                                  , msOmegas :: EnumMap Node (DirMulti Topic)
                                  , msPsis :: EnumMap Node (DirMulti Node)
@@ -100,13 +101,9 @@ data ItemUnit = ItemUnit { iuModel :: STModel
 model :: STData -> ModelMonad (Seq ItemUnit, STModel)
 model d =
   do let STData {stTopics=topics, stNodes=nodes, stItems=items, stNodeItems=nodeItems} = d
-         STData {stFriendships=friendships} = d
-         nis :: EnumMap NodeItem (Node,Item)
-         nis = EM.fromList $ zipWith (\idx (n,i)->(NodeItem idx, (n,i))) [0..] (toList nodeItems)
+         STData {stFriendships=friendships, stNodeItems=nis} = d
          friends :: EnumMap Node (Set Node)
-         --friends = map (\n->(n, S.map (otherFriend n) $ S.filter (isFriend n) friendships)) nodes
-         friends = EM.fromList $ map (\n->(n, S.fromList $ getFriends (S.toList friendships) n))
-                   $ S.toList nodes
+         friends = foldMap (\n->EM.singleton n $ S.fromList $ getFriends (S.toList friendships) n) nodes
      gammas <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ dirMulti (stAlphaGamma d) [True, False]
      omegas <- newSharedEnumMap (S.toList nodes) $ \n ->
@@ -126,7 +123,6 @@ model d =
        in liftRVar $ randomElementT $ SQ.fromList $ S.toList $ friends EM.! n
   
      let model = STModel { mData = d
-                         , mNodeItems = nis
                          , mGammas = gammas
                          , mOmegas = omegas
                          , mPsis = psis
@@ -164,7 +160,7 @@ model d =
 
 likelihood :: STModel -> ModelMonad LogFloat
 likelihood model =
-  do a <- forM (EM.toList $ mNodeItems model) $ \(ni, (n,x)) ->
+  do a <- forM (EM.toList $ stNodeItems $ mData model) $ \(ni, (n,x)) ->
        do s <- getShared $ mSs model EM.! ni
           t <- getShared $ mTs model EM.! ni 
           f <- getShared $ mFs model EM.! ni 
@@ -249,7 +245,6 @@ getModelState model =
      ts <- getSharedEnumMap $ mTs model
      l <- likelihood model
      return $ STModelState { msData = mData model
-                           , msNodeItems = mNodeItems model
                            , msGammas = gammas
                            , msOmegas = omegas
                            , msPsis = psis
