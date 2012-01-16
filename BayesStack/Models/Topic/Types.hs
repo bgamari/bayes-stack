@@ -52,3 +52,6 @@ isFriend u fs = isJust $ otherFriend u fs
 getFriends :: [Friendship] -> Node -> [Node]
 getFriends fs u = mapMaybe (otherFriend u) fs
 
+setupNodeItems :: [(Node,Item)] -> EnumMap NodeItem (Node, Item)
+setupNodeItems nodeItems = EM.fromList $ zipWith (\idx (n,i)->(NodeItem idx, (n,i))) [0..] nodeItems
+

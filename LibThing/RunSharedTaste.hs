@@ -3,8 +3,8 @@
 import Prelude hiding (mapM)
 
 import BayesStack.Core
-import BayesStack.Models.Topic.SharedTaste
 import BayesStack.DirMulti
+import BayesStack.Models.Topic.SharedTasteSync
 import LibThing.Data
 
 import Data.List ((\\), nub, sort)
@@ -85,7 +85,8 @@ run =
                 , stTopics = S.fromList $ map Topic [1..topics args]
                 }
      liftIO $ putStrLn "Finished creating network"
-     (ius, model) <- model d
+     init <- liftRVar $ randomInitialize d
+     (ius, model) <- model d init
      liftIO $ putStr $ printf "%d update units\n" (SQ.length ius)
 
      liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
@@ -115,7 +116,7 @@ getTags =
                     , stFriendships = S.fromList friendships
                     , stItems = S.fromList $ nub $ sort $ map snd userTags
                     , stTopics = S.empty
-                    , stNodeItems = SQ.fromList userTags
+                    , stNodeItems = setupNodeItems userTags
                     }
      return (d, wordMap)
 
