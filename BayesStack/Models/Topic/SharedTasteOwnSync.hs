@@ -9,7 +9,7 @@ module BayesStack.Models.Topic.SharedTasteOwnSync
   , Friendship(..), otherFriend, isFriend, getFriends
     -- * Initialization
   , ModelInit
-  , randomInitialize
+  , randomInitialize, smartInitialize
     -- * Model
   , STModel(..), ItemUnit
   , model, likelihood
@@ -36,6 +36,9 @@ import Data.Function (on)
 import Data.Maybe (mapMaybe, isJust)
 
 import Control.Monad (liftM)
+import Control.Monad.Trans.State
+import Control.Monad.Trans.Class
+
 import Data.Random
 import Data.Random.Distribution.Bernoulli
 import Data.Random.Sequence
@@ -50,7 +53,7 @@ import BayesStack.Models.Topic.Types
 import Control.Monad (when)
 import Control.Monad.IO.Class
 
-import Data.Serialize
+import Data.Serialize (Serialize)
 import GHC.Generics
 
 data ItemSource = Shared | Own deriving (Show, Eq, Generic, Enum, Ord)
@@ -105,16 +108,45 @@ randomInitialize' d init =
       topics = S.toList $ stTopics d
       randomInit :: NodeItem -> RVar ModelInit
       randomInit ni = do t <- randomElement topics
-                         let (n,_) = stNodeItems d EM.! ni
+                         let (n,_) = EM.findWithDefault (error "fucki'") ni (stNodeItems d) --stNodeItems d EM.! ni
                              friends = getFriends (S.toList $ stFriendships d) n
                          f <- randomElement friends
                          --s <- bernoulli (0.5::Double)
                          let s = Shared -- FIXME
                          return $ EM.singleton ni $ ItemVars s f t
-  in liftM mconcat $ forM (ES.toList unset) randomInit
+  in liftM ((init `mappend`) . mconcat) $ forM (ES.toList unset) randomInit
 
 randomInitialize :: STData -> RVar ModelInit
 randomInitialize = (flip randomInitialize') EM.empty
+
+smartInitialize :: STData -> RVar ModelInit
+smartInitialize d =
+  let STData {stTopics=topics, stNodes=nodes, stItems=items, stNodeItems=nodeItems} = d
+      STData {stFriendships=friendships, stNodeItems=nis} = d
+      nisInv :: EnumMap (Node,Item) [NodeItem]
+      nisInv = EM.fromListWith (++) $ map (\(ni,(n,i))->((n,i),[ni])) $ EM.toList nis
+
+      sharedTopics :: Friendship -> StateT (EnumMap Item Topic, EnumMap Friendship (Set Topic)) RVar ModelInit
+      sharedTopics fs@(Friendship (a,b)) =
+        let findItems n = S.fromList $ map snd $ filter (\(n',i)->n==n') $ toList nodeItems
+            sharedItems = toList $ S.intersection (findItems a) (findItems b)
+        in liftM mconcat $ forM sharedItems $ \x -> do
+             (itemTopics,_) <- get
+             t <- if x `EM.member` itemTopics
+                    then return $ itemTopics EM.! x
+                    else do (_, friendshipTopics) <- get
+                            --let possTopics = EM.findWithDefault topics fs friendshipTopics
+                            let possTopics = topics -- FIXME
+                            t <- lift $ randomElement $ S.toList possTopics
+                            modify $ \(a,b)->(EM.insert x t a, b)
+                            return t
+             modify $ \(a,b)->(a, EM.insertWith S.union fs (S.singleton t) b)
+             return $ EM.fromList $ do ax <- EM.findWithDefault (error "fuck") (a,x) nisInv --nisInv EM.! (a,x)
+                                       return (ax, ItemVars Shared b t)
+                                 ++ do bx <- EM.findWithDefault (error "fuck2") (b,x) nisInv -- nisInv EM.! (b,x)
+                                       return (bx, ItemVars Shared a t)
+  in do a <- evalStateT (mapM sharedTopics $ S.toList friendships) (EM.empty, EM.empty)
+        randomInitialize' d $ mconcat a
 
 data ItemUnit = ItemUnit { iuModel :: STModel
                          , iuNodeItem :: NodeItem
@@ -146,7 +178,8 @@ model d init =
      phis <- newSharedEnumMap (S.toList topics) $ \t ->
        return $ symDirMulti (stAlphaPhi d) (S.toList items)
 
-     ivs <- newSharedEnumMap (EM.keys nis) $ \ni -> return $ init EM.! ni
+     ivs <- newSharedEnumMap (EM.keys nis) $ \ni ->
+       return $ EM.findWithDefault (error "Incomplete initialization") ni init
   
      let model = STModel { mData = d
                          , mGammas = gammas
