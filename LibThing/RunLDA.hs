@@ -59,13 +59,18 @@ serializeState model fname =
 main = withSystemRandom $ runModel run
 run = 
   do args <- liftIO $ cmdArgs libThingLDA
-     (d', wordMap) <- liftIO getTags
-     let d = d' { ldaAlphaTheta = theta args
-                , ldaAlphaPhi = phi args
-                , ldaTopics = S.fromList $ map Topic [1..topics args]
-                }
+     (userTags, wordMap) <- liftIO readTags
+     let d = LDAData { ldaAlphaTheta = theta args
+                     , ldaAlphaPhi = phi args
+                     , ldaNodes = S.fromList $ nub $ sort $ map fst userTags
+                     , ldaItems = S.fromList $ nub $ sort $ map snd userTags
+                     , ldaTopics = S.empty
+                     , ldaNodeItems = setupNodeItems userTags
+                     }
      liftIO $ putStrLn "Finished creating network"
-     (ius, model) <- model d
+
+     init <- liftRVar $ randomInitialize d
+     (ius, model) <- model d init
   
      liftIO $ putStrLn "Starting inference"
      let gibbsUpdate :: Int -> S.StateT LogFloat ModelMonad ()
@@ -79,15 +84,3 @@ run =
 
      S.runStateT (forM_ [0..] gibbsUpdate) 0
  
-getTags :: IO (LDAData, Map Item String)
-getTags =
-  do (userTags, wordMap) <- readTags
-     let d = LDAData { ldaAlphaTheta = 0.1
-                     , ldaAlphaPhi = 0.1
-                     , ldaNodes = S.fromList $ nub $ sort $ map fst userTags
-                     , ldaItems = S.fromList $ nub $ sort $ map snd userTags
-                     , ldaTopics = S.empty
-                     , ldaNodeItems = SQ.fromList userTags
-                     }
-     return (d, wordMap)
-
