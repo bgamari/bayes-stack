@@ -50,7 +50,7 @@ data LibThingLDA = LibThingLDA { theta :: Double
                                } deriving (Show, Data, Typeable)
 
 libThingLDA = LibThingLDA { theta = 0.1 &= help "Alpha theta"
-                          , phi = 0.1 &= help "Alpha phi"
+                          , phi = 0.01 &= help "Alpha phi"
                           , topics = 10 &= help "Number of topics"
                           , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
                           }
@@ -78,7 +78,7 @@ run =
                      , ldaAlphaPhi = phi args
                      , ldaNodes = S.fromList $ nub $ sort $ map fst userTags
                      , ldaItems = S.fromList $ nub $ sort $ map snd userTags
-                     , ldaTopics = S.empty
+                     , ldaTopics = S.fromList $ map Topic [1..topics args]
                      , ldaNodeItems = setupNodeItems userTags
                      }
      liftIO $ putStrLn "Finished creating network"
@@ -97,6 +97,7 @@ run =
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
               when (sweepN >= 10 && sweepN `mod` 20 == 0) $ do liftIO $ putStrLn "Parameter estimation"
                                                                lift $ reestimateParams model
+                                                               lift $ concurrentGibbsUpdate 10 ius
                                                                lift (likelihood model) >>= S.put
               lift $ concurrentGibbsUpdate 10 ius
 

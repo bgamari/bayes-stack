@@ -4,8 +4,8 @@ import Prelude hiding (mapM)
 
 import BayesStack.Core
 import BayesStack.DirMulti
-import BayesStack.Models.Topic.SharedTaste
---import BayesStack.Models.Topic.SharedTasteSync
+--import BayesStack.Models.Topic.SharedTaste
+import BayesStack.Models.Topic.SharedTasteSync
 import LibThing.Data
 
 import Data.List ((\\), nub, sort)
@@ -53,7 +53,7 @@ data LibThing = LibThingST { psi :: Double
 
 libThingST = LibThingST { psi = 0.1 &= help "Alpha psi"
                         , lambda = 0.1 &= help "Alpha lambda"
-                        , phi = 0.1 &= help "Alpha phi"
+                        , phi = 0.01 &= help "Alpha phi"
                         , topics = 10 &= help "Number of topics"
                         , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
                         }
@@ -64,9 +64,9 @@ serializeState model fname =
      liftIO $ BS.writeFile fname $ runPut $ put s
 
 reestimateParams model =
-  do alphas <- mapM getShared $ mPsis model
-     let alphas' = reestimatePriors alphas
-     mapM_ (\(u,lambda)->setShared (mPsis model EM.! u) lambda) $ EM.toList alphas'
+  do --alphas <- mapM getShared $ mPsis model
+     --let alphas' = reestimatePriors alphas
+     --mapM_ (\(u,lambda)->setShared (mPsis model EM.! u) lambda) $ EM.toList alphas'
 
      alphas <- mapM getShared $ mLambdas model
      let alphas' = reestimatePriors alphas
@@ -107,6 +107,7 @@ run =
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
               when (sweepN >= 10 && sweepN `mod` 20 == 0) $ do liftIO $ putStrLn "Parameter estimation"
                                                                lift $ reestimateParams model
+                                                               lift $ concurrentGibbsUpdate 10 ius
                                                                lift (likelihood model) >>= S.put
               lift $ concurrentGibbsUpdate 10 ius
 

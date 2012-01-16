@@ -4,8 +4,8 @@ import Prelude hiding (mapM)
 
 import BayesStack.Core
 import BayesStack.DirMulti
-import BayesStack.Models.Topic.SharedTasteOwn
---import BayesStack.Models.Topic.SharedTasteOwnSync
+--import BayesStack.Models.Topic.SharedTasteOwn
+import BayesStack.Models.Topic.SharedTasteOwnSync
 import LibThing.Data
 
 import Data.List ((\\), nub, sort)
@@ -44,7 +44,7 @@ import Text.Printf
 
 import System.Console.CmdArgs
 
-data LibThingST = LibThingST { gamma :: Double
+data LibThingST = LibThingST { gamma_shared, gamma_own :: Double
                              , omega :: Double
                              , lambda :: Double
                              , psi :: Double
@@ -53,11 +53,12 @@ data LibThingST = LibThingST { gamma :: Double
                              , sweeps_dir :: FilePath
                              } deriving (Show, Data, Typeable)
 
-libThingST = LibThingST { gamma = 0.1 &= help "Alpha gamma"
+libThingST = LibThingST { gamma_shared = 45 &= help "Alpha gamma"
+                        , gamma_own = 5 &= help "Alpha gamma"
                         , omega = 0.1 &= help "Alpha omega"
-                        , psi = 0.1 &= help "Alpha psi"
+                        , psi = 0.5 &= help "Alpha psi"
                         , lambda = 0.1 &= help "Alpha lambda"
-                        , phi = 0.1 &= help "Alpha phi"
+                        , phi = 0.01 &= help "Alpha phi"
                         , topics = 10 &= help "Number of topics"
                         , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
                         }
@@ -68,8 +69,7 @@ serializeState model fname =
      liftIO $ BS.writeFile fname $ runPut $ put s
 
 reestimateParams model =
-  do liftIO $ putStrLn "Parameter reestimation"
-     alphas <- mapM getShared $ mGammas model
+  do alphas <- mapM getShared $ mGammas model
      let alphas' = reestimatePriors alphas
      mapM_ (\(u,lambda)->setShared (mGammas model EM.! u) lambda) $ EM.toList alphas'
 
@@ -77,9 +77,9 @@ reestimateParams model =
      let alphas' = reestimatePriors alphas
      mapM_ (\(k,v)->setShared (mOmegas model EM.! k) v) $ EM.toList alphas'
 
-     alphas <- mapM getShared $ mPsis model
-     let alphas' = reestimatePriors alphas
-     mapM_ (\(u,lambda)->setShared (mPsis model EM.! u) lambda) $ EM.toList alphas'
+     --alphas <- mapM getShared $ mPsis model
+     --let alphas' = reestimatePriors alphas
+     --mapM_ (\(u,lambda)->setShared (mPsis model EM.! u) lambda) $ EM.toList alphas'
 
      alphas <- mapM getShared $ mLambdas model
      let alphas' = reestimatePriors alphas
@@ -95,7 +95,7 @@ run =
      (userTags, wordMap) <- liftIO readTags
      liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
      friendships <- liftIO readFriendships
-     let d = STData { stAlphaGamma = [(True, gamma args), (False, 1-gamma args)]
+     let d = STData { stAlphaGamma = [(True, gamma_shared args), (False, gamma_own args)]
                     , stAlphaOmega = omega args
                     , stAlphaPsi = psi args
                     , stAlphaLambda = lambda args
@@ -117,11 +117,12 @@ run =
          gibbsUpdate sweepN =
            do l <- lift $ likelihood model
               lastMax <- S.get
-              when (l > lastMax) $ do lift $ serializeState model $ printf "sweeps/%05d" sweepN
+              when (l > lastMax) $ do lift $ serializeState model $ printf "%s/%05d" (sweeps_dir args) sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
               when (sweepN >= 10 && sweepN `mod` 20 == 0) $ do liftIO $ putStrLn "Parameter estimation"
                                                                lift $ reestimateParams model
+                                                               lift $ concurrentGibbsUpdate 10 ius
                                                                lift (likelihood model) >>= S.put
               lift $ concurrentGibbsUpdate 10 ius
 
