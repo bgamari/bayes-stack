@@ -95,7 +95,8 @@ run =
      (userTags, wordMap) <- liftIO readTags
      liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
      friendships <- liftIO readFriendships
-     let d = STData { stAlphaGamma = [(True, gamma_shared args), (False, gamma_own args)]
+     let d = STData { stAlphaGammaShared = gamma_shared args
+                    , stAlphaGammaOwn = gamma_own args
                     , stAlphaOmega = omega args
                     , stAlphaPsi = psi args
                     , stAlphaLambda = lambda args
