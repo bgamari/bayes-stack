@@ -165,6 +165,7 @@ estimatePrior nInter dms =
       --f :: Enum a => EnumMap a Alpha -> EnumMap a Alpha
       f alphas =
         let newAlpha :: EnumMap Int Int -> Double -> Double
+            newAlpha hist _ | EM.null hist = 1e-5 -- Empty histogram
             newAlpha hist x =
               let (n,_) = EM.findMax hist
                   digammas n = tail $ scanl (\digamma i -> digamma + 1/(x + realToFrac i - 1)) 0 [1..n]
@@ -173,7 +174,7 @@ estimatePrior nInter dms =
                                         * realToFrac digamma)
                  (digammas n) [1..n]
             --alpha' :: Enum a => a -> Alpha -> Alpha
-            alpha' k alpha = let num = newAlpha (binHist EM.! k) (alphas EM.! k)
+            alpha' k alpha = let num = newAlpha (EM.findWithDefault EM.empty k binHist) (alphas EM.! k)
                                  denom = newAlpha lengthHist (sum $ EM.elems alphas)
                              in alpha * num /  denom
         in EM.mapWithKey alpha' alphas
