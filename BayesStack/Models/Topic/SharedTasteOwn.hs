@@ -6,6 +6,9 @@ module BayesStack.Models.Topic.SharedTasteOwn
   , Node(..), Item(..), Topic(..)
   , NodeItem, setupNodeItems
   , Friendship(..), otherFriend, isFriend, getFriends
+  -- * Initialization
+  , ModelInit
+  , randomInitialize
     -- * Model
   , STModel(..), ItemUnit
   , model, likelihood
