@@ -7,6 +7,7 @@ module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                              -- * Prior parameter
                            , Alpha(..)
                            , alphaToMeanPrecision, meanPrecisionToAlpha, symmetrizeAlpha
+                           , prettyAlpha
                              -- * Parameter estimation
                            , estimatePrior, reestimatePriors, reestimateSymPriors
                            ) where
@@ -132,9 +133,13 @@ prettyDirMulti n showA dm =
             $ take n $ Data.Foldable.toList
             $ SQ.sortBy (flip (compare `on` fst)) $ probabilities dm)
 
-prettyAlpha :: (a -> String) -> Alpha a -> Doc
+prettyAlpha :: Enum a => (a -> String) -> Alpha a -> Doc
 prettyAlpha showA (SymAlpha _ alpha) = text "Symmetric" <+> double alpha
-prettyAlpha showA (Alpha alpha) = text "Assymmetric"
+prettyAlpha showA (Alpha alpha) =
+  text "Assymmetric"
+  <+> fsep (punctuate comma
+           $ map (\(a,alpha)->text (showA a) <> parens (text $ printf "%1.2e" alpha))
+           $ take 100 $ EM.toList $ alpha)
 
 -- | Number of iterations to run in prior estimation
 nEstimationIters = 1000
