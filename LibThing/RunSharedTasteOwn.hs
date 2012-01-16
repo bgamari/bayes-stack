@@ -23,11 +23,12 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
 import Data.Traversable (mapM)
+import Data.Foldable (forM_)
 
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State as S
-import Control.Monad hiding (mapM)
+import Control.Monad hiding (mapM, forM_)
 
 import Data.Random hiding (gamma)
 import System.Random.MWC (GenIO, withSystemRandom)
@@ -68,26 +69,41 @@ serializeState model fname =
   do s <- getModelState model
      liftIO $ BS.writeFile fname $ runPut $ put s
 
-reestimateParams model =
-  do alphas <- mapM getShared $ mGammas model
-     let alphas' = reestimatePriors alphas
-     mapM_ (\(u,lambda)->setShared (mGammas model EM.! u) lambda) $ EM.toList alphas'
+reestimateGamma model =
+  do dms <- mapM getShared $ mGammas model
+     let dms' = reestimatePriors dms
+     mapM_ (\(u,lambda)->setShared (mGammas model EM.! u) lambda) $ EM.toList dms'
+     liftIO $ putStr "Alpha Gammas"
+     liftIO $ print $ prettyDirMulti 10 show $ head $ EM.elems dms'
 
-     alphas <- mapM getShared $ mOmegas model
-     let alphas' = reestimatePriors alphas
-     mapM_ (\(k,v)->setShared (mOmegas model EM.! k) v) $ EM.toList alphas'
+reestimateOmega model =
+  do dms <- mapM getShared $ mOmegas model
+     liftIO $ mapM_ (print) $ EM.toList dms
+     let dms' = reestimatePriors dms
+     mapM_ (\(k,v)->setShared (mOmegas model EM.! k) v) $ EM.toList dms'
+     liftIO $ putStr "Alpha Omegas"
+     liftIO $ print $ prettyDirMulti 10 show $ head $ EM.elems dms'
 
-     --alphas <- mapM getShared $ mPsis model
-     --let alphas' = reestimatePriors alphas
-     --mapM_ (\(u,lambda)->setShared (mPsis model EM.! u) lambda) $ EM.toList alphas'
+reestimatePsi model =
+  do dms <- mapM getShared $ mPsis model
+     let dms' = reestimatePriors dms
+     mapM_ (\(u,psi)->setShared (mPsis model EM.! u) psi) $ EM.toList dms'
+     liftIO $ putStr "Alpha Psi"
+     liftIO $ print $ prettyDirMulti 10 show $ head $ EM.elems dms'
 
-     alphas <- mapM getShared $ mLambdas model
-     let alphas' = reestimatePriors alphas
-     mapM_ (\(u,lambda)->setShared (mLambdas model EM.! u) lambda) $ EM.toList alphas'
+reestimateLambda model =
+  do dms <- mapM getShared $ mLambdas model
+     let dms' = reestimatePriors dms
+     mapM_ (\(u,lambda)->setShared (mLambdas model EM.! u) lambda) $ EM.toList dms'
+     liftIO $ putStr "Alpha Lambda"
+     liftIO $ print $ prettyDirMulti 10 show $ head $ EM.elems dms'
 
-     alphas <- mapM getShared $ mPhis model
-     let alphas' = reestimateSymPriors alphas
-     mapM_ (\(t,phi)->setShared (mPhis model EM.! t) phi) $ EM.toList alphas'
+reestimatePhi model =
+  do dms <- mapM getShared $ mPhis model
+     let dms' = reestimateSymPriors dms
+     mapM_ (\(t,phi)->setShared (mPhis model EM.! t) phi) $ EM.toList dms'
+     liftIO $ putStr "Alpha Phi"
+     liftIO $ print $ prettyDirMulti 10 show $ head $ EM.elems dms'
 
 main = withSystemRandom $ runModel run
 run = 
@@ -96,7 +112,7 @@ run =
      liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
      friendships <- liftIO readFriendships
      let d = STData { stAlphaGammaShared = gamma_shared args
-                    , stAlphaGammaOwn = gamma_own args
+                    , stAlphaGammaOwn = 0 -- gamma_own args
                     , stAlphaOmega = omega args
                     , stAlphaPsi = psi args
                     , stAlphaLambda = lambda args
@@ -109,7 +125,7 @@ run =
                     }
      liftIO $ putStrLn "Finished creating network"
 
-     init <- liftRVar $ randomInitialize d
+     init <- liftRVar $ smartInitialize d
      (ius, model) <- model d init
      liftIO $ putStr $ printf "%d update units\n" (SQ.length ius)
 
@@ -121,10 +137,23 @@ run =
               when (l > lastMax) $ do lift $ serializeState model $ printf "%s/%05d" (sweeps_dir args) sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
-              when (sweepN >= 10 && sweepN `mod` 20 == 0) $ do liftIO $ putStrLn "Parameter estimation"
-                                                               lift $ reestimateParams model
-                                                               lift $ concurrentGibbsUpdate 10 ius
-                                                               lift (likelihood model) >>= S.put
+              c <- lift $ mapM getShared $ EM.elems $ mOmegas model
+              liftIO $ putStrLn $ show $ sum $ map dmTotal c
+              c <- lift $ mapM getShared $ EM.elems $ mLambdas model
+              liftIO $ putStrLn $ show $ sum $ map dmTotal c
+
+              when (False && sweepN >= 30 && sweepN `mod` 10 == 0) $ do
+                liftIO $ putStrLn "Parameter estimation"
+                lift $ reestimateLambda model
+                lift $ reestimatePhi model
+                lift $ concurrentGibbsUpdate 10 ius
+                lift (likelihood model) >>= S.put
+
+              when (False && sweepN == 20) $ do
+                let update = updatePrior $ setAlphaOf Own (gamma_own args)
+                lift $ forM_ (mGammas model) $ \dm->updateShared dm update
+                liftIO $ putStrLn "Enabled own topics"
+
               lift $ concurrentGibbsUpdate 10 ius
 
      S.runStateT (forM_ [0..] gibbsUpdate) 0
