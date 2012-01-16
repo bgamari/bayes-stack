@@ -1,7 +1,11 @@
 {-# LANGUAGE OverlappingInstances, DeriveDataTypeable #-}
 
+import Prelude hiding (mapM)
+
 import BayesStack.Core
-import BayesStack.Models.Topic.SharedTasteOwnSync
+import BayesStack.DirMulti
+import BayesStack.Models.Topic.SharedTasteOwn
+--import BayesStack.Models.Topic.SharedTasteOwnSync
 import LibThing.Data
 
 import Data.List ((\\), nub, sort)
@@ -18,10 +22,12 @@ import qualified Data.Map as M
 import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
+import Data.Traversable (mapM)
+
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State as S
-import Control.Monad
+import Control.Monad hiding (mapM)
 
 import Data.Random hiding (gamma)
 import System.Random.MWC (GenIO, withSystemRandom)
@@ -61,6 +67,28 @@ serializeState model fname =
   do s <- getModelState model
      liftIO $ BS.writeFile fname $ runPut $ put s
 
+reestimateParams model =
+  do liftIO $ putStrLn "Parameter reestimation"
+     alphas <- mapM getShared $ mGammas model
+     let alphas' = reestimatePriors alphas
+     mapM_ (\(u,lambda)->setShared (mGammas model EM.! u) lambda) $ EM.toList alphas'
+
+     alphas <- mapM getShared $ mOmegas model
+     let alphas' = reestimatePriors alphas
+     mapM_ (\(k,v)->setShared (mOmegas model EM.! k) v) $ EM.toList alphas'
+
+     alphas <- mapM getShared $ mPsis model
+     let alphas' = reestimatePriors alphas
+     mapM_ (\(u,lambda)->setShared (mPsis model EM.! u) lambda) $ EM.toList alphas'
+
+     alphas <- mapM getShared $ mLambdas model
+     let alphas' = reestimatePriors alphas
+     mapM_ (\(u,lambda)->setShared (mLambdas model EM.! u) lambda) $ EM.toList alphas'
+
+     alphas <- mapM getShared $ mPhis model
+     let alphas' = reestimateSymPriors alphas
+     mapM_ (\(t,phi)->setShared (mPhis model EM.! t) phi) $ EM.toList alphas'
+
 main = withSystemRandom $ runModel run
 run = 
   do args <- liftIO $ cmdArgs libThingST
@@ -93,6 +121,8 @@ run =
               when (l > lastMax) $ do lift $ serializeState model $ printf "sweeps/%05d" sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
+              when (sweepN >= 10 && sweepN `mod` 20 == 0) $ do lift $ reestimateParams model
+                                                               lift (likelihood model) >>= S.put
               lift $ concurrentGibbsUpdate 10 ius
 
      S.runStateT (forM_ [0..] gibbsUpdate) 0

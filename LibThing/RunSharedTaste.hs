@@ -4,7 +4,8 @@ import Prelude hiding (mapM)
 
 import BayesStack.Core
 import BayesStack.DirMulti
-import BayesStack.Models.Topic.SharedTasteSync
+import BayesStack.Models.Topic.SharedTaste
+--import BayesStack.Models.Topic.SharedTasteSync
 import LibThing.Data
 
 import Data.List ((\\), nub, sort)
@@ -43,7 +44,7 @@ import Text.Printf
 
 import System.Console.CmdArgs
 
-data LibThingST = LibThingST { psi :: Double
+data LibThing = LibThingST { psi :: Double
                              , lambda :: Double
                              , phi :: Double
                              , topics :: Int
@@ -63,17 +64,18 @@ serializeState model fname =
      liftIO $ BS.writeFile fname $ runPut $ put s
 
 reestimateParams model =
-  do liftIO $ putStrLn "Lambda parameter reestimation"
+  do liftIO $ putStrLn "Parameter estimation"
+     alphas <- mapM getShared $ mPsis model
+     let alphas' = reestimatePriors alphas
+     mapM_ (\(u,lambda)->setShared (mPsis model EM.! u) lambda) $ EM.toList alphas'
+
      alphas <- mapM getShared $ mLambdas model
      let alphas' = reestimatePriors alphas
      mapM_ (\(u,lambda)->setShared (mLambdas model EM.! u) lambda) $ EM.toList alphas'
-     liftIO $ print $ head $ EM.elems alphas'
 
-     liftIO $ putStrLn "Phi parameter reestimation"
      alphas <- mapM getShared $ mPhis model
      let alphas' = reestimateSymPriors alphas
      mapM_ (\(t,phi)->setShared (mPhis model EM.! t) phi) $ EM.toList alphas'
-     liftIO $ print $ head $ EM.elems alphas'
 
 main = withSystemRandom $ runModel run
 run = 
