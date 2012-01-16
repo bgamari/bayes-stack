@@ -136,23 +136,23 @@ prettyAlpha :: (a -> String) -> Alpha a -> Doc
 prettyAlpha showA (SymAlpha _ alpha) = text "Symmetric" <+> double alpha
 prettyAlpha showA (Alpha alpha) = text "Assymmetric"
 
+-- | Number of iterations to run in prior estimation
+nEstimationIters = 1000
+
 reestimatePriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimatePriors dms =
-  let alpha = estimatePrior $ toList dms
+  let alpha = estimatePrior nEstimationIters $ toList dms
   in fmap (\dm->dm {dmAlpha=alpha}) dms
 
 reestimateSymPriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimateSymPriors dms =
-  let alpha = symmetrizeAlpha $ estimatePrior $ toList dms
+  let alpha = symmetrizeAlpha $ estimatePrior nEstimationIters $ toList dms
   in fmap (\dm->dm {dmAlpha=alpha}) dms
-
--- | Number of iterations to run in prior estimation
-nEstimationIters = 1000
 
 -- | Estimate the prior alpha from a Dirichlet/multinomial
 -- Based on Andrew Mccallum's interpretation of Tom Minka's implementation
-estimatePrior :: (Enum a) => [DirMulti a] -> Alpha a
-estimatePrior dms =
+estimatePrior :: (Enum a) => Int -> [DirMulti a] -> Alpha a
+estimatePrior nInter dms =
   let domain = toList $ dmDomain $ head dms
       --binHist :: Enum a => EnumMap a (EnumMap Int Int)
       binHist = EM.map (EM.fromListWith (+))
@@ -178,6 +178,6 @@ estimatePrior dms =
                              in alpha * num /  denom
         in EM.mapWithKey alpha' alphas
       alphas0 = EM.fromList $ zip domain $ map (alphaOf (dmAlpha $ head dms)) domain
-  in Alpha $ head $ drop nEstimationIters $ iterate f alphas0
+  in Alpha $ head $ drop nIter $ iterate f alphas0
 {-# INLINEABLE estimatePrior #-}
 
