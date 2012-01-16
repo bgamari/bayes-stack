@@ -1,8 +1,11 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric #-}
 
 module BayesStack.Models.Topic.LDA
-  ( LDAData(..)
+  ( -- * Primitives
+    LDAData(..)
   , Node(..), Item(..), Topic(..)
+  , NodeItem, setupNodeItems
+    -- * Model
   , LDAModel(..), ItemUnit
   , LDAModelState(..), getModelState
   , model, likelihood
@@ -43,20 +46,18 @@ data LDAData = LDAData { ldaAlphaTheta :: Double
                        , ldaNodes :: Set Node
                        , ldaItems :: Set Item
                        , ldaTopics :: Set Topic
-                       , ldaNodeItems :: Seq (Node, Item)
+                       , ldaNodeItems :: EnumMap NodeItem (Node, Item)
                        }
                deriving (Show, Eq, Generic)
 instance Serialize LDAData
 
 data LDAModel = LDAModel { mData :: LDAData
-                         , mNodeItems :: EnumMap NodeItem (Node, Item)
                          , mThetas :: SharedEnumMap Node (DirMulti Topic)
                          , mPhis :: SharedEnumMap Topic (DirMulti Item)
                          , mTs :: SharedEnumMap NodeItem Topic
                          } deriving (Generic)
 
 data LDAModelState = LDAModelState { msData :: LDAData
-                                   , msNodeItems :: EnumMap NodeItem (Node, Item)
                                    , msThetas :: EnumMap Node (DirMulti Topic)
                                    , msPhis :: EnumMap Topic (DirMulti Item)
                                    , msTs :: EnumMap NodeItem Topic
@@ -76,8 +77,7 @@ data ItemUnit = ItemUnit { iuData :: LDAData
 
 model :: LDAData -> ModelMonad (Seq ItemUnit, LDAModel)
 model d =
-  do let LDAData {ldaTopics=topics, ldaNodes=nodes, ldaItems=items, ldaNodeItems=nodeItems} = d
-         nis = EM.fromList $ zipWith (\idx (n,i)->(NodeItem idx, (n,i))) [0..] (toList nodeItems)
+  do let LDAData {ldaTopics=topics, ldaNodes=nodes, ldaItems=items, ldaNodeItems=nis} = d
      thetas <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ symDirMulti (ldaAlphaTheta d) (S.toList topics)
      phis <- newSharedEnumMap (S.toList topics) $ \t ->
@@ -98,7 +98,6 @@ model d =
           getShared t >>= guSet unit
           return unit
      let model = LDAModel { mData = d
-                          , mNodeItems = nis
                           , mThetas = thetas
                           , mPhis = phis
                           , mTs = ts }
@@ -106,7 +105,7 @@ model d =
 
 likelihood :: LDAModel -> ModelMonad LogFloat
 likelihood model =
-  do a <- forM (EM.toList $ mNodeItems model) $ \(ni, (n,i)) ->
+  do a <- forM (EM.toList $ ldaNodeItems $ mData model) $ \(ni, (n,i)) ->
        do t <- getShared $ mTs model EM.! ni 
           theta <- getShared $ mThetas model EM.! n
           phi <- getShared $ mPhis model EM.! t
@@ -149,7 +148,6 @@ getModelState model =
      ts <- getSharedEnumMap $ mTs model
      l <- likelihood model
      return $ LDAModelState { msData = mData model 
-                            , msNodeItems = mNodeItems model
                             , msThetas = thetas
                             , msPhis = phis
                             , msTs = ts
