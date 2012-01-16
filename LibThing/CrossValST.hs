@@ -11,6 +11,7 @@ import qualified Data.ByteString as BS
 import qualified Data.EnumMap as EM
 
 import System.IO
+import System.Directory
 import System.Environment
 import Data.Serialize
 
@@ -39,8 +40,10 @@ main =
      let Right state = s
 
      groups <- getGroups
+     createDirectoryIfMissing False $ f++"-crossval-nodes"
+     createDirectoryIfMissing False $ f++"-crossval-edges"
      forM_ (EM.toList groups) $ \(Group i, members) ->
-       do f <- openFile (printf "group%d-nodes" i) WriteMode
+       do f <- openFile (printf "%s-crossval-nodes/group%d" f i) WriteMode
           forM_ (stNodes $ msData state) $ \u ->
             do let isMember = u `elem` members
                hPrintf f "%d" (if isMember then 1 else 0 :: Int)
@@ -49,7 +52,7 @@ main =
                hPutStr f "\n"
 
      forM_ (EM.toList groups) $ \(Group i, members) ->
-       do f <- openFile (printf "group%d-edges" i) WriteMode
+       do f <- openFile (printf "%s-crossval-edges/group%d" f i) WriteMode
           forM_ (stFriendships $ msData state) $ \(Friendship (a,b)) ->
             do let isMember = a `elem` members && b `elem` members
                hPrintf f "%d" (if isMember then 1 else 0 :: Int)

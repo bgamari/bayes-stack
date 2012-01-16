@@ -11,6 +11,7 @@ import qualified Data.ByteString as BS
 import qualified Data.EnumMap as EM
 
 import System.IO
+import System.Directory
 import System.Environment
 import Data.Serialize
 
@@ -35,8 +36,9 @@ main =
      let groups = nub $ map snd userGroups
          nodes = ldaNodes $ msData state
          topics = ldaTopics $ msData state
+     createDirectoryIfMissing False $ f++"-crossval-nodes"
      forM_ groups $ \g@(Group n) ->
-       do f <- openFile (printf "group%d" n) WriteMode
+       do f <- openFile (printf "%s-crossval-nodes/group%02d" f n) WriteMode
           forM_ nodes $ \u ->
             do let isMember = (u,g) `elem` userGroups
                hPrintf f "%d" (if isMember then 1 else 0 :: Int)
