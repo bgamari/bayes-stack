@@ -56,6 +56,16 @@ serializeState model fname =
   do s <- getModelState model
      liftIO $ BS.writeFile fname $ runPut $ put s
 
+reestimateParams model =
+  do liftIO $ putStrLn "Parameter estimation"
+     alphas <- mapM getShared $ mThetas model
+     let alphas' = reestimatePriors alphas
+     mapM_ (\(u,lambda)->setShared (mThetas model EM.! u) lambda) $ EM.toList alphas'
+
+     alphas <- mapM getShared $ mPhis model
+     let alphas' = reestimateSymPriors alphas
+     mapM_ (\(t,phi)->setShared (mPhis model EM.! t) phi) $ EM.toList alphas'
+
 main = withSystemRandom $ runModel run
 run = 
   do args <- liftIO $ cmdArgs libThingLDA
