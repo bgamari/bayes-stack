@@ -93,6 +93,7 @@ main = withSystemRandom $ runModel run
 run = 
   do args <- liftIO $ cmdArgs libThingST
      (userTags, wordMap) <- liftIO readTags
+     liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
      friendships <- liftIO readFriendships
      let d = STData { stAlphaGamma = [(True, gamma args), (False, 1-gamma args)]
                     , stAlphaOmega = omega args
@@ -111,8 +112,6 @@ run =
      (ius, model) <- model d init
      liftIO $ putStr $ printf "%d update units\n" (SQ.length ius)
 
-     liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
-  
      liftIO $ putStrLn "Starting inference"
      let gibbsUpdate :: Int -> S.StateT LogFloat ModelMonad ()
          gibbsUpdate sweepN =
@@ -121,7 +120,8 @@ run =
               when (l > lastMax) $ do lift $ serializeState model $ printf "sweeps/%05d" sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
-              when (sweepN >= 10 && sweepN `mod` 20 == 0) $ do lift $ reestimateParams model
+              when (sweepN >= 10 && sweepN `mod` 20 == 0) $ do liftIO $ putStrLn "Parameter estimation"
+                                                               lift $ reestimateParams model
                                                                lift (likelihood model) >>= S.put
               lift $ concurrentGibbsUpdate 10 ius
 

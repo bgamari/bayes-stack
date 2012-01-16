@@ -1,6 +1,9 @@
 {-# LANGUAGE OverlappingInstances, DeriveDataTypeable #-}
 
+import Prelude hiding (mapM)
+
 import BayesStack.Core
+import BayesStack.DirMulti
 import BayesStack.Models.Topic.LDA
 import LibThing.Data
 
@@ -18,10 +21,12 @@ import qualified Data.Map as M
 import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
+import Data.Traversable (mapM)
+
 import Control.Monad.IO.Class
 import qualified Control.Monad.Trans.State as S
 import Control.Monad.Trans.Class (lift)
-import Control.Monad
+import Control.Monad hiding (mapM)
   
 import Data.Random
 import System.Random.MWC (GenIO, withSystemRandom)
@@ -57,8 +62,7 @@ serializeState model fname =
      liftIO $ BS.writeFile fname $ runPut $ put s
 
 reestimateParams model =
-  do liftIO $ putStrLn "Parameter estimation"
-     alphas <- mapM getShared $ mThetas model
+  do alphas <- mapM getShared $ mThetas model
      let alphas' = reestimatePriors alphas
      mapM_ (\(u,lambda)->setShared (mThetas model EM.! u) lambda) $ EM.toList alphas'
 
@@ -81,6 +85,7 @@ run =
 
      init <- liftRVar $ randomInitialize d
      (ius, model) <- model d init
+     liftIO $ putStr $ printf "%d update units\n" (SQ.length ius)
   
      liftIO $ putStrLn "Starting inference"
      let gibbsUpdate :: Int -> S.StateT LogFloat ModelMonad ()
@@ -90,6 +95,9 @@ run =
               when (l > lastMax) $ do lift $ serializeState model $ printf "%s/%05d" (sweeps_dir args) sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
+              when (sweepN >= 10 && sweepN `mod` 20 == 0) $ do liftIO $ putStrLn "Parameter estimation"
+                                                               lift $ reestimateParams model
+                                                               lift (likelihood model) >>= S.put
               lift $ concurrentGibbsUpdate 10 ius
 
      S.runStateT (forM_ [0..] gibbsUpdate) 0

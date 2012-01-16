@@ -45,11 +45,11 @@ import Text.Printf
 import System.Console.CmdArgs
 
 data LibThing = LibThingST { psi :: Double
-                             , lambda :: Double
-                             , phi :: Double
-                             , topics :: Int
-                             , sweeps_dir :: FilePath
-                             } deriving (Show, Data, Typeable)
+                           , lambda :: Double
+                           , phi :: Double
+                           , topics :: Int
+                           , sweeps_dir :: FilePath
+                           } deriving (Show, Data, Typeable)
 
 libThingST = LibThingST { psi = 0.1 &= help "Alpha psi"
                         , lambda = 0.1 &= help "Alpha lambda"
@@ -64,8 +64,7 @@ serializeState model fname =
      liftIO $ BS.writeFile fname $ runPut $ put s
 
 reestimateParams model =
-  do liftIO $ putStrLn "Parameter estimation"
-     alphas <- mapM getShared $ mPsis model
+  do alphas <- mapM getShared $ mPsis model
      let alphas' = reestimatePriors alphas
      mapM_ (\(u,lambda)->setShared (mPsis model EM.! u) lambda) $ EM.toList alphas'
 
@@ -81,6 +80,7 @@ main = withSystemRandom $ runModel run
 run = 
   do args <- liftIO $ cmdArgs libThingST
      (userTags, wordMap) <- liftIO readTags
+     liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
      friendships <- liftIO readFriendships
      let d = STData { stAlphaPsi = psi args
                     , stAlphaLambda = lambda args
@@ -96,8 +96,6 @@ run =
      init <- liftRVar $ randomInitialize d
      (ius, model) <- model d init
      liftIO $ putStr $ printf "%d update units\n" (SQ.length ius)
-
-     liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
   
      liftIO $ putStrLn "Starting inference"
      let gibbsUpdate :: Int -> S.StateT LogFloat ModelMonad ()
@@ -107,7 +105,8 @@ run =
               when (l > lastMax) $ do lift $ serializeState model $ printf "%s/%05d" (sweeps_dir args) sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
-              when (sweepN >= 10 && sweepN `mod` 20 == 0) $ do lift $ reestimateParams model
+              when (sweepN >= 10 && sweepN `mod` 20 == 0) $ do liftIO $ putStrLn "Parameter estimation"
+                                                               lift $ reestimateParams model
                                                                lift (likelihood model) >>= S.put
               lift $ concurrentGibbsUpdate 10 ius
 
