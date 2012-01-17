@@ -95,7 +95,7 @@ data ItemUnit = ItemUnit { iuTopics :: Set Topic
                          , iuPsi :: Shared (DirMulti Node)
                          , iuLambdas :: SharedEnumMap Friendship (DirMulti Topic)
                          , iuPhis :: SharedEnumMap Topic (DirMulti Item)
-                         , iuState :: Shared (GibbsUpdateState ItemUnit)
+                         , iuState :: Shared GibbsUpdateState
                          }
 
 type ModelInit = EnumMap NodeItem ItemVars

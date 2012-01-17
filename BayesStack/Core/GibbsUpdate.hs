@@ -10,13 +10,11 @@ import Data.Random
 import qualified Data.Random.Distribution.Categorical as C
 import Data.Random.Sequence
 
-import Data.List (sortBy)
 import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 import Data.Foldable hiding (sum)
-import Data.Function (on)
 
-import Control.Monad hiding (forM_)
+import Control.Monad
 import Control.Monad.IO.Class
 
 import BayesStack.Core.ModelMonad
@@ -37,12 +35,11 @@ categoricalDraw norm as weightOf  =
   in do b <- liftRVar $ uniform 0 norm
         f b as
 
-data GibbsUpdateState unit =
-        GibbsUpdateState { gusNorm :: Maybe Weight
-                         , gusSortedDomain :: [GUValue unit]
-                         }
+data GibbsUpdateState = GibbsUpdateState { gusNorm :: Maybe Weight
+                                         }
+                      deriving (Show)
 
-newGibbsUpdateState :: ModelMonad (Shared (GibbsUpdateState a))
+newGibbsUpdateState :: ModelMonad (Shared GibbsUpdateState)
 newGibbsUpdateState = newShared $ GibbsUpdateState { gusNorm=Nothing }
 
 class GibbsUpdateUnit unit where
@@ -51,7 +48,7 @@ class GibbsUpdateUnit unit where
   guDomain :: unit -> ModelMonad [GUValue unit]
   guProb :: unit -> GUValue unit -> ModelMonad Probability
   guSet :: unit -> GUValue unit -> ModelMonad ()
-  guState :: unit -> Shared (GibbsUpdateState unit)
+  guState :: unit -> Shared GibbsUpdateState
 
 fullGibbsUpdate :: GibbsUpdateUnit unit => unit -> ModelMonad ()
 fullGibbsUpdate unit =
@@ -59,10 +56,7 @@ fullGibbsUpdate unit =
      domain <- guDomain unit
      probs <- forM domain $ guProb unit
      let norm = sum probs
-         sorted = map fst $ sortBy (flip (compare `on` snd)) $ zip domain probs
-     updateShared (guState unit) $ \s->s { gusNorm = Just norm
-                                         , gusSortedDomain = sorted
-                                         }
+     updateShared (guState unit) $ \s->s {gusNorm=Just norm}
      new <- liftRVar $ sample $ C.fromList $ zip (map (/norm) probs) domain
      guSet unit new
 
@@ -72,7 +66,7 @@ gibbsUpdate unit =
      case gusNorm state of
           Just norm -> do
             old <- guUnset unit
-            let domain = gusSortedDomain state -- FIXME: Ensure initialized
+            domain <- guDomain unit
             new <- categoricalDraw norm domain (guProb unit)
             case new of
               Just new' -> guSet unit new'
@@ -86,8 +80,7 @@ gibbsUpdateOne units = liftRVar (randomElementT units) >>= gibbsUpdate
 concurrentGibbsUpdate :: GibbsUpdateUnit unit => Int -> Seq unit -> ModelMonad ()
 concurrentGibbsUpdate nSweeps units =
    do let chunks = chunk numCapabilities units
-      concurrentRunModels $ map (\c->do forM_ c fullGibbsUpdate
-                                        replicateM (nSweeps*SQ.length c) $ gibbsUpdateOne c
+      concurrentRunModels $ map (\c->do replicateM (nSweeps*SQ.length c) $ gibbsUpdateOne c
                                         return ()
                                 ) $ toList chunks
 
