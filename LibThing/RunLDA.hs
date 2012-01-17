@@ -47,12 +47,18 @@ data LibThingLDA = LibThingLDA { theta :: Double
                                , phi :: Double
                                , topics :: Int
                                , sweeps_dir :: FilePath
+                               , param_freq :: Maybe Int
+                               , param_holdoff :: Int
+                               , iterations :: Maybe Int
                                } deriving (Show, Data, Typeable)
 
 libThingLDA = LibThingLDA { theta = 0.1 &= help "Alpha theta"
                           , phi = 0.01 &= help "Alpha phi"
                           , topics = 10 &= help "Number of topics"
-                          , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
+                          , sweeps_dir = "sweeps" &= typDir &= help "Directory to place sweep dumps in"
+                          , param_freq = Nothing &= help "Frequency with which to reestimate hyperparameters" &= opt (20::Int) &= typ "SWEEPS"
+                          , param_holdoff = 20 &= help "Number of iterations to hold-off hyperparameter estimation" &= typ "SWEEPS"
+                          , iterations = Just 100 &= help "Number of sweeps to run"
                           }
 
 
@@ -95,11 +101,14 @@ run =
               when (l > lastMax) $ do lift $ serializeState model $ printf "%s/%05d" (sweeps_dir args) sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
-              when (sweepN >= 10 && sweepN `mod` 20 == 0) $ do liftIO $ putStrLn "Parameter estimation"
-                                                               lift $ reestimateParams model
-                                                               lift $ concurrentGibbsUpdate 10 ius
-                                                               lift (likelihood model) >>= S.put
+              when (sweepN >= param_holdoff args
+                 && maybe False (\n->sweepN `mod` n == 0) (param_freq args)) $ do
+                liftIO $ putStrLn "Parameter estimation"
+                lift $ reestimateParams model
+                lift $ concurrentGibbsUpdate 10 ius
+                lift (likelihood model) >>= S.put
               lift $ concurrentGibbsUpdate 10 ius
 
-     S.runStateT (forM_ [0..] gibbsUpdate) 0
+     let nSweeps = maybe [0..] (\n->[0..n]) $ iterations args
+     S.runStateT (forM_ nSweeps gibbsUpdate) 0
  
