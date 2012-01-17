@@ -14,7 +14,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 import Data.Foldable hiding (sum)
 
-import Control.Monad
+import Control.Monad (forM, replicateM)
 import Control.Monad.IO.Class
 
 import BayesStack.Core.ModelMonad
@@ -80,7 +80,11 @@ gibbsUpdateOne units = liftRVar (randomElementT units) >>= gibbsUpdate
 concurrentGibbsUpdate :: GibbsUpdateUnit unit => Int -> Seq unit -> ModelMonad ()
 concurrentGibbsUpdate nSweeps units =
    do let chunks = chunk numCapabilities units
-      concurrentRunModels $ map (\c->do replicateM (nSweeps*SQ.length c) $ gibbsUpdateOne c
+      concurrentRunModels $ map (\c->do forM_ c fullGibbsUpdate 
+                                        replicateM (nSweeps*SQ.length c) $ gibbsUpdateOne c
                                         return ()
                                 ) $ toList chunks
+
+fullGibbsUpdateOne :: GibbsUpdateUnit unit => Seq unit -> ModelMonad ()
+fullGibbsUpdateOne units = liftRVar (randomElementT units) >>= fullGibbsUpdate
 
