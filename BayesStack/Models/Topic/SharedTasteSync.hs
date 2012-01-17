@@ -13,6 +13,7 @@ module BayesStack.Models.Topic.SharedTasteSync
   , STModel(..), ItemUnit(..)
   , model, likelihood
   , STModelState (..), getModelState
+  , sortTopics
   ) where
 
 import Prelude hiding (mapM)
@@ -34,6 +35,7 @@ import Data.Monoid
 import Data.Function (on)
 import Data.Maybe (mapMaybe, isJust)
 import Data.Tuple
+import Data.List (sortBy)
 
 import Control.Monad (liftM)
 import Control.Monad.Trans.State
@@ -77,6 +79,7 @@ data STModel = STModel { mData :: STData
                        , mLambdas :: SharedEnumMap Friendship (DirMulti Topic)
                        , mPhis :: SharedEnumMap Topic (DirMulti Item)
                        , mVars :: SharedEnumMap NodeItem ItemVars
+                       , mSortedTopics :: SharedEnumMap Item [Topic]
                        }
 
 data STModelState = STModelState { msData :: STData
@@ -96,6 +99,7 @@ data ItemUnit = ItemUnit { iuModel :: STModel
                          , iuX :: Item
                          , iuLambdas :: SharedEnumMap Friendship (DirMulti Topic)
                          , iuPhis :: SharedEnumMap Topic (DirMulti Item)
+                         , iuState :: Shared GibbsUpdateState
                          }
 
 type ModelInit = EnumMap NodeItem ItemVars
@@ -159,15 +163,19 @@ model d init =
 
      ivs <- newSharedEnumMap (EM.keys nis) $ \ni -> return $ init EM.! ni
   
+     sortedTopics <- newSharedEnumMap (S.toList items) $ \x -> return $ S.toList topics
+
      let model = STModel { mData = d
                          , mPsis = psis
                          , mLambdas = lambdas
                          , mPhis = phis
                          , mVars = ivs
+                         , mSortedTopics = sortedTopics
                          }
 
      itemUnits <- forM (EM.toList ivs) $ \(ni,iv) ->
-       do let (n,x) = nis EM.! ni
+       do state <- newGibbsUpdateState
+          let (n,x) = nis EM.! ni
               unit = ItemUnit { iuModel = model
                               , iuNodeItem = ni
                               , iuFriends = friends EM.! n
@@ -176,10 +184,19 @@ model d init =
                               , iuX = x
                               , iuLambdas = EM.filterWithKey (\k _->isFriend n k) lambdas
                               , iuPhis = phis
+                              , iuState = state
                               }
           getShared iv >>= guSet unit
           return unit
      return (SQ.fromList itemUnits, model)
+
+sortTopics :: STModel -> ModelMonad ()
+sortTopics model =
+  forM_ (EM.toList $ mSortedTopics model) $ \(x,topics)->do
+    d <- getShared topics
+    weights <- forM d $ \t->do phi <- getShared $ mPhis model EM.! t
+                               return $ prob phi x
+    setShared topics $ map snd $ sortBy (flip (compare `on` fst)) $ zip weights d
 
 likelihood :: STModel -> ModelMonad LogFloat
 likelihood model =
@@ -229,6 +246,8 @@ instance GibbsUpdateUnit ItemUnit where
        (mPsis m EM.! f) `updateShared` incDirMulti u
        lambda `updateShared` incDirMulti t
        phi `updateShared` incDirMulti x
+
+  guState = iuState
 
 getModelState :: STModel -> ModelMonad STModelState
 getModelState model =
