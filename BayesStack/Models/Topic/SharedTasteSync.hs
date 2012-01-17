@@ -8,7 +8,7 @@ module BayesStack.Models.Topic.SharedTasteSync
   , Friendship(..), otherFriend, isFriend, getFriends
   -- * Initialization
   , ModelInit
-  , randomInitialize, initialize
+  , randomInitialize, smartInitialize
   -- * Model
   , STModel(..), ItemUnit(..)
   , model, likelihood
@@ -110,11 +110,13 @@ randomInitialize' d init =
                              friends = getFriends (S.toList $ stFriendships d) n
                          f <- randomElement friends
                          return $ EM.singleton ni $ ItemVars f t
-  in liftM mconcat $ forM (ES.toList unset) randomInit
+  in liftM ((init `mappend`) . mconcat) $ forM (ES.toList unset) randomInit
 
-randomInitialize, initialize :: STData -> RVar ModelInit
+randomInitialize :: STData -> RVar ModelInit
 randomInitialize = (flip randomInitialize') EM.empty
-initialize d =
+
+smartInitialize :: STData -> RVar ModelInit
+smartInitialize d =
   let STData {stTopics=topics, stNodes=nodes, stItems=items, stNodeItems=nodeItems} = d
       STData {stFriendships=friendships, stNodeItems=nis} = d
       nisInv :: EnumMap (Node,Item) [NodeItem]
