@@ -95,6 +95,7 @@ data ItemUnit = ItemUnit { iuTopics :: Set Topic
                          , iuPsi :: Shared (DirMulti Node)
                          , iuLambdas :: SharedEnumMap Friendship (DirMulti Topic)
                          , iuPhis :: SharedEnumMap Topic (DirMulti Item)
+                         , iuState :: Shared GibbsUpdateState
                          }
 
 type ModelInit = EnumMap NodeItem ItemVars
@@ -137,7 +138,8 @@ model d init =
                          }
 
      itemUnits <- forM (EM.toList ivs) $ \(ni,iv) ->
-       do let (n,x) = nis EM.! ni
+       do state <- newGibbsUpdateState
+          let (n,x) = nis EM.! ni
               unit = ItemUnit { iuTopics = topics
                               , iuNodeItem = ni
                               , iuFriends = friends EM.! n
@@ -147,6 +149,7 @@ model d init =
                               , iuPsi = psis EM.! n
                               , iuLambdas = EM.filterWithKey (\k _->isFriend n k) lambdas
                               , iuPhis = phis
+                              , iuState = state
                               }
           getShared iv >>= guSet unit
           return unit
@@ -196,6 +199,8 @@ instance GibbsUpdateUnit ItemUnit where
        psi `updateShared` incDirMulti f
        lambda `updateShared` incDirMulti t
        phi `updateShared` incDirMulti x
+
+  guState = iuState
 
 getModelState :: STModel -> ModelMonad STModelState
 getModelState model =
