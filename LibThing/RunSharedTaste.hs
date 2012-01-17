@@ -4,8 +4,8 @@ import Prelude hiding (mapM)
 
 import BayesStack.Core
 import BayesStack.DirMulti
---import BayesStack.Models.Topic.SharedTaste
-import BayesStack.Models.Topic.SharedTasteSync
+import BayesStack.Models.Topic.SharedTaste
+--import BayesStack.Models.Topic.SharedTasteSync
 import LibThing.Data
 
 import Data.List ((\\), nub, sort)
@@ -49,6 +49,7 @@ data LibThing = LibThingST { psi :: Double
                            , phi :: Double
                            , topics :: Int
                            , sweeps_dir :: FilePath
+                           , iterations :: Maybe Int
                            } deriving (Show, Data, Typeable)
 
 libThingST = LibThingST { psi = 0.1 &= help "Alpha psi"
@@ -56,6 +57,7 @@ libThingST = LibThingST { psi = 0.1 &= help "Alpha psi"
                         , phi = 0.01 &= help "Alpha phi"
                         , topics = 10 &= help "Number of topics"
                         , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
+                        , iterations = Just 100 &= help "Number of sweeps to run"
                         }
 
 serializeState :: STModel -> FilePath -> ModelMonad ()
@@ -111,5 +113,6 @@ run =
                                                                lift (likelihood model) >>= S.put
               lift $ concurrentGibbsUpdate 10 ius
 
-     S.runStateT (forM_ [0..] gibbsUpdate) 0
+     let nSweeps = maybe [0..] (\n->[0..n]) $ iterations args
+     S.runStateT (forM_ nSweeps gibbsUpdate) 0
 
