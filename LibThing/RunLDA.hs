@@ -80,6 +80,7 @@ main = withSystemRandom $ runModel run
 run = 
   do args <- liftIO $ cmdArgs libThingLDA
      (userTags, wordMap) <- liftIO readTags
+     liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
      let d = LDAData { ldaAlphaTheta = theta args
                      , ldaAlphaPhi = phi args
                      , ldaNodes = S.fromList $ nub $ sort $ map fst userTags
