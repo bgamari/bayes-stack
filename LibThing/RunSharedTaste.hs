@@ -98,7 +98,8 @@ run =
      init <- liftRVar $ randomInitialize d
      (ius, model) <- model d init
      liftIO $ putStr $ printf "%d update units\n" (SQ.length ius)
-  
+     sortTopics model 
+
      liftIO $ putStrLn "Starting inference"
      let gibbsUpdate :: Int -> S.StateT LogFloat ModelMonad ()
          gibbsUpdate sweepN =
