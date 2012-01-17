@@ -47,8 +47,8 @@ data LibThingLDA = LibThingLDA { theta :: Double
                                , phi :: Double
                                , topics :: Int
                                , sweeps_dir :: FilePath
-                               , param_freq :: Maybe Int
-                               , param_holdoff :: Int
+                               , param_est :: Maybe Int
+                               , param_est_holdoff :: Int
                                , iterations :: Maybe Int
                                } deriving (Show, Data, Typeable)
 
@@ -56,8 +56,8 @@ libThingLDA = LibThingLDA { theta = 0.1 &= help "Alpha theta"
                           , phi = 0.01 &= help "Alpha phi"
                           , topics = 10 &= help "Number of topics"
                           , sweeps_dir = "sweeps" &= typDir &= help "Directory to place sweep dumps in"
-                          , param_freq = Nothing &= help "Frequency with which to reestimate hyperparameters" &= opt (20::Int) &= typ "SWEEPS"
-                          , param_holdoff = 20 &= help "Number of iterations to hold-off hyperparameter estimation" &= typ "SWEEPS"
+                          , param_est = Nothing &= help "Frequency with which to reestimate hyperparameters" &= opt (20::Int) &= typ "SWEEPS"
+                          , param_est_holdoff = 20 &= help "Number of iterations before starting hyperparameter estimation" &= typ "SWEEPS"
                           , iterations = Just 100 &= help "Number of sweeps to run"
                           }
 
@@ -70,7 +70,7 @@ serializeState model fname =
 reestimateParams model =
   do alphas <- mapM getShared $ mThetas model
      let alphas' = reestimatePriors alphas
-     mapM_ (\(u,lambda)->setShared (mThetas model EM.! u) lambda) $ EM.toList alphas'
+     mapM_ (\(k,theta)->setShared (mThetas model EM.! k) theta) $ EM.toList alphas'
 
      alphas <- mapM getShared $ mPhis model
      let alphas' = reestimateSymPriors alphas
@@ -101,8 +101,8 @@ run =
               when (l > lastMax) $ do lift $ serializeState model $ printf "%s/%05d" (sweeps_dir args) sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
-              when (sweepN >= param_holdoff args
-                 && maybe False (\n->sweepN `mod` n == 0) (param_freq args)) $ do
+              when (sweepN >= param_est_holdoff args
+                 && maybe False (\n->sweepN `mod` n == 0) (param_est args)) $ do
                 liftIO $ putStrLn "Parameter estimation"
                 lift $ reestimateParams model
                 lift $ concurrentGibbsUpdate 10 ius
