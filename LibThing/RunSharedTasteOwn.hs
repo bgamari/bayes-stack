@@ -52,6 +52,10 @@ data LibThingST = LibThingST { gamma_shared, gamma_own :: Double
                              , phi :: Double
                              , topics :: Int
                              , sweeps_dir :: FilePath
+                             , param_freq :: Maybe Int
+                             , param_holdoff :: Int
+                             , own_holdoff :: Maybe Int
+                             , iterations :: Maybe Int
                              } deriving (Show, Data, Typeable)
 
 libThingST = LibThingST { gamma_shared = 45 &= help "Alpha gamma"
@@ -62,6 +66,10 @@ libThingST = LibThingST { gamma_shared = 45 &= help "Alpha gamma"
                         , phi = 0.01 &= help "Alpha phi"
                         , topics = 10 &= help "Number of topics"
                         , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
+                        , param_freq = Nothing &= help "Frequency with which to reestimate hyperparameters" &= opt (20::Int) &= typ "SWEEPS"
+                        , param_holdoff = 20 &= help "Number of iterations to hold-off hyperparameter estimation" &= typ "SWEEPS"
+                        , own_holdoff = Nothing &= help "Number of iterations to hold-off enabling own items" &= typ "SWEEPS" &= opt (0::Int)
+                        , iterations = Just 100 &= help "Number of sweeps to run"
                         }
 
 serializeState :: STModel -> FilePath -> ModelMonad ()
@@ -112,7 +120,7 @@ run =
      liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
      friendships <- liftIO readFriendships
      let d = STData { stAlphaGammaShared = gamma_shared args
-                    , stAlphaGammaOwn = 0 -- gamma_own args
+                    , stAlphaGammaOwn = 0
                     , stAlphaOmega = omega args
                     , stAlphaPsi = psi args
                     , stAlphaLambda = lambda args
@@ -142,19 +150,20 @@ run =
               c <- lift $ mapM getShared $ EM.elems $ mLambdas model
               liftIO $ putStrLn $ show $ sum $ map dmTotal c
 
-              when (False && sweepN >= 30 && sweepN `mod` 10 == 0) $ do
+              when (sweepN >= param_holdoff args
+                 && maybe False (\n->sweepN `mod` n == 0) (param_freq args)) $ do
                 liftIO $ putStrLn "Parameter estimation"
                 lift $ reestimateLambda model
                 lift $ reestimatePhi model
                 lift $ concurrentGibbsUpdate 10 ius
                 lift (likelihood model) >>= S.put
 
-              when (False && sweepN == 20) $ do
+              when (maybe False (sweepN==) (own_holdoff args)) $ do
                 let update = updatePrior $ setAlphaOf Own (gamma_own args)
                 lift $ forM_ (mGammas model) $ \dm->updateShared dm update
                 liftIO $ putStrLn "Enabled own topics"
 
               lift $ concurrentGibbsUpdate 10 ius
 
-     S.runStateT (forM_ [0..] gibbsUpdate) 0
- 
+     let nSweeps = maybe [0..] (\n->[0..n]) $ iterations args
+     S.runStateT (forM_ nSweeps gibbsUpdate) 0
