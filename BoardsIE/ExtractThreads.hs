@@ -1,77 +1,50 @@
-
 {-# LANGUAGE OverloadedStrings, ExtendedDefaultRules #-}
-import System.Directory
-import Text.HTML.TagSoup
+
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe
-import qualified System.FilePath.Find as FP
-import System.FilePath.Find hiding (find)
-import qualified Control.Exception as E
  
 import Data.Set (Set)
 import qualified Data.Set as S
 
 import Data.Maybe
-import Data.Monoid
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as E
 import qualified Data.Text.IO as TIO
 
-import Control.Concurrent.ParallelIO
-import Database.MongoDB
-import Debug.Trace
+import Text.HTML.TagSoup
+import Database.Redis
+import Types
+import Extract
 
---rootPath = "/iesl/canvas/dietz/boardsie/unzip/thread"
-rootPath = "/iesl/local/dietz/boardsie/thread"
-
-tryReadFile :: MonadIO m => FilePath -> MaybeT m String
-tryReadFile fp =
-  MaybeT $ liftIO $ E.catch (TIO.readFile fp >>= return . Just . T.unpack)
-                            (\e->do print (e :: IOError)
-                                    return Nothing)
-type UserId = String
-type ForumId = String
-type PostId = String
-type ThreadId = String
-
-data Thread = Thread { tId :: ThreadId
-                     , tTitle :: String
-                     , tForum :: ForumId
-                     , tPosts :: Set PostId
-                     }
-            deriving (Show, Eq)
-
-parseThread :: String -> Maybe Thread
+parseThread :: Text -> Maybe Thread
 parseThread thread = 
   do let tags = parseTags thread
      thread <- listToMaybe $ dropWhile (~/= "<sioc:Thread>") tags
-     title <- listToMaybe $ dropWhile (not . isTagText)  $ dropWhile (~/= "<dc:title>") $ dropWhile (~/= "<sioc:Thread>") tags
+     title <- listToMaybe $ dropWhile (not . isTagText) 
+              $ dropWhile (~/= "<dc:title>")
+              $ dropWhile (~/= "<sioc:Thread>") tags
      forum <- listToMaybe $ dropWhile (~/= "<sioc:Forum>") tags
-     let posts = map (fromAttrib "rdf:about") $ filter (isTagOpenName "sioc:Post") tags
-     return $ Thread { tId = fromAttrib "rdf:about" thread
+     let posts = map (sanitizeId . fromAttrib "rdf:about")
+                 $ filter (isTagOpenName "sioc:Post") tags
+     return $ Thread { tId = sanitizeId $ fromAttrib "rdf:about" thread
                      , tTitle = fromTagText title
-                     , tForum = fromAttrib "rdf:about" forum
+                     , tForum = sanitizeId $ fromAttrib "rdf:about" forum
                      , tPosts = S.fromList posts
                      }
 
-getThreads :: Action IO ()
-getThreads = 
-  do fs <- liftIO $ FP.find always (fileType ==? RegularFile) rootPath
-     mapM_ (runMaybeT . putThread) fs
-  where putThread :: FilePath -> MaybeT (Action IO) ()
-        putThread f = do t <- tryReadFile f >>= maybe mzero return . parseThread
-                         lift $ repsert (select ["_id" =: u (tId t)] "threads")
-                                        [ "$set" =: [ "title" =: u (tTitle t)
-                                                    , "forum" =: u (tForum t)
-                                                    ]
-                                        , "$pushAll" =: ["posts" =: map u (S.toList $ tPosts t) ]
-                                        ]
-                         return ()
+putThread :: FilePath -> MaybeT Redis ()
+putThread f =
+  do a <- tryReadFile f
+     t <- MaybeT $ return $ parseThread a
+     lift $ hmset (E.encodeUtf8 $ tId t) [ (E.encodeUtf8 "title", E.encodeUtf8 $ tTitle t)
+                                         , (E.encodeUtf8 "forum", E.encodeUtf8 $ tForum t)
+                                         ]
+     lift $ sadd (E.encodeUtf8 $ tId t `T.append` "%posts") $ map E.encodeUtf8 $ S.toList $ tPosts t
+     lift $ sadd "%threads" [E.encodeUtf8 $ tId t]
+     return ()
 
-main =
-  do pipe <- runIOE $ connect (Host "avon-2" (PortNumber 27025))
-     access pipe master "boardsie" getThreads >>= print
-     close pipe
-
+main = extract $ \f->do runMaybeT $ putThread f
+                        return ()

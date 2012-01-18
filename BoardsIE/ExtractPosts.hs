@@ -1,47 +1,40 @@
-
 {-# LANGUAGE OverloadedStrings, ExtendedDefaultRules #-}
-import System.Directory
-import Text.HTML.TagSoup
+
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe
-import qualified System.FilePath.Find as FP
-import System.FilePath.Find hiding (find)
-import qualified Control.Exception as E
  
 import Data.Set (Set)
 import qualified Data.Set as S
 
 import Data.Maybe
-import Data.Monoid
-import Data.Text (Text)
+
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
+import qualified Data.Text.Encoding as E
+import Data.Text (Text)
 
-import Control.Concurrent.ParallelIO
-import Database.MongoDB
+import Text.HTML.TagSoup
+import Database.Redis
+import Types
+import Extract
 
-
-parsePost :: String -> Maybe Post
+parsePost :: Text -> Maybe Post
 parsePost post =
   do let tags = parseTags post
      post <- listToMaybe $ dropWhile (~/= "<sioct:BoardPost>") tags
      maker <- listToMaybe $ dropWhile (~/= "<foaf:Person>") $ dropWhile (~/= "<foaf:maker>") tags
-     return $ Post { pId = fromAttrib "rdf:about" post
-                   , pUser = fromAttrib "rdf:about" maker
+     return $ Post { pId = sanitizeId $ fromAttrib "rdf:about" post
+                   , pUser = sanitizeId $ fromAttrib "rdf:about" maker
                    }
 
-getPosts = 
-  do fs <- liftIO $ FP.find always (fileType ==? RegularFile) "/iesl/canvas/dietz/boardsie/unzip/post"
-     liftM catMaybes $ parallelInterleaved $ map (runMaybeT . putPost) fs
-  where putPost :: FilePath -> MaybeT IO Post
-        putPost f = do p <- tryReadFile f
-                       liftIO $ putStrLn f
-                       return $ parsePost p
+putPost :: FilePath -> MaybeT Redis ()
+putPost f = do a <- tryReadFile f
+               p <- MaybeT $ return $ parsePost a
+               lift $ hset (E.encodeUtf8 $ pId p) "user" (E.encodeUtf8 $ pUser p)
+               lift $ sadd (E.encodeUtf8 $ pUser p `T.append` "%posts") [E.encodeUtf8 $ pId p]
+               lift $ sadd "%posts" [E.encodeUtf8 $ pId p]
+               return ()
 
-
-main =
-  do posts <- getPosts
-     BS.writeFile "posts.out" $ encode posts
-     stopGlobalPool
+main = extract $ \f->do runMaybeT $ putPost f
+                        return ()

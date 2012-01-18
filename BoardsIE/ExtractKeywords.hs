@@ -1,80 +1,69 @@
 {-# LANGUAGE OverloadedStrings, ExtendedDefaultRules #-}
 
 import Data.Hashable
-import qualified Data.Text as T
 import Data.Foldable (forM_)
 import Data.Traversable (forM)
 import Data.Char
 
-import Data.Map (Map)
-import qualified Data.Map as M
+import qualified Data.Text as T
+import Data.Text (Text)
+import qualified Data.Text.Encoding as E
 
 import Data.Set (Set)
 import qualified Data.Set as S
 
-import Data.EnumMap (EnumMap)
-import qualified Data.EnumMap as EM
+import qualified Data.ByteString as BS
+import Data.Maybe
 
-import Data.EnumSet (EnumSet)
-import qualified Data.EnumSet as ES
-
-import Control.Monad (guard, liftM)
+import Control.Monad (guard, liftM, when)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 import Control.Monad.Trans.State
 
-import Control.Concurrent.ParallelIO.Global
-import Database.MongoDB
-import BayesStack.Models.Topic.Types
-import BayesStack.UniqueKey
+import Types
+import Database.Redis
 
-type Keyword = String
-type UserId = String
-type PostId = String
-type ThreadId = String
+type Keyword = Text
 
-getStopWords :: IO (Set T.Text)
-getStopWords = liftM (S.fromList . map T.pack . filter (\w->length w >= 2) . words) $
-                readFile "BoardsIE/stopwords.txt"
+getStopWords :: IO (Set Text)
+getStopWords = liftM (S.fromList . map T.pack . filter (\w->length w >= 2) . words)
+               $ readFile "stopwords.txt"
 
-getUserKeywords :: Set T.Text -> UserId -> Action IO [Keyword]
+getUserKeywords :: Set Text -> BS.ByteString -> Redis [Keyword]
 getUserKeywords stopWords user =
-  do cursor <- find (select ["user" =: user] "posts")
-     execWriterT $ fetch cursor
-  where fetch :: Cursor -> WriterT [Keyword] (Action IO) ()
-        fetch c = do d <- lift $ next c
-                     case d of
-                       Just doc -> do
-                         runMaybeT $ do let id = "_id" `at` doc :: PostId
-                                        thread <- MaybeT $ lift $ findOne (select ["posts" =: id] "threads")
-                                        let title = "title" `at` thread :: String
-                                            titleWords = map T.unpack
-                                                         $ filter (`S.notMember` stopWords)
-                                                         $ filter (\w->T.compareLength w 2 == GT)
-                                                         $ T.words
-                                                         $ T.toLower
-                                                         $ T.filter (\c->isAlpha c || isSpace c)
-                                                         $ T.pack title :: [Keyword]
-                                        lift $ tell titleWords
-                         fetch c
-                       Nothing  -> return ()
+  do Right posts <- smembers $ user `BS.append` "%posts"
+     execWriterT $ forM_ posts $ \postId->do
+       Right (Just threadId) <- lift $ hget "thread" postId
+       title <- lift $ hget "title" threadId
+       case title of
+            Left _ -> return ()
+            Right Nothing -> return ()
+            Right (Just t) ->
+              let titleWords = filter (`S.notMember` stopWords)
+                               $ filter (\w->T.compareLength w 2 == GT)
+                               $ T.words
+                               $ T.toLower
+                               $ T.filter (\c->isAlpha c || isSpace c)
+                               $ E.decodeUtf8 t :: [Keyword]
+              in tell titleWords
+
+connectInfo = defaultConnectInfo {connectHost="blake"}
 
 main =
-  do pipe <- runIOE $ connect (Host "avon-2" (PortNumber 27025))
+  do conn <- connect $ connectInfo
      stopWords <- liftIO getStopWords
+     runRedis conn $ do
+       Right hi <- keys "*%keywords"
+       del hi
+       del ["%peopleWithKeywords"]
 
-     Right users <- access pipe master "boardsie" $ do
-                          cursor <- find (select [] "users")
-                          liftM (map ("_id" `at`)) $ rest cursor
-     let hello u = do liftIO $ print u
-                      access pipe master "boardsie" $ do
-                        kws <- getUserKeywords stopWords u
-                        repsert (select ["_id" =: u] "userKeywords")
-                                [ "$pushAll" =: ["keywords" =: kws]]
-     parallel_ $ map hello users
-     --mapM_ hello users
-     close pipe
-     stopGlobalPool
+       Right people <- smembers "%peopleWithPosts"
+       forM_ (zip [1..] people) $ \(i,p)->do
+         keywords <- getUserKeywords stopWords p
+         guard (not $ empty keywords)
+         forM_ keywords $ zincrby (p `BS.append` "%keywords") 1 . E.encodeUtf8
+         sadd "%peopleWithKeywords" [p]
+         liftIO $ when (i `mod` 1000 == 0) $ print i
 

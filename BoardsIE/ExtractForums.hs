@@ -1,58 +1,55 @@
-
 {-# LANGUAGE OverloadedStrings, ExtendedDefaultRules #-}
-import System.Directory
-import Text.HTML.TagSoup
+
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe
-import qualified System.FilePath.Find as FP
-import System.FilePath.Find hiding (find)
-import qualified Control.Exception as E
  
 import Data.Set (Set)
 import qualified Data.Set as S
 
 import Data.Maybe
 import Data.Monoid
+import qualified Data.ByteString as BS
+import qualified Data.Text.Encoding as E
 import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 
-import Control.Concurrent.ParallelIO
-import Data.Serialize
+import Text.HTML.TagSoup
+import Database.Redis
 import Types
+import Extract
 
-parseThread :: String -> Maybe Thread
-parseThread thread = 
-  do let tags = parseTags thread
-     thread <- listToMaybe $ dropWhile (~/= "<sioc:Thread>") tags
-     title <- listToMaybe $ dropWhile (not . isTagText)  $ dropWhile (~/= "<dc:title>") $ dropWhile (~/= "<sioc:Thread>") tags
-     forum <- listToMaybe $ dropWhile (~/= "<sioc:Forum>") tags
-     let posts = map (fromAttrib "rdf:about") $ filter (isTagOpenName "sioc:Post") tags
-     return $ Thread { tId = fromAttrib "rdf:about" thread
-                     , tTitle = fromTagText title
-                     , tForum = fromAttrib "rdf:about" forum
-                     , tPosts = S.fromList posts
-                     }
+parseForum :: Text -> Forum
+parseForum forum = 
+  let tags = dropWhile (~/= "<sioct:MessageBoard>") $ parseTags forum
+      children = map (takeWhile (~/= "</sioc:parent_of>")) $ sections (~== "<sioc:parent_of") tags
+  in Forum { fId = sanitizeId . fromAttrib "rdf:about" $ head
+                   $ dropWhile (~/= "<sioct:MessageBoard>") tags
+           , fTitle = fromTagText $ head $ dropWhile (not . isTagText) 
+                      $ dropWhile (~/= "<dc:title>") tags
+           , fParent = fmap (sanitizeId . fromAttrib "rdf:about") $ listToMaybe
+                       $ dropWhile (~/= "<sioc:Forum>")
+                       $ dropWhile (~/= "<sioc:has_parent>") tags
+           , fChildren = S.fromList 
+                         $ mapMaybe (fmap (sanitizeId . fromAttrib "rdf:about") . listToMaybe
+                                     . dropWhile (~/= "<sioc:Forum>"))
+                         $ children
+           , fThreads = S.fromList
+                        $ mapMaybe (fmap (sanitizeId . fromAttrib "rdf:about") . listToMaybe
+                                    . dropWhile (~/= "<sioc:Thread>"))
+                        $ children
+           }
 
-getForums :: IO [Forum]
-getForums = 
-  do fs <- liftIO $ FP.find always (fileType ==? RegularFile) rootPath
-     mapM_ (runMaybeT . putThread) fs
-  where putForum :: FilePath -> MaybeT (Action IO) ()
-        putForum f = do t <- tryReadFile f >>= maybe mzero return . parseThread
-                        lift $ save "threads" [ "_id" =: u (tId t)
-                                              , "title" =: u (tTitle t)
-                                              , "forum" =: u (tForum t)
-                                              ]
-                        lift $ modify (Select ["_id" =: u (tId t)] "threads")
-                                      [ "$pushAll" =: ["posts" =: map u (S.toList $ tPosts t) ] ]
-                        liftIO $ putStrLn f
+putForum :: FilePath -> MaybeT Redis ()
+putForum f =
+  do a <- tryReadFile f
+     t <- return $ parseForum a
+     lift $ hmset (E.encodeUtf8 $ fId t) [ (E.encodeUtf8 "title", E.encodeUtf8 $ fTitle t) ]
+     --lift $ when (isJust $ fParent t) $ hset (E.encodeUtf8 $ fId t) (E.encodeUtf8 "parent") (E.encodeUtf8 $ fromJust $ fParent t)
+     lift $ sadd (E.encodeUtf8 $ fId t `T.append` "%threads") $ map E.encodeUtf8 $ S.toList $ fThreads t
+     lift $ sadd "%forums" $ [E.encodeUtf8 $ fId t]
+     return ()
+
+main = extract $ \f->do runMaybeT $ putForum f
                         return ()
-
-main =
-  do forums <- getForums
-     BS.writeFile "forums.out" $ encode users
-     stopGlobalPool
-
