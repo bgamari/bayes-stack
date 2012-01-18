@@ -41,7 +41,7 @@ main =
        do f <- openFile (printf "%s-crossval-nodes/group%d" f n) WriteMode
           forM_ nodes $ \u ->
             do let isMember = (u,g) `elem` userGroups
-               hPrintf f "%d" (if isMember then 1 else 0 :: Int)
+               hPrintf f "%d" (if isMember then 1 else -1 :: Int)
                forM_ (zip [1..] $ S.toList topics) $ \(i,t) ->
                  hPrintf f " %d:%f" (i::Int) (prob (msThetas state EM.! u) t)
                hPutStr f "\n"
