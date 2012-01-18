@@ -53,9 +53,9 @@ topicGroupCorr state userGroups topic group =
                  | otherwise = 0
 
 main =
-  do --a <- liftM decode $ BS.readFile "word.map"
-     --let wordMap :: EM.EnumMap Item String
-     --    wordMap = either (error "Bad word map") id a
+  do a <- liftM decode $ BS.readFile "word.map"
+     let wordMap :: EM.EnumMap Item String
+         wordMap = either (error "Bad word map") id a
      f:_ <- getArgs
      Right state <- liftM decode $ BS.readFile f
      print $ msLogLikelihood state
@@ -72,7 +72,7 @@ main =
      putStrLn "P(x|t)"
      forM (S.toList $ ldaTopics $ msData state) $ \t ->
        do let phi = msPhis state EM.! t
-          print $ prettyDirMulti 10 (show) phi
+          print $ prettyDirMulti 30 (wordMap EM.!) phi
 
      putStrLn "\nP(t|x)"
      let wordCounts :: EM.EnumMap Item Int
@@ -86,7 +86,7 @@ main =
                       $ S.toList $ ldaItems $ msData state
           print $ text (show t) <+> colon
               <+> hsep (punctuate comma
-                        $ map (\(x,p)->text (show x) <> parens (text $ printf "%1.2e" p))
+                        $ map (\(x,p)->text (wordMap EM.! x) <> parens (text $ printf "%1.2e" p))
                         $ take 10 $ sortBy (flip (compare `on` snd))
                         $ zip (S.toList $ ldaItems $ msData state) probs
                        )
