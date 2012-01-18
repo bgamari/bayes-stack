@@ -37,8 +37,9 @@ readTags =
          records = mapMaybe (\rec -> do a <- maybeRead $ rec !! 0
                                         return (a, map toLower $ rec !! 6))
                    $ tail csv
-         (userTags, wordMap) = runUniqueKey $ forM records $ \(n,i) -> do k <- uniqueKey Item i
-                                                                          return (Node n, k)
+         (userTags, wordMap) = runUniqueKeyWithInvMap $ forM records $ \(n,i) ->
+                        do k <- newUniqueKey Item i
+                           return (Node n, k)
 
      return (userTags, wordMap)
 
