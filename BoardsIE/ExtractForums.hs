@@ -20,27 +20,8 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
 import Control.Concurrent.ParallelIO
-import Database.MongoDB
-import Debug.Trace
-
-rootPath = "/iesl/canvas/dietz/boardsie/unzip/forum"
-
-tryReadFile :: MonadIO m => FilePath -> MaybeT m String
-tryReadFile fp =
-  MaybeT $ liftIO $ E.catch (TIO.readFile fp >>= return . Just . T.unpack)
-                            (\e->do print (e :: IOError)
-                                    return Nothing)
-type UserId = String
-type ForumId = String
-type PostId = String
-type ThreadId = String
-
-data Forum = Forum { tId :: ThreadId
-                   , tTitle :: String
-                   , tForum :: ForumId
-                   , tPosts :: Set PostId
-                   }
-             deriving (Show, Eq)
+import Data.Serialize
+import Types
 
 parseThread :: String -> Maybe Thread
 parseThread thread = 
@@ -55,23 +36,23 @@ parseThread thread =
                      , tPosts = S.fromList posts
                      }
 
-getThreads :: Action IO ()
-getThreads = 
+getForums :: IO [Forum]
+getForums = 
   do fs <- liftIO $ FP.find always (fileType ==? RegularFile) rootPath
      mapM_ (runMaybeT . putThread) fs
-  where putThread :: FilePath -> MaybeT (Action IO) ()
-        putThread f = do t <- tryReadFile f >>= maybe mzero return . parseThread
-                         lift $ save "threads" [ "_id" =: u (tId t)
-                                               , "title" =: u (tTitle t)
-                                               , "forum" =: u (tForum t)
-                                               ]
-                         lift $ modify (Select ["_id" =: u (tId t)] "threads")
-                                       [ "$pushAll" =: ["posts" =: map u (S.toList $ tPosts t) ] ]
-                         liftIO $ putStrLn f
-                         return ()
+  where putForum :: FilePath -> MaybeT (Action IO) ()
+        putForum f = do t <- tryReadFile f >>= maybe mzero return . parseThread
+                        lift $ save "threads" [ "_id" =: u (tId t)
+                                              , "title" =: u (tTitle t)
+                                              , "forum" =: u (tForum t)
+                                              ]
+                        lift $ modify (Select ["_id" =: u (tId t)] "threads")
+                                      [ "$pushAll" =: ["posts" =: map u (S.toList $ tPosts t) ] ]
+                        liftIO $ putStrLn f
+                        return ()
 
 main =
-  do pipe <- runIOE $ connect (Host "avon-2" (PortNumber 27025))
-     access pipe master "boardsie" getThreads >>= print
-     close pipe
+  do forums <- getForums
+     BS.writeFile "forums.out" $ encode users
+     stopGlobalPool
 

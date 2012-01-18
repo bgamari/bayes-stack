@@ -22,18 +22,6 @@ import qualified Data.Text.IO as TIO
 import Control.Concurrent.ParallelIO
 import Database.MongoDB
 
-tryReadFile :: MonadIO m => FilePath -> MaybeT m String
-tryReadFile fp =
-  MaybeT $ liftIO $ E.catch (TIO.readFile fp >>= return . Just . T.unpack)
-                            (\e->do print (e :: IOError)
-                                    return Nothing)
-type UserId = String
-type PostId = String
-
-data Post = Post { pId :: PostId
-                 , pUser :: UserId
-                 }
-            deriving (Show, Eq)
 
 parsePost :: String -> Maybe Post
 parsePost post =
@@ -46,16 +34,14 @@ parsePost post =
 
 getPosts = 
   do fs <- liftIO $ FP.find always (fileType ==? RegularFile) "/iesl/canvas/dietz/boardsie/unzip/post"
-     mapM_ (runMaybeT . putPost) fs
-  where putPost :: FilePath -> MaybeT (Action IO) ()
-        putPost f = do p <- tryReadFile f >>= maybe mzero return . parsePost
-                       lift $ save "posts" [ "_id" =: u (pId p)
-                                           , "user" =: u (pUser p)
-                                           ]
+     liftM catMaybes $ parallelInterleaved $ map (runMaybeT . putPost) fs
+  where putPost :: FilePath -> MaybeT IO Post
+        putPost f = do p <- tryReadFile f
                        liftIO $ putStrLn f
+                       return $ parsePost p
 
 
 main =
-  do pipe <- runIOE $ connect (Host "avon-2" (PortNumber 27025))
-     access pipe master "boardsie" getPosts
-     close pipe
+  do posts <- getPosts
+     BS.writeFile "posts.out" $ encode posts
+     stopGlobalPool
