@@ -12,6 +12,7 @@ module BayesStack.Models.Topic.LDA
   , LDAModel(..), ItemUnit
   , LDAModelState(..), getModelState
   , model, likelihood
+  , sortTopics
   ) where
 
 import Data.EnumMap (EnumMap)
@@ -28,6 +29,8 @@ import qualified Data.EnumSet as ES
 import Data.Traversable
 import Data.Foldable
 import Data.Monoid
+import Data.Function (on)
+import Data.List (sortBy)
 
 import Control.Monad (liftM)
 import Data.Random
@@ -60,6 +63,7 @@ data LDAModel = LDAModel { mData :: LDAData
                          , mThetas :: SharedEnumMap Node (DirMulti Topic)
                          , mPhis :: SharedEnumMap Topic (DirMulti Item)
                          , mTs :: SharedEnumMap NodeItem Topic
+                         , mSortedTopics :: SharedEnumMap Item [Topic]
                          } deriving (Generic)
 
 data LDAModelState = LDAModelState { msData :: LDAData
@@ -78,6 +82,7 @@ data ItemUnit = ItemUnit { iuData :: LDAData
                          , iuX :: Item
                          , iuTheta :: Shared (DirMulti Topic)
                          , iuPhis :: SharedEnumMap Topic (DirMulti Item)
+                         , iuState :: Shared GibbsUpdateState
                          }
 
 type ModelInit = EnumMap NodeItem Topic
@@ -102,9 +107,12 @@ model d init =
        return $ symDirMulti (ldaAlphaPhi d) (S.toList items)
 
      ts <- newSharedEnumMap (EM.keys nis) $ \ni -> return $ init EM.! ni
+
+     sortedTopics <- newSharedEnumMap (S.toList items) $ \x -> return $ S.toList topics
   
      itemUnits <- forM (EM.toList ts) $ \(ni, t) ->
-       do let (n,x) = nis EM.! ni
+       do state <- newGibbsUpdateState
+          let (n,x) = nis EM.! ni
           let unit = ItemUnit { iuData = d 
                               , iuNodeItem = ni
                               , iuN = n
@@ -112,14 +120,25 @@ model d init =
                               , iuX = x
                               , iuTheta = thetas EM.! n
                               , iuPhis = phis
+                              , iuState = state
                               }
           getShared t >>= guSet unit
           return unit
      let model = LDAModel { mData = d
                           , mThetas = thetas
                           , mPhis = phis
-                          , mTs = ts }
+                          , mTs = ts
+                          , mSortedTopics = sortedTopics
+                          }
      return (SQ.fromList itemUnits, model)
+
+sortTopics :: LDAModel -> ModelMonad ()
+sortTopics model =
+  forM_ (EM.toList $ mSortedTopics model) $ \(x,topics)->do
+    d <- getShared topics
+    weights <- forM d $ \t->do phi <- getShared $ mPhis model EM.! t
+                               return $ prob phi x
+    setShared topics $ map snd $ sortBy (flip (compare `on` fst)) $ zip weights d
 
 likelihood :: LDAModel -> ModelMonad LogFloat
 likelihood model =
@@ -158,6 +177,8 @@ instance GibbsUpdateUnit ItemUnit where
            phi = iuPhis unit EM.! t
        theta `updateShared` incDirMulti t
        phi `updateShared` incDirMulti x
+
+  guState = iuState
 
 getModelState :: LDAModel -> ModelMonad LDAModelState
 getModelState model =
