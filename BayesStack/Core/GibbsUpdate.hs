@@ -80,7 +80,7 @@ concurrentGibbsUpdate :: GibbsUpdateUnit unit => Int -> Seq unit -> ModelMonad (
 concurrentGibbsUpdate nSweeps units =
    do let chunks = chunk numCapabilities units
       concurrentRunModels $ map (\c->do forM_ c fullGibbsUpdate 
-                                        replicateM (nSweeps*SQ.length c) $ gibbsUpdateOne c
+                                        replicateM_ (nSweeps*SQ.length c) $ gibbsUpdateOne c
                                         return ()
                                 ) $ toList chunks
 
@@ -90,6 +90,6 @@ fullGibbsUpdateOne units = liftRVar (randomElementT units) >>= fullGibbsUpdate
 concurrentFullGibbsUpdate :: GibbsUpdateUnit unit => Int -> Seq unit -> ModelMonad ()
 concurrentFullGibbsUpdate nSweeps units =
    do let chunks = chunk numCapabilities units
-      concurrentRunModels $ map (\c->do replicateM (nSweeps*SQ.length c) $ fullGibbsUpdateOne c
+      concurrentRunModels $ map (\c->do replicateM_ (nSweeps*SQ.length c) $ fullGibbsUpdateOne c
                                         return ()
                                 ) $ toList chunks
