@@ -27,7 +27,7 @@ import System.Random.MWC (GenIO, withSystemRandom)
 import Text.Printf
 import Database.Redis
 import Data.Serialize
-import System.Console.CmdArgs hiding (args)
+import System.Console.CmdArgs.Implicit
 
 import BayesStack.Core
 import BayesStack.UniqueKey
@@ -61,42 +61,31 @@ data BoardsST = BoardsST { gamma_shared, gamma_own :: Double
                          , iterations :: Maybe Int
                          } deriving (Show, Data, Typeable)
 
-boardsST = boardsST { gamma_shared = 45
-                    , gamma_own = 5
-                    , omega = 0.1
-                    , psi = 0.5
-                    , lambda = 0.1
-                    , phi = 0.01
-                    , topics = 10
-                    , sweeps_dir = "sweeps"
-                    , iterations = Just 100
+boardsST = BoardsST { gamma_shared = 45 &= help "Alpha gamma"
+                    , gamma_own = 5 &= help "Alpha gamma"
+                    , omega = 0.1 &= help "Alpha omega"
+                    , psi = 0.5 &= help "Alpha psi"
+                    , lambda = 0.1 &= help "Alpha lambda"
+                    , phi = 0.01 &= help "Alpha phi"
+                    , topics = 10 &= help "Number of topics"
+                    , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
+                    , iterations = Just 100 &= help "Number of sweeps to run"
                     }
---boardsST = boardsST { gamma_shared = 45 &= help "Alpha gamma"
---                    , gamma_own = 5 &= help "Alpha gamma"
---                    , omega = 0.1 &= help "Alpha omega"
---                    , psi = 0.5 &= help "Alpha psi"
---                    , lambda = 0.1 &= help "Alpha lambda"
---                    , phi = 0.01 &= help "Alpha phi"
---                    , topics = 10 &= help "Number of topics"
---                    , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
---                    , iterations = Just 100 &= help "Number of sweeps to run"
---                    }
 
 main =
-  do --args <- cmdArgs boardsST
-     let args = boardsST
+  do config <- cmdArgs boardsST
      conn <- connect $ connectInfo
      d <- runRedis conn $ runNodeItemUniqueKey $ do
        fs <- execWriterT getFriendships
        nodeItems <- execWriterT getNodeItems
-       let nodes = foldMap (\(Friendship (u,f))->S.fromList [u,f]) fs
+       let nodes = foldMap (\(Friendship (u,f))->S.fromList [f,u]) $ S.toList fs
            items = foldMap (\(n,x)->S.singleton x) nodeItems
-       return $ STData { stAlphaGammaShared = 0.1
-                       , stAlphaGammaOwn = 0.1
-                       , stAlphaOmega = 0.1
-                       , stAlphaPsi = 0.1
-                       , stAlphaLambda = 0.1
-                       , stAlphaPhi = 0.01
+       return $ STData { stAlphaGammaShared = gamma_shared config
+                       , stAlphaGammaOwn = gamma_shared config
+                       , stAlphaOmega = omega config
+                       , stAlphaPsi = psi config
+                       , stAlphaLambda = lambda config
+                       , stAlphaPhi = phi config
                        , stNodes = nodes
                        , stFriendships = fs
                        , stItems = items
@@ -106,27 +95,26 @@ main =
      printf "%d nodes, %d friendships, %d items, %d node items\n"
         (S.size $ stNodes d) (S.size $ stFriendships d) (S.size $ stItems d)
         (EM.size $ stNodeItems d)
+     withSystemRandom $ runModel $ run config d
 
-     withSystemRandom $ runModel $ run args d
-
-run args d =
+run config d =
   do liftIO $ putStr "Initializing model..."
-     init <- liftRVar $ randomInitialize d
-     (ius, m) <- model d init
+     initial <- liftRVar $ randomInitialize d
+     (ius, m) <- model d initial
      liftIO $ putStr $ printf "Created %d update units\n" (SQ.length ius)
      liftIO $ putStrLn "Starting inference"
      let gibbsUpdate :: Int -> S.StateT LogFloat ModelMonad ()
          gibbsUpdate sweepN =
            do l <- lift $ likelihood m
               lastMax <- S.get
-              when (l > lastMax) $ do lift $ serializeState m $ printf "%s/%05d" (sweeps_dir args) sweepN
+              when (l > lastMax) $ do lift $ serializeState m $ printf "%s/%05d" (sweeps_dir config) sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
 
               if sweepN > 20 then lift $ concurrentGibbsUpdate 10 ius
                              else lift $ concurrentFullGibbsUpdate 10 ius
 
-     let nSweeps = maybe [0..] (\n->[0..n]) $ iterations args
+     let nSweeps = maybe [0..] (\n->[0..n]) $ iterations config
      S.runStateT (forM_ nSweeps gibbsUpdate) 0
 
 
