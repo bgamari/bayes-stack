@@ -2,7 +2,7 @@
 
 module BayesStack.Core.GibbsUpdate ( GibbsUpdateUnit(..)
                                    , fullGibbsUpdate, gibbsUpdate, gibbsUpdateOne
-                                   , concurrentGibbsUpdate
+                                   , concurrentGibbsUpdate, concurrentFullGibbsUpdate
                                    , GibbsUpdateState, newGibbsUpdateState
                                    ) where
 
@@ -88,3 +88,9 @@ concurrentGibbsUpdate nSweeps units =
 fullGibbsUpdateOne :: GibbsUpdateUnit unit => Seq unit -> ModelMonad ()
 fullGibbsUpdateOne units = liftRVar (randomElementT units) >>= fullGibbsUpdate
 
+concurrentFullGibbsUpdate :: GibbsUpdateUnit unit => Int -> Seq unit -> ModelMonad ()
+concurrentFullGibbsUpdate nSweeps units =
+   do let chunks = chunk numCapabilities units
+      concurrentRunModels $ map (\c->do replicateM (nSweeps*SQ.length c) $ fullGibbsUpdateOne c
+                                        return ()
+                                ) $ toList chunks
