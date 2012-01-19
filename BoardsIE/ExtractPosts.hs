@@ -32,6 +32,7 @@ putPost :: FilePath -> MaybeT Redis ()
 putPost f = do a <- tryReadFile f
                p <- MaybeT $ return $ parsePost a
                lift $ hset (E.encodeUtf8 $ pId p) "user" (E.encodeUtf8 $ pUser p)
+               lift $ sadd "%peopleWithPosts" (E.encodeUtf8 $ pUser p)
                lift $ sadd (E.encodeUtf8 $ pUser p `T.append` "%posts") [E.encodeUtf8 $ pId p]
                lift $ sadd "%posts" [E.encodeUtf8 $ pId p]
                return ()
