@@ -27,9 +27,6 @@ import Text.Printf
 maybeInc Nothing = Just 1
 maybeInc (Just n) = Just (n+1)
 
-addCat :: (a -> Probability) -> (a -> Probability) -> Double -> Double -> (a -> Probability)
-addCat f g a b x = a*(f x) + b*(g x)
-
 theta :: STModelState -> Node -> Topic -> Probability
 theta state u t =
   sum $ map (\f->let lambda = msLambdas state EM.! Friendship (u,f)
