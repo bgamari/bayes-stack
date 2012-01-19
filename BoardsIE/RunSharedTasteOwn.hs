@@ -38,13 +38,13 @@ connectInfo = defaultConnectInfo {connectHost="blake"}
 type NodeItemUniqueKey m = UniqueKeyT ByteString Node (UniqueKeyT ByteString Item m)
 
 runNodeItemUniqueKey :: Monad m => NodeItemUniqueKey m a -> m a
-runNodeItemUniqueKey = runUniqueKeyT Item . runUniqueKeyT Node
+runNodeItemUniqueKey = runUniqueKeyT . runUniqueKeyT 
 
 newNodeKey :: Monad m => ByteString -> NodeItemUniqueKey m Node
-newNodeKey = newUniqueKey
+newNodeKey = newUniqueKey Node
 
 newItemKey :: Monad m => ByteString -> NodeItemUniqueKey m Item
-newItemKey = lift . newUniqueKey
+newItemKey = lift . newUniqueKey Item
 
 serializeState :: STModel -> FilePath -> ModelMonad ()
 serializeState model fname =
