@@ -133,12 +133,12 @@ getFriendships =
 getNodeItems :: WriterT [(Node,Item)] (NodeItemUniqueKey Redis) ()
 getNodeItems = 
   do Right people <- liftRedis $ smembers "%interestingPeople"
-     forM_ people $ \p -> do
-       u <- lift $ newNodeKey p
-       Right items <- liftRedis $ zrangebyscore (p `BS.append` "%keywords") 10 (100000)
-       forM_ items $ \x -> do
-         x' <- lift $ newItemKey x
-         tell $ [(u,x')]
+     forM_ people $ \userId -> do
+       u <- lift $ newNodeKey userId
+       Right items <- liftRedis $ zrangebyscore (userId `BS.append` "%keywords") 10 (100000)
+       forM_ items $ \kw -> do
+         x <- lift $ newItemKey kw
+         tell [(u,x)]
   where liftRedis = lift . lift . lift
 
 
