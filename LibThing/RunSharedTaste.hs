@@ -4,8 +4,8 @@ import Prelude hiding (mapM)
 
 import BayesStack.Core
 import BayesStack.DirMulti
-import BayesStack.Models.Topic.SharedTaste
---import BayesStack.Models.Topic.SharedTasteSync
+--import BayesStack.Models.Topic.SharedTaste
+import BayesStack.Models.Topic.SharedTasteSync
 import LibThing.Data
 
 import Data.List ((\\), nub, sort)

@@ -6,9 +6,6 @@ module BayesStack.Core.Types ( Probability
 
 import GHC.Prim (Constraint)
 
-import BayesStack.Core.ModelMonad
-import BayesStack.Core.Shared
-
 type Probability = Double
 
 -- | A map over a domain 'a' to probabilities

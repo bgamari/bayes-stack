@@ -3,7 +3,6 @@ module BayesStack.Categorical (categorical, Categorical, getCategorical) where
 import BayesStack.Core
 
 import Data.Random
-import qualified Data.Random.Distribution.Categorical as C
  
 data Categorical a = Categorical (Shared a)
 

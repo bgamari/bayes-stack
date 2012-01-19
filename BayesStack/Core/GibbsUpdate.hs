@@ -14,8 +14,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 import Data.Foldable hiding (sum)
 
-import Control.Monad (forM, replicateM)
-import Control.Monad.IO.Class
+import Control.Monad (forM, replicateM_)
 
 import BayesStack.Core.ModelMonad
 import BayesStack.Core.Types

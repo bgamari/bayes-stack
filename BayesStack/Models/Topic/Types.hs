@@ -11,10 +11,7 @@ import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
 
 import Data.Sequence (Seq)
-import qualified Data.Sequence as SQ
-
 import Data.Set (Set)
-import qualified Data.Set as S
 
 
 newtype Node = Node Int deriving (Show, Eq, Ord, Enum, Generic)

@@ -27,7 +27,7 @@ import System.Random.MWC (GenIO, withSystemRandom)
 import Text.Printf
 import Database.Redis
 import Data.Serialize
-import System.Console.CmdArgs
+import System.Console.CmdArgs hiding (args)
 
 import BayesStack.Core
 import BayesStack.UniqueKey

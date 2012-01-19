@@ -1,6 +1,5 @@
 module Data.Serialize.EnumMap where
 
-import Control.Monad
 import Data.Serialize
 import Data.EnumMap
 

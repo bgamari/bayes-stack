@@ -8,7 +8,6 @@ import Control.Monad
 import Control.Monad.IO.Class
 
 import Control.Concurrent
-import Control.Concurrent.MVar
 import GHC.Conc (numCapabilities)
 
 import Data.Random

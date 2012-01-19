@@ -34,7 +34,6 @@ import Data.Traversable
 import Data.Foldable
 import Data.Monoid
 import Data.Function (on)
-import Data.Maybe (mapMaybe, isJust)
 import Data.List (sortBy)
 
 import Control.Monad (liftM)

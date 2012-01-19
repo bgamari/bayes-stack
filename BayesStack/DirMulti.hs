@@ -25,13 +25,12 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
 import Data.Foldable (toList, Foldable, fold)
-import Data.List (sortBy)
 import Data.Function (on)
 
 import Text.PrettyPrint
 import Text.Printf
 
-import GHC.Generics
+import GHC.Generics (Generic)
 import Data.Serialize
 import Data.Serialize.EnumMap
  
