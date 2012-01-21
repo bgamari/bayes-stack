@@ -78,6 +78,8 @@ main =
      d <- runRedis conn $ runNodeItemUniqueKey $ do
        fs <- execWriterT getFriendships
        nodeItems <- execWriterT getNodeItems
+       keywordMap <- lift $ getInvMap
+       liftIO $ BS.writeFile "keywords.map" $ runPut $ put keywordMap
        let nodes = foldMap (\(Friendship (u,f))->S.fromList [f,u]) $ S.toList fs
            items = foldMap (\(n,x)->S.singleton x) nodeItems
        return $ STData { stAlphaGammaShared = gamma_shared config
@@ -111,12 +113,11 @@ run config d =
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
 
-              if sweepN > 20 then lift $ concurrentGibbsUpdate 10 ius
+              if sweepN > 20 then lift $ concurrentFullGibbsUpdate 10 ius
                              else lift $ concurrentFullGibbsUpdate 10 ius
 
      let nSweeps = maybe [0..] (\n->[0..n]) $ iterations config
      S.runStateT (forM_ nSweeps gibbsUpdate) 0
-
 
 getFriendships :: WriterT (Set Friendship) (NodeItemUniqueKey Redis) ()
 getFriendships = 
