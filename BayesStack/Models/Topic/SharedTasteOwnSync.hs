@@ -15,6 +15,7 @@ module BayesStack.Models.Topic.SharedTasteOwnSync
   , model, likelihood
   , STModelState (..), getModelState
   , sortTopics
+  , ItemVars(..)
   ) where
 
 import Prelude hiding (mapM)
