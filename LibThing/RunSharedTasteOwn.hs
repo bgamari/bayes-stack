@@ -145,10 +145,6 @@ run =
               when (l > lastMax) $ do lift $ serializeState model $ printf "%s/%05d" (sweeps_dir args) sweepN
                                       S.put l
               liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
-              c <- lift $ mapM getShared $ EM.elems $ mOmegas model
-              liftIO $ putStrLn $ show $ sum $ map dmTotal c
-              c <- lift $ mapM getShared $ EM.elems $ mLambdas model
-              liftIO $ putStrLn $ show $ sum $ map dmTotal c
 
               when (sweepN >= param_est_holdoff args
                  && maybe False (\n->sweepN `mod` n == 0) (param_est args)) $ do
