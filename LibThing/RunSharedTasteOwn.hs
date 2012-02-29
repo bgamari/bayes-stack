@@ -159,7 +159,7 @@ run =
                 lift $ forM_ (mGammas model) $ \dm->updateShared dm update
                 liftIO $ putStrLn "Enabled own topics"
 
-              lift $ concurrentFullGibbsUpdate 1 ius
+              lift $ concurrentFullGibbsUpdate 10 ius
 
      let nSweeps = maybe [0..] (\n->[0..n]) $ iterations args
      S.runStateT (forM_ nSweeps gibbsUpdate) 0
