@@ -111,7 +111,7 @@ randomInitialize' d init =
       topics = S.toList $ stTopics d
       randomInit :: NodeItem -> RVar ModelInit
       randomInit ni = do t <- randomElement topics
-                         let (n,_) = EM.findWithDefault (error "fucki'") ni (stNodeItems d) --stNodeItems d EM.! ni
+                         let (n,_) = EM.findWithDefault (error "Can't find nodeItem") ni (stNodeItems d)
                              friends = getFriends (S.toList $ stFriendships d) n
                          f <- randomElement friends
                          --s <- bernoulli (0.5::Double)
