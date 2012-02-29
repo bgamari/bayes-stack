@@ -120,7 +120,7 @@ run =
      liftIO $ BS.writeFile "word.map" $ runPut $ put wordMap
      friendships <- liftIO readFriendships
      let d = STData { stAlphaGammaShared = gamma_shared args
-                    , stAlphaGammaOwn = 0
+                    , stAlphaGammaOwn = gamma_own args
                     , stAlphaOmega = omega args
                     , stAlphaPsi = psi args
                     , stAlphaLambda = lambda args
