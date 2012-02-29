@@ -80,8 +80,13 @@ alphaDomain (Alpha alpha) = SQ.fromList $ EM.keys alpha
 
 -- | 'alphaOf alpha k' is the value of element 'k' in prior 'alpha'
 alphaOf :: Enum a => Alpha a -> a -> Double
-alphaOf (SymAlpha _ alpha) = const $ alpha
+alphaOf (SymAlpha _ alpha) = const alpha
 alphaOf (Alpha alpha) = (alpha EM.!)
+
+-- | 'sumAlpha alpha' is the sum of all alphas
+sumAlpha :: Enum a => Alpha a -> Double
+sumAlpha (SymAlpha domain alpha) = realToFrac (SQ.length domain) * alpha
+sumAlpha (Alpha alpha) = sum $ EM.elems alpha
 
 -- | Set a particular alpha element
 setAlphaOf :: Enum a => a -> Double -> Alpha a -> Alpha a
@@ -143,8 +148,7 @@ instance ProbDist DirMulti where
   prob dm@(DirMulti {dmCounts=counts, dmTotal=total}) k =
   	let alpha = (dmAlpha dm) `alphaOf` k
             c = realToFrac $ EM.findWithDefault 0 k counts
-            range = realToFrac $ SQ.length $ dmDomain dm
-        in (c + alpha) / (realToFrac total + range * alpha)
+        in (c + alpha) / (realToFrac total + sumAlpha (dmAlpha dm))
   {-# INLINEABLE prob #-}
 
 {-# INLINEABLE probabilities #-}
