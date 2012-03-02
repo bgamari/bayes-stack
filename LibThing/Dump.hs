@@ -112,3 +112,6 @@ main =
                         $ zip (S.toList $ stItems $ msData state) probs
                        )
 
+     let own = sum $ map dmTotal $ EM.elems $ msOmegas state
+         shared = sum $ map dmTotal $ EM.elems $ msLambdas state
+     printf "Own topics: %d / %d" own (own+shared)
