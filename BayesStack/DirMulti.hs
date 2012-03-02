@@ -2,7 +2,8 @@
 
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                              DirMulti, dirMulti, symDirMulti
-                           , dmTotal
+                             -- | Do not do record updates with these
+                           , dmTotal, dmAlpha
                            , decDirMulti, incDirMulti
                            , prettyDirMulti
                            , updatePrior
