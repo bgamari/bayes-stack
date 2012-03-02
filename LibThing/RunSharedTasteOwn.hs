@@ -68,7 +68,7 @@ libThingST = LibThingST { gamma_shared = 45 &= help "Alpha gamma"
                         , sweeps_dir = "sweeps" &= help "Directory to place sweep dumps in" &= opt "sweeps"
                         , param_est = Nothing &= help "Frequency with which to reestimate hyperparameters" &= opt (20::Int) &= typ "SWEEPS"
                         , param_est_holdoff = 20 &= help "Number of iterations to hold-off hyperparameter estimation" &= typ "SWEEPS"
-                        , own_holdoff = Nothing &= help "Number of iterations to hold-off enabling own items" &= typ "SWEEPS" &= opt (0::Int)
+                        , own_holdoff = Nothing &= help "Number of iterations to hold-off enabling own items" &= typ "SWEEPS"
                         , iterations = Just 100 &= help "Number of sweeps to run"
                         }
 
@@ -142,9 +142,11 @@ run =
          gibbsUpdate sweepN =
            do l <- lift $ likelihood model
               lastMax <- S.get
+              liftIO $ putStr $ printf "Sweep %d: %f" sweepN (logFromLogFloat l :: Double)
               when (l > lastMax) $ do lift $ serializeState model $ printf "%s/%05d" (sweeps_dir args) sweepN
                                       S.put l
-              liftIO $ putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
+                                      liftIO $ putStr " (dumped)"
+              liftIO $ putStr "\n"
 
               when (sweepN >= param_est_holdoff args
                  && maybe False (\n->sweepN `mod` n == 0) (param_est args)) $ do
