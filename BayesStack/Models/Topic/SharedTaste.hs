@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric #-}
 
-module BayesStack.Models.Topic.SharedTasteOwnSync
+module BayesStack.Models.Topic.SharedTaste
   ( -- * Primitives
     STData(..)
   , ItemSource(..)
