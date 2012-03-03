@@ -25,7 +25,7 @@ import qualified Data.EnumMap as EM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
-import Data.Foldable (toList, Foldable, fold)
+import Data.Foldable (toList, Foldable, fold, foldMap)
 import Data.Function (on)
 
 import Text.PrettyPrint
@@ -37,6 +37,8 @@ import Data.Serialize.EnumMap
  
 import BayesStack.Core
 
+import Numeric.Digamma
+import Debug.Trace
 
 maybeInc, maybeDec :: Maybe Int -> Maybe Int
 maybeInc Nothing = Just 1
@@ -146,12 +148,16 @@ dirMultiFromAlpha alpha = DirMulti { dmAlpha = alpha
                                    , dmDomain = alphaDomain alpha
                                    }
 
+dmGetCounts :: Enum a => DirMulti a -> a -> Int
+dmGetCounts (DirMulti {dmCounts=counts}) k =
+  EM.findWithDefault 0 k counts
+
 instance ProbDist DirMulti where
   type PdContext DirMulti a = (Ord a, Enum a)
 
-  prob dm@(DirMulti {dmCounts=counts, dmTotal=total}) k =
+  prob dm@(DirMulti {dmTotal=total}) k =
   	let alpha = (dmAlpha dm) `alphaOf` k
-            c = realToFrac $ EM.findWithDefault 0 k counts
+            c = realToFrac $ dmGetCounts dm k
         in (c + alpha) / (realToFrac total + sumAlpha (dmAlpha dm))
   {-# INLINEABLE prob #-}
 
@@ -175,53 +181,42 @@ prettyAlpha showA (Alpha alpha _) =
            $ map (\(a,alpha)->text (showA a) <> parens (text $ printf "%1.2e" alpha))
            $ take 100 $ EM.toList $ alpha)
 
--- | Number of iterations to run in prior estimation
-nEstimationIters = 1000
-
 -- | Update the prior of a Dirichlet/multinomial
 updatePrior :: (Alpha a -> Alpha a) -> DirMulti a -> DirMulti a
 updatePrior f dm = dm {dmAlpha=f $ dmAlpha dm}
 
+-- | Relative tolerance in precision for prior estimation
+estimationTol = 1e-8
+
 reestimatePriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimatePriors dms =
-  let alpha = estimatePrior nEstimationIters $ toList dms
-  in fmap (\dm->dm {dmAlpha=alpha}) dms
+  let alpha = estimatePrior estimationTol $ toList dms
+  in fmap (updatePrior $ const alpha) dms
 
 reestimateSymPriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimateSymPriors dms =
-  let alpha = symmetrizeAlpha $ estimatePrior nEstimationIters $ toList dms
-  in fmap (\dm->dm {dmAlpha=alpha}) dms
+  let alpha = symmetrizeAlpha $ estimatePrior estimationTol $ toList dms
+  in fmap (updatePrior $ const alpha) dms
 
--- | Estimate the prior alpha from a Dirichlet/multinomial
--- Based on Andrew Mccallum's interpretation of Tom Minka's implementation
-estimatePrior :: (Enum a) => Int -> [DirMulti a] -> Alpha a
-estimatePrior nIter dms =
+-- | Estimate the prior alpha from a set of Dirichlet/multinomials
+estimatePrior' :: (Enum a) => [DirMulti a] -> Alpha a -> Alpha a
+estimatePrior' dms alpha =
   let domain = toList $ dmDomain $ head dms
-      --binHist :: Enum a => EnumMap a (EnumMap Int Int)
-      binHist = EM.map (EM.fromListWith (+))
-                $ EM.fromListWith (++) $ do dm <- dms
-                                            (a,c) <- EM.toList $ dmCounts dm
-                                            return (a, [(c, 1)])
-      lengthHist :: EnumMap Int Int
-      lengthHist = EM.fromListWith (+) $ do dm <- dms
-                                            return (dmTotal dm, 1)
-      --f :: Enum a => EnumMap a Alpha -> EnumMap a Alpha
-      f alphas =
-        let newAlpha :: EnumMap Int Int -> Double -> Double
-            newAlpha hist _ | EM.null hist = 1e-5 -- Empty histogram (FIXME?)
-            newAlpha hist x =
-              let (n,_) = EM.findMax hist
-                  digammas n = tail $ scanl (\digamma i -> digamma + 1/(x + realToFrac i - 1)) 0 [1..n]
-              in realToFrac $ sum
-                 $ zipWith (\digamma i->realToFrac (EM.findWithDefault 0 i hist)
-                                        * realToFrac digamma)
-                 (digammas n) [1..n]
-            --alpha' :: Enum a => a -> Alpha -> Alpha
-            alpha' k alpha = let num = newAlpha (EM.findWithDefault EM.empty k binHist) (alphas EM.! k)
-                                 denom = newAlpha lengthHist (sum $ EM.elems alphas)
-                             in alpha * num /  denom
-        in EM.mapWithKey alpha' alphas
-      alphas0 = EM.fromList $ zip domain $ map (alphaOf (dmAlpha $ head dms)) domain
-  in asymAlpha $ head $ drop nIter $ iterate f alphas0
-{-# INLINEABLE estimatePrior #-}
+      f k = let num = sum $ map (\i->digamma (realToFrac (dmGetCounts i k) + alphaOf alpha k)
+                                      - digamma (alphaOf alpha k)
+                                ) dms
+                n i = sum $ map (\k->dmGetCounts i k) domain
+                sumAlpha = sum $ map (alphaOf alpha) domain
+                denom = sum $ map (\i->digamma (realToFrac (n i) + sumAlpha) - digamma sumAlpha) dms
+            in alphaOf alpha k * num / denom
+  in asymAlpha $ foldMap (\k->EM.singleton k (f k)) domain
+
+estimatePrior :: (Enum a) => Double -> [DirMulti a] -> Alpha a
+estimatePrior tol dms = iter $ dmAlpha $ head dms
+  where iter alpha = let alpha' = estimatePrior' dms alpha
+                         (_, prec)  = alphaToMeanPrecision alpha
+                         (_, prec') = alphaToMeanPrecision alpha'
+                     in if abs ((prec' - prec) / prec) > tol
+                           then iter alpha'
+                           else alpha'
 
