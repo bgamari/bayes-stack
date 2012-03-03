@@ -37,7 +37,6 @@ import Data.Serialize.EnumMap
  
 import BayesStack.Core
 
-import Debug.Trace
 
 maybeInc, maybeDec :: Maybe Int -> Maybe Int
 maybeInc Nothing = Just 1
@@ -209,7 +208,7 @@ estimatePrior nIter dms =
       --f :: Enum a => EnumMap a Alpha -> EnumMap a Alpha
       f alphas =
         let newAlpha :: EnumMap Int Int -> Double -> Double
-            newAlpha hist _ | EM.null hist = trace "uh oh" 1e-5 -- Empty histogram
+            newAlpha hist _ | EM.null hist = 1e-5 -- Empty histogram (FIXME?)
             newAlpha hist x =
               let (n,_) = EM.findMax hist
                   digammas n = tail $ scanl (\digamma i -> digamma + 1/(x + realToFrac i - 1)) 0 [1..n]
