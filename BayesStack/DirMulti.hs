@@ -60,15 +60,15 @@ incDirMulti k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
 -- with symmetric parameter 'alpha', ...
 data DirMulti a = DirMulti { dmAlpha :: Alpha a
                            , dmCounts :: EnumMap a Int
-                           , dmTotal :: Int
+                           , dmTotal :: !Int
                            , dmDomain :: Seq a
                            }
                   deriving (Show, Eq, Generic)
 instance (Enum a, Serialize a) => Serialize (DirMulti a)
 
 -- | A Dirichlet prior
-data Alpha a = SymAlpha (Seq a) Double
-             | Alpha (EnumMap a Double) Double
+data Alpha a = SymAlpha (Seq a) !Double
+             | Alpha (EnumMap a Double) !Double
              deriving (Show, Eq, Generic)
 instance (Enum a, Serialize a) => Serialize (Alpha a)
 
