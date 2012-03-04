@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds, DeriveGeneric, DefaultSignatures #-}
 
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
-                             DirMulti, dirMulti, symDirMulti
+                             DirMulti, dirMulti, symDirMulti, fixedDirMulti
                              -- | Do not do record updates with these
                            , dmTotal, dmAlpha
                            , decDirMulti, incDirMulti
@@ -63,6 +63,12 @@ data DirMulti a = DirMulti { dmAlpha :: Alpha a
                            , dmTotal :: !Int
                            , dmDomain :: Seq a
                            }
+                | Fixed { dmAlpha :: !(Alpha a)
+                        , dmProbs :: !(EnumMap a Probability)
+                        , dmCounts :: !(EnumMap a Int)
+                        , dmTotal :: !Int
+                        , dmDomain :: !(Seq a)
+                        }
                   deriving (Show, Eq, Generic)
 instance (Enum a, Serialize a) => Serialize (DirMulti a)
 
@@ -136,6 +142,14 @@ dirMultiFromPrecision m p = dirMultiFromAlpha $ meanPrecisionToAlpha m p
 symDirMulti :: Enum a => Double -> [a] -> DirMulti a
 symDirMulti alpha domain = dirMultiFromAlpha $ SymAlpha (SQ.fromList domain) alpha
 
+fixedDirMulti :: Enum a => [(a,Probability)] -> DirMulti a
+fixedDirMulti probs = Fixed { dmAlpha = SymAlpha (SQ.fromList $ map fst probs) 0
+                            , dmProbs = EM.fromList probs
+                            , dmCounts = EM.empty
+                            , dmTotal = 0
+                            , dmDomain = SQ.fromList $ map fst probs
+                            }
+
 -- | Create an asymmetric Dirichlet/multinomial from items and alphas
 dirMulti :: Enum a => [(a,Double)] -> DirMulti a
 dirMulti domain = dirMultiFromAlpha $ asymAlpha $ EM.fromList domain
@@ -155,6 +169,7 @@ dmGetCounts (DirMulti {dmCounts=counts}) k =
 instance ProbDist DirMulti where
   type PdContext DirMulti a = (Ord a, Enum a)
 
+  prob dm@(Fixed {dmProbs=prob}) k = prob EM.! k
   prob dm@(DirMulti {dmTotal=total}) k =
   	let alpha = (dmAlpha dm) `alphaOf` k
             c = realToFrac $ dmGetCounts dm k
@@ -186,16 +201,16 @@ updatePrior :: (Alpha a -> Alpha a) -> DirMulti a -> DirMulti a
 updatePrior f dm = dm {dmAlpha=f $ dmAlpha dm}
 
 -- | Relative tolerance in precision for prior estimation
-estimationTol = 1e-8
+estimationTol = 1e-3
 
 reestimatePriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimatePriors dms =
-  let alpha = estimatePrior estimationTol $ toList dms
+  let alpha = estimatePrior estimationTol $ filter (\dm->dmTotal dm > 5) $ toList dms
   in fmap (updatePrior $ const alpha) dms
 
 reestimateSymPriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimateSymPriors dms =
-  let alpha = symmetrizeAlpha $ estimatePrior estimationTol $ toList dms
+  let alpha = symmetrizeAlpha $ estimatePrior estimationTol $ filter (\dm->dmTotal dm > 5) $ toList dms
   in fmap (updatePrior $ const alpha) dms
 
 -- | Estimate the prior alpha from a set of Dirichlet/multinomials
