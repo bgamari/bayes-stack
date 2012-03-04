@@ -75,9 +75,9 @@ data STData = STData { stAlphaGammaShared, stAlphaGammaOwn :: Double
                deriving (Show, Eq, Generic)
 instance Serialize STData
 
-data ItemVars = ItemVars { ivS :: ItemSource
-                         , ivF :: Node
-                         , ivT :: Topic
+data ItemVars = ItemVars { ivS :: !ItemSource
+                         , ivF :: !Node
+                         , ivT :: !Topic
                          }
                 deriving (Show, Eq, Generic)
 instance Serialize ItemVars
