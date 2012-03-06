@@ -54,7 +54,7 @@ decDirMulti k dm = dm { dmCounts = EM.alter maybeDec k $ dmCounts dm
                       , dmTotal = dmTotal dm - 1 }
 incDirMulti k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
                       , dmTotal = dmTotal dm + 1 }
-                   
+
 -- | 'DirMulti a' represents collapsed Dirichlet/multinomial pair over a domain 'a'.
 -- 'DirMulti alpha count total' is a multinomial with Dirichlet prior
 -- with symmetric parameter 'alpha', ...
@@ -73,8 +73,14 @@ data DirMulti a = DirMulti { dmAlpha :: Alpha a
 instance (Enum a, Serialize a) => Serialize (DirMulti a)
 
 -- | A Dirichlet prior
-data Alpha a = SymAlpha (Seq a) !Double
-             | Alpha (EnumMap a Double) !Double
+data Alpha a = SymAlpha { aDomain :: Seq a
+                        , aAlpha :: !Double
+                        , aNorm :: !LogFloat
+                        }
+             | Alpha { aAlphas :: EnumMap a Double
+                     , aSumAlphas :: !Double
+                     , aNorm :: !LogFloat
+                     }
              deriving (Show, Eq, Generic)
 instance (Enum a, Serialize a) => Serialize (Alpha a)
 
@@ -87,31 +93,31 @@ asymAlpha alpha = Alpha alpha (sum $ EM.elems alpha)
 
 -- | 'alphaDomain a' is the domain of prior 'a'
 alphaDomain :: Enum a => Alpha a -> Seq a
-alphaDomain (SymAlpha domain _) = domain
-alphaDomain (Alpha alpha _) = SQ.fromList $ EM.keys alpha
+alphaDomain (SymAlpha {aDomain=d}) = d
+alphaDomain (Alpha {aAlphas=a}) = SQ.fromList $ EM.keys a
 
 -- | 'alphaOf alpha k' is the value of element 'k' in prior 'alpha'
 alphaOf :: Enum a => Alpha a -> a -> Double
-alphaOf (SymAlpha _ alpha) = const alpha
-alphaOf (Alpha alpha _) = (alpha EM.!)
+alphaOf (SymAlpha {aAlpha=alpha}) = const alpha
+alphaOf (Alpha {aAlphas=alphas}) = (alphas EM.!)
 
 -- | 'sumAlpha alpha' is the sum of all alphas
 sumAlpha :: Enum a => Alpha a -> Double
-sumAlpha (SymAlpha domain alpha) = realToFrac (SQ.length domain) * alpha
-sumAlpha (Alpha alpha sum) = sum
+sumAlpha (SymAlpha {aDomain=domain, aAlpha=alpha}) = realToFrac (SQ.length domain) * alpha
+sumAlpha (Alpha {aSumAlphas=sum}) = sum
 
 -- | Set a particular alpha element
 setAlphaOf :: Enum a => a -> Double -> Alpha a -> Alpha a
 setAlphaOf k a alpha@(SymAlpha {}) = setAlphaOf k a $ asymmetrizeAlpha alpha
-setAlphaOf k a (Alpha alpha _) = asymAlpha $ EM.insert k a alpha
+setAlphaOf k a (Alpha {aAlphas=alphas}) = asymAlpha $ EM.insert k a alphas
 
 -- | 'alphaToMeanPrecision a' is the mean/precision representation of the prior 'a'
 alphaToMeanPrecision :: Enum a => Alpha a -> (Mean a, Precision)
-alphaToMeanPrecision (SymAlpha domain alpha) =
-  let prec = realToFrac (SQ.length domain) * alpha
-  in (EM.fromList $ map (\a->(a, alpha/prec)) $ toList domain, prec)
-alphaToMeanPrecision (Alpha alpha _) = let prec = sum $ EM.elems alpha
-                                       in (fmap (/prec) alpha, prec)
+alphaToMeanPrecision (SymAlpha {aDomain=dom, aAlpha=alpha}) =
+  let prec = realToFrac (SQ.length dom) * alpha
+  in (EM.fromList $ map (\a->(a, alpha/prec)) $ toList dom, prec)
+alphaToMeanPrecision (Alpha {aAlphas=alphas, aSumAlphas=prec}) =
+  (fmap (/prec) alphas, prec)
 
 -- | 'meanPrecisionToAlpha m p' is a prior with mean 'm' and precision 'p'
 meanPrecisionToAlpha :: Enum a => Mean a -> Precision -> Alpha a
@@ -120,12 +126,13 @@ meanPrecisionToAlpha mean prec = asymAlpha $ fmap (*prec) mean
 -- | Symmetrize a Dirichlet prior (such that mean=0) 
 symmetrizeAlpha :: Enum a => Alpha a -> Alpha a
 symmetrizeAlpha alpha@(SymAlpha {}) = alpha
-symmetrizeAlpha alpha@(Alpha a _) = SymAlpha (alphaDomain alpha) alpha'
-  where alpha' = sum (EM.elems a) / realToFrac (EM.size a)
+symmetrizeAlpha alpha@(Alpha {}) = SymAlpha (alphaDomain alpha) alpha'
+  where alpha' = sumAlphas alpha / realToFrac (EM.size a)
 
 -- | Turn a symmetric alpha into an asymmetric alpha. For internal use.
 asymmetrizeAlpha :: Enum a => Alpha a -> Alpha a
-asymmetrizeAlpha (SymAlpha domain alpha) = asymAlpha $ fold $ fmap (\k->EM.singleton k alpha) domain
+asymmetrizeAlpha (SymAlpha {aDomain=domain, aAlpha=alpha}) =
+  asymAlpha $ fold $ fmap (\k->EM.singleton k alpha) domain
 asymmetrizeAlpha alpha@(Alpha {}) = alpha
 
 -- | 'symDirMultiFromPrecision d p' is a symmetric Dirichlet/multinomial over a
@@ -189,12 +196,12 @@ prettyDirMulti n showA dm =
             $ SQ.sortBy (flip (compare `on` fst)) $ probabilities dm)
 
 prettyAlpha :: Enum a => (a -> String) -> Alpha a -> Doc
-prettyAlpha showA (SymAlpha _ alpha) = text "Symmetric" <+> double alpha
-prettyAlpha showA (Alpha alpha _) =
+prettyAlpha showA (SymAlpha {aAlpha=alpha}) = text "Symmetric" <+> double alpha
+prettyAlpha showA (Alpha {aAlphas=alphas}) =
   text "Assymmetric"
   <+> fsep (punctuate comma
            $ map (\(a,alpha)->text (showA a) <> parens (text $ printf "%1.2e" alpha))
-           $ take 100 $ EM.toList $ alpha)
+           $ take 100 $ EM.toList $ alphas)
 
 -- | Update the prior of a Dirichlet/multinomial
 updatePrior :: (Alpha a -> Alpha a) -> DirMulti a -> DirMulti a
