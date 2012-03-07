@@ -4,8 +4,6 @@ module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                              DirMulti, dirMulti, symDirMulti, fixedDirMulti
                              -- | Do not do record updates with these
                            , dmTotal, dmAlpha
-                             -- Debug
-                           , dmCounts, dmGetCounts, dmDomain, sumAlpha, aDomain, aNorm
                            , decDirMulti, incDirMulti
                            , prettyDirMulti
                            , updatePrior
