@@ -27,7 +27,7 @@ import qualified Data.Set as S
 import qualified Data.EnumSet as ES
 
 import Data.Traversable
-import Data.Foldable
+import Data.Foldable hiding (product)
 import Data.Monoid
 import Data.Function (on)
 import Data.List (sortBy)
@@ -178,11 +178,11 @@ getModelState model =
   do thetas <- getSharedEnumMap $ mThetas model
      phis <- getSharedEnumMap $ mPhis model
      ts <- getSharedEnumMap $ mTs model
-     l <- modelLikelihood model
-     return $ LDAModelState { msData = mData model 
-                            , msThetas = thetas
-                            , msPhis = phis
-                            , msTs = ts
-                            , msLogLikelihood = logFromLogFloat l
-                            }
+     let state = LDAModelState { msData = mData model 
+                               , msThetas = thetas
+                               , msPhis = phis
+                               , msTs = ts
+                               , msLogLikelihood = logFromLogFloat $ modelLikelihood state
+                               }
+     return state
 
