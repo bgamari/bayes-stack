@@ -4,12 +4,14 @@ module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                              DirMulti, dirMulti, symDirMulti, fixedDirMulti
                              -- | Do not do record updates with these
                            , dmTotal, dmAlpha
+                             -- Debug
+                           , dmCounts, dmGetCounts, dmDomain, sumAlpha, aDomain, aNorm
                            , decDirMulti, incDirMulti
                            , prettyDirMulti
                            , updatePrior
                              -- * Prior parameter
-                           , Alpha
-                           , alphaOf, setAlphaOf
+                           , Alpha(SymAlpha, aAlpha)
+                           , alphaOf, setAlphaOf, setSymAlpha
                            , alphaToMeanPrecision, meanPrecisionToAlpha
                            , symmetrizeAlpha
                            , prettyAlpha
@@ -37,8 +39,9 @@ import Data.Serialize.EnumMap
  
 import BayesStack.Core
 
+import Data.Number.LogFloat hiding (realToFrac)
 import Numeric.Digamma
-import Debug.Trace
+import Math.Gamma
 
 maybeInc, maybeDec :: Maybe Int -> Maybe Int
 maybeInc Nothing = Just 1
@@ -64,7 +67,7 @@ data DirMulti a = DirMulti { dmAlpha :: Alpha a
                            , dmDomain :: Seq a
                            }
                 | Fixed { dmAlpha :: !(Alpha a)
-                        , dmProbs :: !(EnumMap a Probability)
+                        , dmProbs :: !(EnumMap a Double)
                         , dmCounts :: !(EnumMap a Int)
                         , dmTotal :: !Int
                         , dmDomain :: !(Seq a)
@@ -72,14 +75,18 @@ data DirMulti a = DirMulti { dmAlpha :: Alpha a
                   deriving (Show, Eq, Generic)
 instance (Enum a, Serialize a) => Serialize (DirMulti a)
 
+instance Serialize LogFloat where
+  put = put . (logFromLogFloat :: LogFloat -> Double)
+  get = (logToLogFloat :: Double -> LogFloat) `fmap` get
+
 -- | A Dirichlet prior
 data Alpha a = SymAlpha { aDomain :: Seq a
                         , aAlpha :: !Double
-                        , aNorm :: !LogFloat
+                        , aNorm :: LogFloat
                         }
              | Alpha { aAlphas :: EnumMap a Double
                      , aSumAlphas :: !Double
-                     , aNorm :: !LogFloat
+                     , aNorm :: LogFloat
                      }
              deriving (Show, Eq, Generic)
 instance (Enum a, Serialize a) => Serialize (Alpha a)
@@ -89,7 +96,26 @@ type Precision = Double
 
 -- | Construct an asymmetric Alpha
 asymAlpha :: Enum a => EnumMap a Double -> Alpha a
-asymAlpha alpha = Alpha alpha (sum $ EM.elems alpha)
+asymAlpha alphas = Alpha { aAlphas = alphas
+                         , aSumAlphas = sum $ EM.elems alphas
+                         , aNorm = alphaNorm $ asymAlpha alphas
+                         }
+
+setSymAlpha :: Enum a => Double -> Alpha a -> Alpha a
+setSymAlpha alpha a = let b = (symmetrizeAlpha a) { aAlpha = alpha
+                                                  , aNorm = alphaNorm b
+                                                  }
+                      in b
+
+-- | Compute the normalizer of the likelihood involving alphas,
+-- (product_k gamma(alpha_k)) / gamma(sum_k alpha_k)
+alphaNorm :: Enum a => Alpha a -> LogFloat
+alphaNorm alpha = normNum / normDenom
+  where dim = realToFrac $ SQ.length $ aDomain alpha
+        normNum = case alpha of
+                      Alpha {} -> product $ map (logToLogFloat . lnGamma) $ EM.elems $ aAlphas alpha
+                      SymAlpha {} -> logToLogFloat $ dim * lnGamma (aAlpha alpha)
+        normDenom = logToLogFloat $ lnGamma $ sumAlpha alpha
 
 -- | 'alphaDomain a' is the domain of prior 'a'
 alphaDomain :: Enum a => Alpha a -> Seq a
@@ -126,8 +152,11 @@ meanPrecisionToAlpha mean prec = asymAlpha $ fmap (*prec) mean
 -- | Symmetrize a Dirichlet prior (such that mean=0) 
 symmetrizeAlpha :: Enum a => Alpha a -> Alpha a
 symmetrizeAlpha alpha@(SymAlpha {}) = alpha
-symmetrizeAlpha alpha@(Alpha {}) = SymAlpha (alphaDomain alpha) alpha'
-  where alpha' = sumAlphas alpha / realToFrac (EM.size a)
+symmetrizeAlpha alpha@(Alpha {}) =
+  SymAlpha { aDomain = alphaDomain alpha
+           , aAlpha = sumAlpha alpha / realToFrac (EM.size $ aAlphas alpha)
+           , aNorm = alphaNorm $ symmetrizeAlpha alpha
+           }
 
 -- | Turn a symmetric alpha into an asymmetric alpha. For internal use.
 asymmetrizeAlpha :: Enum a => Alpha a -> Alpha a
@@ -147,15 +176,23 @@ dirMultiFromPrecision m p = dirMultiFromAlpha $ meanPrecisionToAlpha m p
 
 -- | Create a symmetric Dirichlet/multinomial
 symDirMulti :: Enum a => Double -> [a] -> DirMulti a
-symDirMulti alpha domain = dirMultiFromAlpha $ SymAlpha (SQ.fromList domain) alpha
+symDirMulti alpha domain = dirMultiFromAlpha a
+  where a = SymAlpha { aDomain = SQ.fromList domain
+                     , aAlpha = alpha
+                     , aNorm = alphaNorm a
+                     }
 
-fixedDirMulti :: Enum a => [(a,Probability)] -> DirMulti a
-fixedDirMulti probs = Fixed { dmAlpha = SymAlpha (SQ.fromList $ map fst probs) 0
+fixedDirMulti :: Enum a => [(a,Double)] -> DirMulti a
+fixedDirMulti probs = Fixed { dmAlpha = a
                             , dmProbs = EM.fromList probs
                             , dmCounts = EM.empty
                             , dmTotal = 0
                             , dmDomain = SQ.fromList $ map fst probs
                             }
+  where a = SymAlpha { aDomain = SQ.fromList $ map fst probs
+                     , aAlpha = 0
+                     , aNorm = alphaNorm a
+                     }
 
 -- | Create an asymmetric Dirichlet/multinomial from items and alphas
 dirMulti :: Enum a => [(a,Double)] -> DirMulti a
@@ -173,19 +210,31 @@ dmGetCounts :: Enum a => DirMulti a -> a -> Int
 dmGetCounts (DirMulti {dmCounts=counts}) k =
   EM.findWithDefault 0 k counts
 
-instance ProbDist DirMulti where
-  type PdContext DirMulti a = (Ord a, Enum a)
+instance HasLikelihood DirMulti where
+  type LContext DirMulti a = (Ord a, Enum a)
+  likelihood dm@(Fixed {}) =
+    product $ map (\(k,n)->(realToFrac $ dmProbs dm EM.! k)^n) $ EM.assocs $ dmCounts dm
+  likelihood dm =
+        let alpha = dmAlpha dm
+            f (k,n) = logToLogFloat $ lnGamma (realToFrac n + alpha `alphaOf` k)
+        in 1 / aNorm alpha
+           * product (map f $ EM.assocs $ dmCounts dm)
+           / logToLogFloat (lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha) 
+  {-# INLINEABLE likelihood #-}
 
-  prob dm@(Fixed {dmProbs=prob}) k = prob EM.! k
-  prob dm@(DirMulti {dmTotal=total}) k =
-  	let alpha = (dmAlpha dm) `alphaOf` k
-            c = realToFrac $ dmGetCounts dm k
-        in (c + alpha) / (realToFrac total + sumAlpha (dmAlpha dm))
-  {-# INLINEABLE prob #-}
+instance FullConditionable DirMulti where
+  type FCContext DirMulti a = (Ord a, Enum a)
+  sampleProb dm@(Fixed {dmProbs=prob}) k = prob EM.! k
+  sampleProb dm@(DirMulti {dmAlpha=a}) k =
+  	let alpha = a `alphaOf` k
+            n = realToFrac $ dmGetCounts dm k
+            total = realToFrac $ dmTotal dm
+        in (n + alpha) / (total + sumAlpha a)
+  {-# INLINEABLE sampleProb #-}
 
 {-# INLINEABLE probabilities #-}
 probabilities :: (Ord a, Enum a) => DirMulti a -> Seq (Double, a)
-probabilities dm = fmap (\a->(prob dm a, a)) $ dmDomain dm
+probabilities dm = fmap (\a->(sampleProb dm a, a)) $ dmDomain dm -- FIXME
 
 prettyDirMulti :: (Ord a, Enum a) => Int -> (a -> String) -> DirMulti a -> Doc
 prettyDirMulti n showA dm =
@@ -208,7 +257,7 @@ updatePrior :: (Alpha a -> Alpha a) -> DirMulti a -> DirMulti a
 updatePrior f dm = dm {dmAlpha=f $ dmAlpha dm}
 
 -- | Relative tolerance in precision for prior estimation
-estimationTol = 1e-3
+estimationTol = 1e-8
 
 reestimatePriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimatePriors dms =
@@ -227,9 +276,9 @@ estimatePrior' dms alpha =
       f k = let num = sum $ map (\i->digamma (realToFrac (dmGetCounts i k) + alphaOf alpha k)
                                       - digamma (alphaOf alpha k)
                                 ) dms
-                n i = sum $ map (\k->dmGetCounts i k) domain
+                total i = realToFrac $ sum $ map (\k->dmGetCounts i k) domain
                 sumAlpha = sum $ map (alphaOf alpha) domain
-                denom = sum $ map (\i->digamma (realToFrac (n i) + sumAlpha) - digamma sumAlpha) dms
+                denom = sum $ map (\i->digamma (total i + sumAlpha) - digamma sumAlpha) dms
             in alphaOf alpha k * num / denom
   in asymAlpha $ foldMap (\k->EM.singleton k (f k)) domain
 

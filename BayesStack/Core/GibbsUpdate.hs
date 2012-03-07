@@ -16,6 +16,7 @@ import Data.Foldable hiding (sum)
 
 import Control.Monad (forM, replicateM_)
 
+import Data.Number.LogFloat hiding (realToFrac)
 import BayesStack.Core.ModelMonad
 import BayesStack.Core.Types
 import BayesStack.Core.Concurrent
@@ -45,7 +46,7 @@ class GibbsUpdateUnit unit where
   type GUValue unit :: *
   guUnset :: unit -> ModelMonad (GUValue unit)
   guDomain :: unit -> ModelMonad [GUValue unit]
-  guProb :: unit -> GUValue unit -> ModelMonad Probability
+  guProb :: unit -> GUValue unit -> ModelMonad Double
   guSet :: unit -> GUValue unit -> ModelMonad ()
   guState :: unit -> Shared GibbsUpdateState
 
@@ -56,7 +57,7 @@ fullGibbsUpdate unit =
      probs <- forM domain $ guProb unit
      let norm = sum probs
      updateShared (guState unit) $ \s->s {gusNorm=Just norm}
-     new <- liftRVar $ sample $ C.fromList $ zip (map (/norm) probs) domain
+     new <- liftRVar $ sample $ C.fromList $ zip (map (\p->p/norm) probs) domain
      guSet unit new
 
 gibbsUpdate :: GibbsUpdateUnit unit => unit -> ModelMonad ()

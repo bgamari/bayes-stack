@@ -12,13 +12,13 @@ module BayesStack.Models.Topic.SharedTaste
   , randomInitialize, smartInitialize
     -- * Model
   , STModel(..), ItemUnit
-  , model, likelihood
+  , model, modelLikelihood
   , STModelState (..), getModelState
   , sortTopics
   , ItemVars(..)
   ) where
 
-import Prelude hiding (mapM)
+import Prelude hiding (mapM, product)
 
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
@@ -171,8 +171,8 @@ model d init =
          friends :: EnumMap Node (Set Node)
          friends = foldMap (\n->EM.singleton n $ S.fromList $ getFriends (S.toList friendships) n) nodes
      gammas <- newSharedEnumMap (S.toList nodes) $ \n ->
-       return $ fixedDirMulti [ (Shared, stAlphaGammaShared d)
-                              , (Own, stAlphaGammaOwn d) ]
+       return $ dirMulti [ (Shared, stAlphaGammaShared d)
+                         , (Own, stAlphaGammaOwn d) ]
      omegas <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ symDirMulti (stAlphaOmega d) (S.toList topics)
      psis <- newSharedEnumMap (S.toList nodes) $ \n ->
@@ -221,27 +221,22 @@ sortTopics model =
   forM_ (EM.toList $ mSortedTopics model) $ \(x,topics)->do
     d <- getShared topics
     weights <- forM d $ \t->do phi <- getShared $ mPhis model EM.! t
-                               return $ prob phi x
+                               return $ sampleProb phi x -- FIXME
     setShared topics $ map snd $ sortBy (flip (compare `on` fst)) $ zip weights d
 
-likelihood :: STModel -> ModelMonad LogFloat
-likelihood model =
-  do a <- forM (EM.toList $ stNodeItems $ mData model) $ \(ni, (n,x)) ->
-       do ItemVars s f t <- getShared $ mVars model EM.! ni
-          gamma <- getShared $ mGammas model EM.! n
-          omega <- getShared $ mOmegas model EM.! n
-          psi <- getShared $ mPsis model EM.! n
-          lambda <- getShared $ mLambdas model EM.! Friendship (n,f)
-          phi <- getShared $ mPhis model EM.! t
-          case s of
-              Shared -> return $ Product $ logFloat (prob gamma s)
-                                         * logFloat (prob psi f)
-                                         * logFloat (prob lambda t)
-                                         * logFloat (prob phi x)
-              Own -> return $ Product $ logFloat (prob gamma s)
-                                      * logFloat (prob omega t)
-                                      * logFloat (prob phi x)
-     return $ getProduct $ mconcat a
+modelLikelihood :: STModelState -> Probability
+modelLikelihood model =
+  product $ map likelihood (EM.elems $ msGammas model)
+         ++ map likelihood (EM.elems $ msPhis model)
+         ++ [likelihood psi]
+         ++ map likelihood (EM.elems $ msLambdas model)
+         ++ map likelihood (EM.elems $ msOmegas model)
+  where alphaPsi = 1 --TODO
+        psi = foldl' (\psi (ni,iv)->let (n,i) = stNodeItems (msData model) EM.! ni
+                                    in incDirMulti (Friendship (n, ivF iv)) psi
+                     )
+              (symDirMulti alphaPsi (S.toList $ stFriendships $ msData model))
+              (filter (\(_,iv)->ivS iv == Shared) $ EM.assocs $ msVars model)
 
 instance GibbsUpdateUnit ItemUnit where
   type GUValue ItemUnit = ItemVars
@@ -252,8 +247,13 @@ instance GibbsUpdateUnit ItemUnit where
        phi <- getShared $ iuPhis unit EM.! t 
        lambda <- getShared $ iuLambdas unit EM.! Friendship (iuN unit, f)
        case s of
-            Shared -> return $ prob gamma s * prob psi f * prob lambda t * prob phi (iuX unit) 
-            Own -> return $ prob gamma s * prob omega t * prob phi (iuX unit)
+            Shared -> return $ sampleProb gamma s
+                             * sampleProb psi f
+                             * sampleProb lambda t
+                             * sampleProb phi (iuX unit) 
+            Own -> return $ sampleProb gamma s
+                          * sampleProb omega t
+                          * sampleProb phi (iuX unit)
   
   guDomain unit = return $ (do t <- S.toList $ stTopics $ mData $ iuModel unit
                                f <- S.toList $ iuFriends unit
@@ -307,14 +307,14 @@ getModelState model =
      lambdas <- getSharedEnumMap $ mLambdas model
      phis <- getSharedEnumMap $ mPhis model
      vars <- getSharedEnumMap $ mVars model
-     l <- likelihood model
-     return $ STModelState { msData = mData model
-                           , msGammas = gammas
-                           , msOmegas = omegas
-                           , msPsis = psis
-                           , msLambdas = lambdas
-                           , msPhis = phis
-                           , msVars = vars
-                           , msLogLikelihood = logFromLogFloat l
-                           }
+     let state = STModelState { msData = mData model
+                              , msGammas = gammas
+                              , msOmegas = omegas
+                              , msPsis = psis
+                              , msLambdas = lambdas
+                              , msPhis = phis
+                              , msVars = vars
+                              , msLogLikelihood = logFromLogFloat $ modelLikelihood state
+                              }
+     return state
 

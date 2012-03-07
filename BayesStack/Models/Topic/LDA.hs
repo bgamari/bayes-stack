@@ -11,7 +11,7 @@ module BayesStack.Models.Topic.LDA
     -- * Model
   , LDAModel(..), ItemUnit
   , LDAModelState(..), getModelState
-  , model, likelihood
+  , model, modelLikelihood
   , sortTopics
   ) where
 
@@ -137,27 +137,20 @@ sortTopics model =
   forM_ (EM.toList $ mSortedTopics model) $ \(x,topics)->do
     d <- getShared topics
     weights <- forM d $ \t->do phi <- getShared $ mPhis model EM.! t
-                               return $ prob phi x
+                               return $ sampleProb phi x -- FIXME
     setShared topics $ map snd $ sortBy (flip (compare `on` fst)) $ zip weights d
 
-likelihood :: LDAModel -> ModelMonad LogFloat
-likelihood model =
-  do a <- forM (EM.toList $ ldaNodeItems $ mData model) $ \(ni, (n,i)) ->
-       do t <- getShared $ mTs model EM.! ni 
-          theta <- getShared $ mThetas model EM.! n
-          phi <- getShared $ mPhis model EM.! t
-          return $ Product $ logFloat (prob theta t)
-                           * logFloat (prob phi i)
-     return $ getProduct $ mconcat a
+modelLikelihood :: LDAModelState -> Probability
+modelLikelihood model =
+  product $ map likelihood (EM.elems $ msThetas model)
+         ++ map likelihood (EM.elems $ msPhis model)
 
 instance GibbsUpdateUnit ItemUnit where
   type GUValue ItemUnit = Topic
   guProb unit t =
     do phi <- getShared $ iuPhis unit EM.! t 
        theta <- getShared $ iuTheta unit
-       let th = prob theta t
-       let ph = prob phi (iuX unit) 
-       return $ th * ph
+       return $ sampleProb theta t * sampleProb phi (iuX unit) 
   
   guDomain = return . S.toList . ldaTopics . iuData
   
@@ -185,7 +178,7 @@ getModelState model =
   do thetas <- getSharedEnumMap $ mThetas model
      phis <- getSharedEnumMap $ mPhis model
      ts <- getSharedEnumMap $ mTs model
-     l <- likelihood model
+     l <- modelLikelihood model
      return $ LDAModelState { msData = mData model 
                             , msThetas = thetas
                             , msPhis = phis

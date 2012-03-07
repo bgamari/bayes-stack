@@ -1,17 +1,23 @@
 {-# LANGUAGE TypeFamilies, KindSignatures, ConstraintKinds #-}
 
 module BayesStack.Core.Types ( Probability
-                             , ProbDist(..)
+                             , HasLikelihood(..)
+                             , FullConditionable(..)
                              ) where
 
 import GHC.Prim (Constraint)
+import Data.Number.LogFloat
 
-type Probability = Double
+type Probability = LogFloat
 
--- | A map over a domain 'a' to probabilities
-class ProbDist p where
-  type PdContext p a :: Constraint
-  type PdContext p a = ()
-  -- | 'prob p a' is the probability of 'a' in 'p'
-  prob :: PdContext p a => p a -> a -> Probability
+class HasLikelihood p where
+  type LContext p a :: Constraint
+  type LContext p a = ()
+  likelihood :: LContext p a => p a -> Probability
  
+-- | A distribution for which a full conditional factor can be produced
+class FullConditionable p where
+  type FCContext p a :: Constraint
+  type FCContext p a = () 
+  sampleProb :: FCContext p a => p a -> a -> Double
+
