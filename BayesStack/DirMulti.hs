@@ -187,6 +187,7 @@ symDirMulti alpha domain = dirMultiFromAlpha a
                      , aNorm = alphaNorm a
                      }
 
+-- | This is a hack
 fixedDirMulti :: Enum a => [(a,Double)] -> DirMulti a
 fixedDirMulti probs = Fixed { dmAlpha = a
                             , dmProbs = EM.fromList probs
@@ -196,7 +197,7 @@ fixedDirMulti probs = Fixed { dmAlpha = a
                             }
   where a = SymAlpha { aDomain = SQ.fromList $ map fst probs
                      , aAlpha = 0
-                     , aNorm = alphaNorm a
+                     , aNorm = 1 -- FIXME
                      }
 
 -- | Create an asymmetric Dirichlet/multinomial from items and alphas
