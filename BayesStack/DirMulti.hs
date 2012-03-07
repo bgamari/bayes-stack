@@ -37,9 +37,15 @@ import Data.Serialize.EnumMap
  
 import BayesStack.Core
 
-import Data.Number.LogFloat hiding (realToFrac)
+import Data.Number.LogFloat hiding (realToFrac, isNaN, isInfinite)
 import Numeric.Digamma
 import Math.Gamma
+
+-- | Make error handling a bit easier
+checkNaN :: RealFloat a => String -> a -> a
+checkNaN loc x | isNaN x = error $ "BayesStack.DirMulti."++loc++": Not a number"
+checkNaN loc x | isInfinite x = error $ "BayesStack.DirMulti."++loc++": Infinity"
+checkNaN _ x = x
 
 maybeInc, maybeDec :: Maybe Int -> Maybe Int
 maybeInc Nothing = Just 1
@@ -111,9 +117,10 @@ alphaNorm :: Enum a => Alpha a -> LogFloat
 alphaNorm alpha = normNum / normDenom
   where dim = realToFrac $ SQ.length $ aDomain alpha
         normNum = case alpha of
-                      Alpha {} -> product $ map (logToLogFloat . lnGamma) $ EM.elems $ aAlphas alpha
-                      SymAlpha {} -> logToLogFloat $ dim * lnGamma (aAlpha alpha)
-        normDenom = logToLogFloat $ lnGamma $ sumAlpha alpha
+                      Alpha {} -> product $ map (\a->logToLogFloat $ checkNaN ("alphaNorm.normNum(asym) alpha="++show a) $ lnGamma a)
+                                  $ EM.elems $ aAlphas alpha
+                      SymAlpha {} -> logToLogFloat $ checkNaN "alphaNorm.normNum(sym)" $ dim * lnGamma (aAlpha alpha)
+        normDenom = logToLogFloat $ checkNaN "alphaNorm.normDenom" $ lnGamma $ sumAlpha alpha
 
 -- | 'alphaDomain a' is the domain of prior 'a'
 alphaDomain :: Enum a => Alpha a -> Seq a
@@ -214,10 +221,11 @@ instance HasLikelihood DirMulti where
     product $ map (\(k,n)->(realToFrac $ dmProbs dm EM.! k)^n) $ EM.assocs $ dmCounts dm
   likelihood dm =
         let alpha = dmAlpha dm
-            f (k,n) = logToLogFloat $ lnGamma (realToFrac n + alpha `alphaOf` k)
+            f (k,n) = logToLogFloat $ checkNaN "likelihood(factor)"
+                      $ lnGamma (realToFrac n + alpha `alphaOf` k)
         in 1 / aNorm alpha
            * product (map f $ EM.assocs $ dmCounts dm)
-           / logToLogFloat (lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha) 
+           / logToLogFloat (checkNaN "likelihood" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha) 
   {-# INLINEABLE likelihood #-}
 
 instance FullConditionable DirMulti where
@@ -259,13 +267,19 @@ estimationTol = 1e-8
 
 reestimatePriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimatePriors dms =
-  let alpha = estimatePrior estimationTol $ filter (\dm->dmTotal dm > 5) $ toList dms
-  in fmap (updatePrior $ const alpha) dms
+  let usableDms = filter (\dm->dmTotal dm > 5) $ toList dms
+      alpha = case () of
+                _ | length usableDms <= 3 -> id
+                otherwise -> const $ estimatePrior estimationTol usableDms
+  in fmap (updatePrior alpha) dms
 
 reestimateSymPriors :: (Foldable f, Functor f, Enum a) => f (DirMulti a) -> f (DirMulti a)
 reestimateSymPriors dms =
-  let alpha = symmetrizeAlpha $ estimatePrior estimationTol $ filter (\dm->dmTotal dm > 5) $ toList dms
-  in fmap (updatePrior $ const alpha) dms
+  let usableDms = filter (\dm->dmTotal dm > 5) $ toList dms
+      alpha = case () of
+                _ | length usableDms <= 3 -> id
+                otherwise -> const $ symmetrizeAlpha $ estimatePrior estimationTol usableDms
+  in fmap (updatePrior alpha) dms
 
 -- | Estimate the prior alpha from a set of Dirichlet/multinomials
 estimatePrior' :: (Enum a) => [DirMulti a] -> Alpha a -> Alpha a
