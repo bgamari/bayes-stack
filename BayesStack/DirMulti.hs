@@ -222,10 +222,10 @@ instance HasLikelihood DirMulti where
     product $ map (\(k,n)->(realToFrac $ dmProbs dm EM.! k)^n) $ EM.assocs $ dmCounts dm
   likelihood dm =
         let alpha = dmAlpha dm
-            f (k,n) = logToLogFloat $ checkNaN "likelihood(factor)"
-                      $ lnGamma (realToFrac n + alpha `alphaOf` k)
+            f k = logToLogFloat $ checkNaN "likelihood(factor)"
+                  $ lnGamma (realToFrac (dmGetCounts dm k) + alpha `alphaOf` k)
         in 1 / aNorm alpha
-           * product (map f $ EM.assocs $ dmCounts dm)
+           * product (map f $ toList $ dmDomain dm)
            / logToLogFloat (checkNaN "likelihood" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha) 
   {-# INLINEABLE likelihood #-}
 
