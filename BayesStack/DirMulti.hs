@@ -288,11 +288,17 @@ estimatePrior' dms alpha =
   let domain = toList $ dmDomain $ head dms
       f k = let num = sum $ map (\i->digamma (realToFrac (dmGetCounts i k) + alphaOf alpha k)
                                       - digamma (alphaOf alpha k)
-                                ) dms
+                                ) 
+                      $ filter (\i->dmGetCounts i k > 0) dms
                 total i = realToFrac $ sum $ map (\k->dmGetCounts i k) domain
                 sumAlpha = sum $ map (alphaOf alpha) domain
                 denom = sum $ map (\i->digamma (total i + sumAlpha) - digamma sumAlpha) dms
-            in alphaOf alpha k * num / denom
+            in case () of
+                 _ | isNaN num  -> error $ "BayesStack.DirMulti.estimatePrior': num = NaN: "++show (map (\i->(digamma (realToFrac (dmGetCounts i k) + alphaOf alpha k), digamma (alphaOf alpha k))) dms)
+                 _ | denom == 0 -> error "BayesStack.DirMulti.estimatePrior': denom=0"
+                 _ | isInfinite num -> error "BayesStack.DirMulti.estimatePrior': num is infinity "
+                 _ | isNaN (alphaOf alpha k * num / denom) -> error $ "NaN"++show (num, denom)
+                 otherwise  -> alphaOf alpha k * num / denom
   in asymAlpha $ foldMap (\k->EM.singleton k (f k)) domain
 
 estimatePrior :: (Enum a) => Double -> [DirMulti a] -> Alpha a
