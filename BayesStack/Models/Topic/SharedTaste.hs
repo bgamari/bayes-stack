@@ -228,15 +228,9 @@ modelLikelihood :: STModelState -> Probability
 modelLikelihood model =
   product $ map likelihood (EM.elems $ msGammas model)
          ++ map likelihood (EM.elems $ msPhis model)
-         ++ [likelihood psi]
          ++ map likelihood (EM.elems $ msLambdas model)
          ++ map likelihood (EM.elems $ msOmegas model)
-  where alphaPsi = 1 --TODO
-        psi = foldl' (\psi (ni,iv)->let (n,i) = stNodeItems (msData model) EM.! ni
-                                    in incDirMulti (Friendship (n, ivF iv)) psi
-                     )
-              (symDirMulti alphaPsi (S.toList $ stFriendships $ msData model))
-              (filter (\(_,iv)->ivS iv == Shared) $ EM.assocs $ msVars model)
+         ++ map likelihood (EM.elems $ msPsis model)
 
 instance GibbsUpdateUnit ItemUnit where
   type GUValue ItemUnit = ItemVars
