@@ -16,9 +16,12 @@ module BayesStack.Models.Topic.SharedTaste
   , STModelState (..), getModelState
   , sortTopics
   , ItemVars(..)
+    -- * Quantities of interest
+  , friendInfluence
+  , theta
   ) where
 
-import Prelude hiding (mapM, product)
+import Prelude hiding (mapM, sum, product)
 
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
@@ -44,7 +47,7 @@ import Control.Monad.Trans.Class
 import Data.Random
 import Data.Random.Distribution.Bernoulli
 import Data.Random.Sequence
-import Data.Number.LogFloat
+import Data.Number.LogFloat hiding (realToFrac)
 
 import BayesStack.Core
 import BayesStack.Categorical
@@ -311,4 +314,26 @@ getModelState model =
                               , msLogLikelihood = logFromLogFloat $ modelLikelihood state
                               }
      return state
+
+-- | The analogue of theta in LDA
+theta :: STModelState -> Node -> Topic -> Double
+theta state u t =
+  sampleProb gamma Own * sampleProb omega t
+  + sum (map (\f->let lambda = msLambdas state EM.! Friendship (u,f)
+                  in sampleProb psi f * sampleProb lambda t * sampleProb gamma Shared
+             ) $ getFriends (S.toList $ stFriendships $ msData state) u
+        )
+  where psi = msPsis state EM.! u
+        gamma = msGammas state EM.! u
+        omega = msOmegas state EM.! u
+
+friendInfluence :: STModelState -> Node -> Node -> LogFloat
+friendInfluence state u f =
+  let lambda = msLambdas state EM.! Friendship(u,f)
+      vars = map snd
+             $ filter (\(ni,iv)->let (u',x) = stNodeItems (msData state) EM.! ni in u==u')
+             $ EM.assocs $ msVars state
+      tProbF = map (realToFrac . sampleProb lambda . ivT) vars
+      tMean = (sum tProbF) / (realToFrac $ length vars)
+  in tMean
 
