@@ -323,9 +323,11 @@ getModelState model =
 theta :: STModelState -> Node -> Topic -> Double
 theta state u t =
   sampleProb gamma Own * sampleProb omega t
-  + sum (map (\f->let lambda = msLambdas state EM.! Friendship (u,f)
-                  in sampleProb psi f * sampleProb lambda t * sampleProb gamma Shared
-             ) $ getFriends (S.toList $ stFriendships $ msData state) u
+  + sampleProb gamma Shared
+  * sum (map (\f->let lambda = msLambdas state EM.! Friendship (u,f)
+                  in sampleProb psi f * sampleProb lambda t
+             )
+         $ getFriends (S.toList $ stFriendships $ msData state) u
         )
   where psi = msPsis state EM.! u
         gamma = msGammas state EM.! u
