@@ -141,7 +141,7 @@ smartInitialize d =
         in liftM mconcat $ forM sharedItems $ \x -> do
              (itemTopics,_) <- get
              t <- if x `EM.member` itemTopics
-                    then return $ itemTopics EM.! x
+                    then return $ EM.findWithDefault (error "Item has no topic") x itemTopics
                     else do (_, friendshipTopics) <- get
                             --let possTopics = EM.findWithDefault topics fs friendshipTopics
                             let possTopics = topics -- FIXME
@@ -149,9 +149,9 @@ smartInitialize d =
                             modify $ \(a,b)->(EM.insert x t a, b)
                             return t
              modify $ \(a,b)->(a, EM.insertWith S.union fs (S.singleton t) b)
-             return $ EM.fromList $ do ax <- EM.findWithDefault (error "fuck") (a,x) nisInv --nisInv EM.! (a,x)
+             return $ EM.fromList $ do ax <- EM.findWithDefault (error "ouch") (a,x) nisInv
                                        return (ax, ItemVars Shared b t)
-                                 ++ do bx <- EM.findWithDefault (error "fuck2") (b,x) nisInv -- nisInv EM.! (b,x)
+                                 ++ do bx <- EM.findWithDefault (error "ouch") (b,x) nisInv
                                        return (bx, ItemVars Shared a t)
   in do a <- evalStateT (mapM sharedTopics $ S.toList friendships) (EM.empty, EM.empty)
         randomInitialize' d $ mconcat a
