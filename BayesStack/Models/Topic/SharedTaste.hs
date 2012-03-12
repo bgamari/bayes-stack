@@ -33,6 +33,7 @@ import Data.Set (Set)
 import qualified Data.Set as S
 
 import qualified Data.EnumSet as ES
+import qualified Data.Vector as V
 
 import Data.Traversable
 import Data.Foldable
@@ -58,6 +59,7 @@ import BayesStack.Models.Topic.Types
 import Control.Monad (when)
 import Control.Monad.IO.Class
 
+import Statistics.Sample
 import Data.Serialize (Serialize)
 import GHC.Generics
 
@@ -327,13 +329,14 @@ theta state u t =
         gamma = msGammas state EM.! u
         omega = msOmegas state EM.! u
 
-friendInfluence :: STModelState -> Node -> Node -> LogFloat
+friendInfluence :: STModelState -> Node -> Node -> Double
 friendInfluence state u f =
   let lambda = msLambdas state EM.! Friendship(u,f)
       vars = map snd
              $ filter (\(ni,iv)->let (u',x) = stNodeItems (msData state) EM.! ni in u==u')
              $ EM.assocs $ msVars state
       tProbF = map (realToFrac . sampleProb lambda . ivT) vars
-      tMean = (sum tProbF) / (realToFrac $ length vars)
-  in tMean
+  in case vars of
+       [] -> 0
+       otherwise -> geometricMean $ V.fromList tProbF
 
