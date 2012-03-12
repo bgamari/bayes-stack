@@ -176,8 +176,10 @@ model d init =
          friends :: EnumMap Node (Set Node)
          friends = foldMap (\n->EM.singleton n $ S.fromList $ getFriends (S.toList friendships) n) nodes
      gammas <- newSharedEnumMap (S.toList nodes) $ \n ->
-       return $ dirMulti [ (Shared, stAlphaGammaShared d)
-                         , (Own, stAlphaGammaOwn d) ]
+       --return $ dirMulti [ (Shared, stAlphaGammaShared d)
+       --                  , (Own, stAlphaGammaOwn d) ]
+       return $ fixedDirMulti [ (Shared, stAlphaGammaShared d)
+                              , (Own, stAlphaGammaOwn d) ]
      omegas <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ symDirMulti (stAlphaOmega d) (S.toList topics)
      psis <- newSharedEnumMap (S.toList nodes) $ \n ->
