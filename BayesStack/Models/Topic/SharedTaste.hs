@@ -340,7 +340,7 @@ friendInfluence state u f =
              $ filter (\(ni,iv)->let (u',x) = stNodeItems (msData state) EM.! ni in u==u')
              $ EM.assocs $ msVars state
       tProbF = map (realToFrac . sampleProb lambda . ivT) vars
-  in case vars of
-       [] -> 0
+  in case tProbF of
+       [] -> error "friendInfluence: vars is null"
        otherwise -> geometricMean $ V.fromList tProbF
 
