@@ -7,17 +7,9 @@ module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                            , decMultinom, incMultinom
                            , prettyMultinom
                            , updatePrior
-                             -- * Prior parameter
-                           , Alpha(SymAlpha, aAlpha)
-                           , alphaOf, setAlphaOf, setSymAlpha
-                           , alphaToMeanPrecision, meanPrecisionToAlpha
-                           , symmetrizeAlpha
-                           , prettyAlpha
                              -- * Parameter estimation
                            , estimatePrior, reestimatePriors, reestimateSymPriors
                            ) where
-
-import qualified Data.Foldable 
 
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
@@ -25,6 +17,7 @@ import qualified Data.EnumMap as EM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
+import qualified Data.Foldable 
 import Data.Foldable (toList, Foldable, fold, foldMap)
 import Data.Function (on)
 
@@ -34,8 +27,10 @@ import Text.Printf
 import GHC.Generics (Generic)
 import Data.Serialize
 import Data.Serialize.EnumMap
+import Data.Serialize.LogFloat
 
 import BayesStack.Core
+import BayesStack.Dirichlet
 
 import Data.Number.LogFloat hiding (realToFrac, isNaN, isInfinite)
 import Numeric.Digamma
@@ -58,19 +53,19 @@ maybeDec (Just n) = Just (n-1)
 {-# INLINEABLE incMultinom #-}
 decMultinom, incMultinom :: (Ord a, Enum a) => a -> Multinom a -> Multinom a
 decMultinom k dm = dm { dmCounts = EM.alter maybeDec k $ dmCounts dm
-                    , dmTotal = dmTotal dm - 1 }
+                      , dmTotal = dmTotal dm - 1 }
 incMultinom k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
-                    , dmTotal = dmTotal dm + 1 }
+                      , dmTotal = dmTotal dm + 1 }
 
 -- | 'Multinom a' represents multinomial distribution over domain 'a'.
 -- Optionally, this can include a collapsed Dirichlet prior.
 -- 'Multinom alpha count total' is a multinomial with Dirichlet prior
 -- with symmetric parameter 'alpha', ...
 data Multinom a = DirMulti { dmAlpha :: Alpha a
-                         , dmCounts :: EnumMap a Int
-                         , dmTotal :: !Int
-                         , dmDomain :: Seq a
-                         }
+                           , dmCounts :: EnumMap a Int
+                           , dmTotal :: !Int
+                           , dmDomain :: Seq a
+                           }
                 | Multinom { dmProbs :: !(EnumMap a Double)
                            , dmCounts :: !(EnumMap a Int)
                            , dmTotal :: !Int
@@ -79,121 +74,27 @@ data Multinom a = DirMulti { dmAlpha :: Alpha a
                 deriving (Show, Eq, Generic)
 instance (Enum a, Serialize a) => Serialize (Multinom a)
 
-instance Serialize LogFloat where
-  put = put . (logFromLogFloat :: LogFloat -> Double)
-  get = (logToLogFloat :: Double -> LogFloat) `fmap` get
-
--- | A Dirichlet prior
-data Alpha a = SymAlpha { aDomain :: Seq a
-                        , aAlpha :: !Double
-                        , aNorm :: LogFloat
-                        }
-             | Alpha { aAlphas :: EnumMap a Double
-                     , aSumAlphas :: !Double
-                     , aNorm :: LogFloat
-                     }
-             deriving (Show, Eq, Generic)
-instance (Enum a, Serialize a) => Serialize (Alpha a)
-
-type Mean a = EnumMap a Double
-type Precision = Double
-
--- | Construct an asymmetric Alpha
-asymAlpha :: Enum a => EnumMap a Double -> Alpha a
-asymAlpha alphas = Alpha { aAlphas = alphas
-                         , aSumAlphas = sum $ EM.elems alphas
-                         , aNorm = alphaNorm $ asymAlpha alphas
-                         }
-
-setSymAlpha :: Enum a => Double -> Alpha a -> Alpha a
-setSymAlpha alpha a = let b = (symmetrizeAlpha a) { aAlpha = alpha
-                                                  , aNorm = alphaNorm b
-                                                  }
-                      in b
-
--- | Compute the normalizer of the likelihood involving alphas,
--- (product_k gamma(alpha_k)) / gamma(sum_k alpha_k)
-alphaNorm :: Enum a => Alpha a -> LogFloat
-alphaNorm alpha = normNum / normDenom
-  where dim = realToFrac $ SQ.length $ aDomain alpha
-        normNum = case alpha of
-                      Alpha {} -> product $ map (\a->logToLogFloat $ checkNaN ("alphaNorm.normNum(asym) alpha="++show a) $ lnGamma a)
-                                  $ EM.elems $ aAlphas alpha
-                      SymAlpha {} -> logToLogFloat $ checkNaN "alphaNorm.normNum(sym)" $ dim * lnGamma (aAlpha alpha)
-        normDenom = logToLogFloat $ checkNaN "alphaNorm.normDenom" $ lnGamma $ sumAlpha alpha
-
--- | 'alphaDomain a' is the domain of prior 'a'
-alphaDomain :: Enum a => Alpha a -> Seq a
-alphaDomain (SymAlpha {aDomain=d}) = d
-alphaDomain (Alpha {aAlphas=a}) = SQ.fromList $ EM.keys a
-
--- | 'alphaOf alpha k' is the value of element 'k' in prior 'alpha'
-alphaOf :: Enum a => Alpha a -> a -> Double
-alphaOf (SymAlpha {aAlpha=alpha}) = const alpha
-alphaOf (Alpha {aAlphas=alphas}) = (alphas EM.!)
-
--- | 'sumAlpha alpha' is the sum of all alphas
-sumAlpha :: Enum a => Alpha a -> Double
-sumAlpha (SymAlpha {aDomain=domain, aAlpha=alpha}) = realToFrac (SQ.length domain) * alpha
-sumAlpha (Alpha {aSumAlphas=sum}) = sum
-
--- | Set a particular alpha element
-setAlphaOf :: Enum a => a -> Double -> Alpha a -> Alpha a
-setAlphaOf k a alpha@(SymAlpha {}) = setAlphaOf k a $ asymmetrizeAlpha alpha
-setAlphaOf k a (Alpha {aAlphas=alphas}) = asymAlpha $ EM.insert k a alphas
-
--- | 'alphaToMeanPrecision a' is the mean/precision representation of the prior 'a'
-alphaToMeanPrecision :: Enum a => Alpha a -> (Mean a, Precision)
-alphaToMeanPrecision (SymAlpha {aDomain=dom, aAlpha=alpha}) =
-  let prec = realToFrac (SQ.length dom) * alpha
-  in (EM.fromList $ map (\a->(a, alpha/prec)) $ toList dom, prec)
-alphaToMeanPrecision (Alpha {aAlphas=alphas, aSumAlphas=prec}) =
-  (fmap (/prec) alphas, prec)
-
--- | 'meanPrecisionToAlpha m p' is a prior with mean 'm' and precision 'p'
-meanPrecisionToAlpha :: Enum a => Mean a -> Precision -> Alpha a
-meanPrecisionToAlpha mean prec = asymAlpha $ fmap (*prec) mean
-
--- | Symmetrize a Dirichlet prior (such that mean=0) 
-symmetrizeAlpha :: Enum a => Alpha a -> Alpha a
-symmetrizeAlpha alpha@(SymAlpha {}) = alpha
-symmetrizeAlpha alpha@(Alpha {}) =
-  SymAlpha { aDomain = alphaDomain alpha
-           , aAlpha = sumAlpha alpha / realToFrac (EM.size $ aAlphas alpha)
-           , aNorm = alphaNorm $ symmetrizeAlpha alpha
-           }
-
--- | Turn a symmetric alpha into an asymmetric alpha. For internal use.
-asymmetrizeAlpha :: Enum a => Alpha a -> Alpha a
-asymmetrizeAlpha (SymAlpha {aDomain=domain, aAlpha=alpha}) =
-  asymAlpha $ fold $ fmap (\k->EM.singleton k alpha) domain
-asymmetrizeAlpha alpha@(Alpha {}) = alpha
-
 -- | 'symMultinomFromPrecision d p' is a symmetric Dirichlet/multinomial over a
 -- domain 'd' with precision 'p'
-symDirMultiFromPrecision :: Enum a => [a] -> Precision -> Multinom a
+symDirMultiFromPrecision :: Enum a => [a] -> DirPrecision -> Multinom a
 symDirMultiFromPrecision domain prec = symDirMulti (0.5*prec) domain
 
 -- | 'dirMultiFromMeanPrecision m p' is an asymmetric Dirichlet/multinomial
 -- over a domain 'd' with mean 'm' and precision 'p'
-dirMultiFromPrecision :: Enum a => Mean a -> Precision -> Multinom a
+dirMultiFromPrecision :: Enum a => DirMean a -> DirPrecision -> Multinom a
 dirMultiFromPrecision m p = dirMultiFromAlpha $ meanPrecisionToAlpha m p
 
 -- | Create a symmetric Dirichlet/multinomial
 symDirMulti :: Enum a => Double -> [a] -> Multinom a
-symDirMulti alpha domain = dirMultiFromAlpha a
-  where a = SymAlpha { aDomain = SQ.fromList domain
-                     , aAlpha = alpha
-                     , aNorm = alphaNorm a
-                     }
+symDirMulti alpha domain = dirMultiFromAlpha $ symAlpha domain alpha
 
 -- | A multinomial without a prior
 multinom :: Enum a => [(a,Double)] -> Multinom a
 multinom probs = Multinom { dmProbs = EM.fromList probs
-                        , dmCounts = EM.empty
-                        , dmTotal = 0
-                        , dmDomain = SQ.fromList $ map fst probs
-                        }
+                          , dmCounts = EM.empty
+                          , dmTotal = 0
+                          , dmDomain = SQ.fromList $ map fst probs
+                          }
 
 -- | Create an asymmetric Dirichlet/multinomial from items and alphas
 dirMulti :: Enum a => [(a,Double)] -> Multinom a
@@ -219,7 +120,7 @@ instance HasLikelihood Multinom where
         let alpha = dmAlpha dm
             f k = logToLogFloat $ checkNaN "likelihood(factor)"
                   $ lnGamma (realToFrac (dmGetCounts dm k) + alpha `alphaOf` k)
-        in 1 / aNorm alpha
+        in 1 / alphaNormalizer alpha
            * product (map f $ toList $ dmDomain dm)
            / logToLogFloat (checkNaN "likelihood" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha) 
   {-# INLINEABLE likelihood #-}
@@ -246,14 +147,6 @@ prettyMultinom n showA dm@(DirMulti {}) =
             $ map (\(p,a)->text (showA a) <> parens (text $ printf "%1.2e" p))
             $ take n $ Data.Foldable.toList
             $ SQ.sortBy (flip (compare `on` fst)) $ probabilities dm)
-
-prettyAlpha :: Enum a => (a -> String) -> Alpha a -> Doc
-prettyAlpha showA (SymAlpha {aAlpha=alpha}) = text "Symmetric" <+> double alpha
-prettyAlpha showA (Alpha {aAlphas=alphas}) =
-  text "Assymmetric"
-  <+> fsep (punctuate comma
-           $ map (\(a,alpha)->text (showA a) <> parens (text $ printf "%1.2e" alpha))
-           $ take 100 $ EM.toList $ alphas)
 
 -- | Update the prior of a Dirichlet/multinomial
 updatePrior :: (Alpha a -> Alpha a) -> Multinom a -> Multinom a
