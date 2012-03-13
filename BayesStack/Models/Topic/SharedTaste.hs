@@ -119,9 +119,11 @@ randomInitialize' d init =
                          let (n,_) = EM.findWithDefault (error "Can't find nodeItem") ni (stNodeItems d)
                              friends = getFriends (S.toList $ stFriendships d) n
                          f <- randomElement friends
-                         --s <- bernoulli (0.5::Double)
-                         let s = Shared -- FIXME
-                         return $ EM.singleton ni $ ItemVars s f t
+                         s <- bernoulli $ stAlphaGammaShared d
+                         let s' = case s of
+                                        True  -> Shared
+                                        False -> Own
+                         return $ EM.singleton ni $ ItemVars s' f t
   in liftM ((init `mappend`) . mconcat) $ forM (ES.toList unset) randomInit
 
 randomInitialize :: STData -> RVar ModelInit
