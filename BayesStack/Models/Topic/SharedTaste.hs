@@ -88,21 +88,21 @@ data ItemVars = ItemVars { ivS :: !ItemSource
 instance Serialize ItemVars
 
 data STModel = STModel { mData :: STData
-                       , mGammas :: SharedEnumMap Node (DirMulti ItemSource)
-                       , mOmegas :: SharedEnumMap Node (DirMulti Topic)
-                       , mPsis :: SharedEnumMap Node (DirMulti Node)
-                       , mLambdas :: SharedEnumMap Friendship (DirMulti Topic)
-                       , mPhis :: SharedEnumMap Topic (DirMulti Item)
+                       , mGammas :: SharedEnumMap Node (Multinom ItemSource)
+                       , mOmegas :: SharedEnumMap Node (Multinom Topic)
+                       , mPsis :: SharedEnumMap Node (Multinom Node)
+                       , mLambdas :: SharedEnumMap Friendship (Multinom Topic)
+                       , mPhis :: SharedEnumMap Topic (Multinom Item)
                        , mVars :: SharedEnumMap NodeItem ItemVars
                        , mSortedTopics :: SharedEnumMap Item [Topic]
                        }
 
 data STModelState = STModelState { msData :: STData
-                                 , msGammas :: EnumMap Node (DirMulti ItemSource)
-                                 , msOmegas :: EnumMap Node (DirMulti Topic)
-                                 , msPsis :: EnumMap Node (DirMulti Node)
-                                 , msLambdas :: EnumMap Friendship (DirMulti Topic)
-                                 , msPhis :: EnumMap Topic (DirMulti Item)
+                                 , msGammas :: EnumMap Node (Multinom ItemSource)
+                                 , msOmegas :: EnumMap Node (Multinom Topic)
+                                 , msPsis :: EnumMap Node (Multinom Node)
+                                 , msLambdas :: EnumMap Friendship (Multinom Topic)
+                                 , msPhis :: EnumMap Topic (Multinom Item)
                                  , msVars :: EnumMap NodeItem ItemVars
                                  , msLogLikelihood :: Double
                                  } deriving (Show, Generic)
@@ -164,10 +164,10 @@ data ItemUnit = ItemUnit { iuModel :: STModel
                          , iuN :: Node
                          , iuVars :: Shared ItemVars
                          , iuX :: Item
-                         , iuGamma :: Shared (DirMulti ItemSource)
-                         , iuOmega :: Shared (DirMulti Topic)
-                         , iuLambdas :: SharedEnumMap Friendship (DirMulti Topic)
-                         , iuPhis :: SharedEnumMap Topic (DirMulti Item)
+                         , iuGamma :: Shared (Multinom ItemSource)
+                         , iuOmega :: Shared (Multinom Topic)
+                         , iuLambdas :: SharedEnumMap Friendship (Multinom Topic)
+                         , iuPhis :: SharedEnumMap Topic (Multinom Item)
                          , iuState :: Shared GibbsUpdateState
                          }
 
@@ -180,8 +180,8 @@ model d init =
      gammas <- newSharedEnumMap (S.toList nodes) $ \n ->
        --return $ dirMulti [ (Shared, stAlphaGammaShared d)
        --                  , (Own, stAlphaGammaOwn d) ]
-       return $ fixedDirMulti [ (Shared, stAlphaGammaShared d)
-                              , (Own, stAlphaGammaOwn d) ]
+       return $ multinom [ (Shared, stAlphaGammaShared d)
+                         , (Own, stAlphaGammaOwn d) ]
      omegas <- newSharedEnumMap (S.toList nodes) $ \n ->
        return $ symDirMulti (stAlphaOmega d) (S.toList topics)
      psis <- newSharedEnumMap (S.toList nodes) $ \n ->
@@ -274,13 +274,13 @@ instance GibbsUpdateUnit ItemUnit where
            omega = iuOmega unit
            lambda = iuLambdas unit EM.! Friendship (iuN unit, f)
            phi = iuPhis unit EM.! t
-       gamma `updateShared` decDirMulti s
+       gamma `updateShared` decMultinom s
        case s of
-            Shared -> do (mPsis m EM.! u) `updateShared` decDirMulti f
-                         (mPsis m EM.! f) `updateShared` decDirMulti u
-                         lambda `updateShared` decDirMulti t
-            Own -> omega `updateShared` decDirMulti t
-       phi `updateShared` decDirMulti x
+            Shared -> do (mPsis m EM.! u) `updateShared` decMultinom f
+                         (mPsis m EM.! f) `updateShared` decMultinom u
+                         lambda `updateShared` decMultinom t
+            Own -> omega `updateShared` decMultinom t
+       phi `updateShared` decMultinom x
        return $ ItemVars s f t
   
   guSet unit iv@(ItemVars s f t) =
@@ -292,13 +292,13 @@ instance GibbsUpdateUnit ItemUnit where
            omega = iuOmega unit
            lambda = iuLambdas unit EM.! Friendship (iuN unit, f)
            phi = iuPhis unit EM.! t
-       gamma `updateShared` incDirMulti s
+       gamma `updateShared` incMultinom s
        case s of
-            Shared -> do (mPsis m EM.! u) `updateShared` incDirMulti f
-                         (mPsis m EM.! f) `updateShared` incDirMulti u
-                         lambda `updateShared` incDirMulti t
-            Own -> omega `updateShared` incDirMulti t
-       phi `updateShared` incDirMulti x
+            Shared -> do (mPsis m EM.! u) `updateShared` incMultinom f
+                         (mPsis m EM.! f) `updateShared` incMultinom u
+                         lambda `updateShared` incMultinom t
+            Own -> omega `updateShared` incMultinom t
+       phi `updateShared` incMultinom x
 
   guState = iuState
 

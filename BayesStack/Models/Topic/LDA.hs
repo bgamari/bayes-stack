@@ -60,15 +60,15 @@ data LDAData = LDAData { ldaAlphaTheta :: Double
 instance Serialize LDAData
 
 data LDAModel = LDAModel { mData :: LDAData
-                         , mThetas :: SharedEnumMap Node (DirMulti Topic)
-                         , mPhis :: SharedEnumMap Topic (DirMulti Item)
+                         , mThetas :: SharedEnumMap Node (Multinom Topic)
+                         , mPhis :: SharedEnumMap Topic (Multinom Item)
                          , mTs :: SharedEnumMap NodeItem Topic
                          , mSortedTopics :: SharedEnumMap Item [Topic]
                          } deriving (Generic)
 
 data LDAModelState = LDAModelState { msData :: LDAData
-                                   , msThetas :: EnumMap Node (DirMulti Topic)
-                                   , msPhis :: EnumMap Topic (DirMulti Item)
+                                   , msThetas :: EnumMap Node (Multinom Topic)
+                                   , msPhis :: EnumMap Topic (Multinom Item)
                                    , msTs :: EnumMap NodeItem Topic
                                    , msLogLikelihood :: Double
                                    }
@@ -80,8 +80,8 @@ data ItemUnit = ItemUnit { iuData :: LDAData
                          , iuN :: Node
                          , iuT :: Shared Topic
                          , iuX :: Item
-                         , iuTheta :: Shared (DirMulti Topic)
-                         , iuPhis :: SharedEnumMap Topic (DirMulti Item)
+                         , iuTheta :: Shared (Multinom Topic)
+                         , iuPhis :: SharedEnumMap Topic (Multinom Item)
                          , iuState :: Shared GibbsUpdateState
                          }
 
@@ -159,8 +159,8 @@ instance GibbsUpdateUnit ItemUnit where
        let x = iuX unit
            theta = iuTheta unit
            phi = iuPhis unit EM.! t
-       theta `updateShared` decDirMulti t
-       phi `updateShared` decDirMulti x
+       theta `updateShared` decMultinom t
+       phi `updateShared` decMultinom x
        return t
   
   guSet unit t =
@@ -168,8 +168,8 @@ instance GibbsUpdateUnit ItemUnit where
        let x = iuX unit
            theta = iuTheta unit
            phi = iuPhis unit EM.! t
-       theta `updateShared` incDirMulti t
-       phi `updateShared` incDirMulti x
+       theta `updateShared` incMultinom t
+       phi `updateShared` incMultinom x
 
   guState = iuState
 
