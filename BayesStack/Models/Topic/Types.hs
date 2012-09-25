@@ -8,8 +8,8 @@ import Data.Serialize
 import Data.Function
 import Data.Maybe
 
-import Data.EnumMap (EnumMap)
-import qualified Data.EnumMap as EM
+import Data.Map (Map)
+import qualified Data.Map as M
 
 import Data.Sequence (Seq)
 import Data.Set (Set)
@@ -50,6 +50,6 @@ isFriend u fs = isJust $ otherFriend u fs
 getFriends :: [Friendship] -> Node -> [Node]
 getFriends fs u = mapMaybe (otherFriend u) fs
 
-setupNodeItems :: [(Node,Item)] -> EnumMap NodeItem (Node, Item)
-setupNodeItems nodeItems = EM.fromList $ zipWith (\idx (n,i)->(NodeItem idx, (n,i))) [0..] nodeItems
+setupNodeItems :: [(Node,Item)] -> Map NodeItem (Node, Item)
+setupNodeItems nodeItems = M.fromList $ zipWith (\idx (n,i)->(NodeItem idx, (n,i))) [0..] nodeItems
 
