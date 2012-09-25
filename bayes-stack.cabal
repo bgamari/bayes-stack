@@ -1,6 +1,6 @@
 Name:                bayes-stack
 
-Version:             0.1
+Version:             0.2
 Synopsis:            Framework for inferring generative probabilistic models with Gibbs sampling
 License:             BSD3
 License-file:        LICENSE
