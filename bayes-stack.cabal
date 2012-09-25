@@ -18,6 +18,7 @@ Library
                        BayesStack.UniqueKey,
                        BayesStack.TupleEnum,
                        Data.Serialize.EnumMap,
+                       Data.Serialize.LogFloat,
                        Data.Random.Sequence, Data.Sequence.Chunk,
                        BayesStack.Models.Topic.Types,
                        BayesStack.Models.Topic.LDA
