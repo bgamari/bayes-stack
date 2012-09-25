@@ -86,13 +86,15 @@ data LDAState = LDAState { stThetas :: Map Node (Multinom Topic)
                          , stPhis   :: Map Topic (Multinom Item)
                          , stT      :: Map NodeItem Topic
                          }
-              deriving (Show)
+              deriving (Show, Generic)
+instance Serialize LDAState
 
 data LDAUpdateUnit = LDAUpdateUnit { uuNI :: NodeItem
                                    , uuN :: Node
                                    , uuX :: Item
                                    }
-                   deriving (Show)
+                   deriving (Show, Generic)
+instance Serialize LDAUpdateUnit
 
 unsetUU :: LDAUpdateUnit -> LDAState -> LDAState
 unsetUU (LDAUpdateUnit {uuN=n, uuNI=ni, uuX=x}) ms =
