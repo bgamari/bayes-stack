@@ -13,14 +13,13 @@ Cabal-version:       >=1.2
 
 
 Library
-  Exposed-modules:     BayesStack.Core, BayesStack.Core.Types, BayesStack.Core.GibbsUpdate, BayesStack.Core.ModelMonad,
-                       BayesStack.Core.Shared, BayesStack.Core.Concurrent,
-                       BayesStack.Categorical, BayesStack.DirMulti, BayesStack.Dirichlet,
+  Exposed-modules:     BayesStack.Core, BayesStack.Core.Types, BayesStack.Core.Gibbs,
+                       BayesStack.DirMulti, BayesStack.Dirichlet,
                        BayesStack.UniqueKey,
                        BayesStack.TupleEnum,
                        Data.Serialize.EnumMap,
                        Data.Random.Sequence, Data.Sequence.Chunk,
                        BayesStack.Models.Topic.Types,
-                       BayesStack.Models.Topic.LDA, BayesStack.Models.Topic.SharedTaste
-  Build-depends:       base, transformers, random-source, random-fu, rvar, containers, enummapset, ghc-prim, vector, mwc-random, pretty, cereal, logfloat, loch-th, digamma, gamma, statistics
+                       BayesStack.Models.Topic.LDA
+  Build-depends:       base, transformers, deepseq, random-source, random-fu, rvar, containers, enummapset, ghc-prim, vector, mwc-random, pretty, cereal, logfloat, loch-th, digamma, gamma, statistics, SafeSemaphore
   

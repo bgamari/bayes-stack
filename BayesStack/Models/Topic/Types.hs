@@ -2,6 +2,7 @@
 
 module BayesStack.Models.Topic.Types where
 
+import Control.DeepSeq
 import GHC.Generics
 import Data.Serialize
 import Data.Function
@@ -14,11 +15,11 @@ import Data.Sequence (Seq)
 import Data.Set (Set)
 
 
-newtype Node = Node Int deriving (Show, Eq, Ord, Enum, Generic)
-newtype Item = Item Int deriving (Show, Eq, Ord, Enum, Generic)
-newtype Topic = Topic Int deriving (Show, Eq, Ord, Enum, Generic)
-newtype NodeItem = NodeItem Int deriving (Show, Eq, Ord, Enum, Generic)
-newtype Friendship = Friendship (Node, Node) deriving (Show, Generic)
+newtype Node = Node Int deriving (Show, Eq, Ord, Enum, Generic, NFData)
+newtype Item = Item Int deriving (Show, Eq, Ord, Enum, Generic, NFData)
+newtype Topic = Topic Int deriving (Show, Eq, Ord, Enum, Generic, NFData)
+newtype NodeItem = NodeItem Int deriving (Show, Eq, Ord, Enum, Generic, NFData)
+newtype Friendship = Friendship (Node, Node) deriving (Show, Generic, NFData)
 
 instance Serialize Node
 instance Serialize Item
