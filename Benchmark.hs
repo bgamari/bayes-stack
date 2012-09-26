@@ -53,8 +53,9 @@ benchmarks xs = withSystemRandomIO $ runRVar (forM xs f) :: IO [Benchmark]
     
 main = do
     ldaBenchmarks <- benchmarks
-        [ ("100 topics", netParams {nTopics=100})
-        , ("10 topics", netParams {nTopics=10})
+        [ ("10 topics", netParams {nTopics=10})
+        , ("100 topics", netParams {nTopics=100})
+        , ("1000 topics", netParams {nTopics=1000})
         ]
 
     defaultMainWith defaultConfig (return ())
