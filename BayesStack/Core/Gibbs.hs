@@ -6,7 +6,7 @@ module BayesStack.Core.Gibbs ( UpdateUnit(..)
                              
 import Control.Monad (replicateM, when)
 import Control.Concurrent
-import Control.DeepSeq       
+import Control.DeepSeq
 import Data.Random
 import Data.Random.Lift       
 import System.Random.MWC (withSystemRandom)
@@ -17,7 +17,17 @@ class UpdateUnit uu where
     fetchSetting   :: uu -> ModelState uu -> Setting uu
     evolveSetting  :: ModelState uu -> uu -> RVar (Setting uu)
     updateSetting  :: uu -> Setting uu -> Setting uu -> ModelState uu -> ModelState uu
- 
+
+-- ^ Update an UpdateUnit
+updateUnit :: (UpdateUnit uu, NFData (Setting uu))
+           => MVar (ModelState uu) -> uu -> RVarT IO ()
+updateUnit modelStateV unit = do           
+    modelState <- lift $ readMVar modelStateV
+    let s = fetchSetting unit modelState
+    s' <- lift $ evolveSetting modelState unit
+    deepseq (s, s') $ return ()
+    lift $ modifyMVar_ modelStateV (return . updateSetting unit s s')
+
 maybeHead :: [a] -> ([a], Maybe a)
 maybeHead [] = ([], Nothing)
 maybeHead (head:rest) = (rest, Just head)
@@ -27,13 +37,8 @@ updateWorker :: (UpdateUnit uu, NFData (Setting uu))
 updateWorker modelStateV unitsV = do
     units <- lift $ modifyMVar unitsV $ return . maybeHead
     case units of
-        Just unit -> do
-            modelState <- lift $ readMVar modelStateV
-            let s = fetchSetting unit modelState
-            s' <- lift $ evolveSetting modelState unit
-            deepseq (s, s') $ return ()
-            lift $ modifyMVar_ modelStateV (return . updateSetting unit s s')
-            updateWorker modelStateV unitsV
+        Just unit -> do updateUnit modelStateV unit
+                        updateWorker modelStateV unitsV
         Nothing -> return ()
 
 gibbsUpdate :: (UpdateUnit uu, NFData (Setting uu))
