@@ -1,6 +1,8 @@
-{-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts,
+             ExistentialQuantification #-}
               
 module BayesStack.Core.Gibbs ( UpdateUnit(..)
+                             , WrappedUpdateUnit(..)
                              , gibbsUpdate
                              ) where
                              
@@ -18,22 +20,22 @@ class UpdateUnit uu where
     evolveSetting  :: ModelState uu -> uu -> RVar (Setting uu)
     updateSetting  :: uu -> Setting uu -> Setting uu -> ModelState uu -> ModelState uu
 
--- ^ Update an UpdateUnit
-updateUnit :: (UpdateUnit uu, NFData (Setting uu))
-           => MVar (ModelState uu) -> uu -> RVarT IO ()
-updateUnit modelStateV unit = do           
+data WrappedUpdateUnit ms = forall uu. (UpdateUnit uu, ModelState uu ~ ms, NFData (Setting uu))
+                         => WrappedUU uu
+     
+updateUnit :: MVar ms -> WrappedUpdateUnit ms -> RVarT IO ()
+updateUnit modelStateV (WrappedUU unit) = do
     modelState <- lift $ readMVar modelStateV
     let s = fetchSetting unit modelState
     s' <- lift $ evolveSetting modelState unit
     deepseq (s, s') $ return ()
     lift $ modifyMVar_ modelStateV (return . updateSetting unit s s')
-
+    
 maybeHead :: [a] -> ([a], Maybe a)
 maybeHead [] = ([], Nothing)
 maybeHead (head:rest) = (rest, Just head)
 
-updateWorker :: (UpdateUnit uu, NFData (Setting uu))
-             => MVar (ModelState uu) -> MVar [uu] -> RVarT IO ()
+updateWorker :: MVar ms -> MVar [WrappedUpdateUnit ms] -> RVarT IO ()
 updateWorker modelStateV unitsV = do
     units <- lift $ modifyMVar unitsV $ return . maybeHead
     case units of
@@ -41,8 +43,7 @@ updateWorker modelStateV unitsV = do
                         updateWorker modelStateV unitsV
         Nothing -> return ()
 
-gibbsUpdate :: (UpdateUnit uu, NFData (Setting uu))
-       => ModelState uu -> [uu] -> IO (ModelState uu)
+gibbsUpdate :: ms -> [WrappedUpdateUnit ms] -> IO ms
 gibbsUpdate modelState units = do
     unitsV <- newMVar units
     modelStateV <- newMVar modelState

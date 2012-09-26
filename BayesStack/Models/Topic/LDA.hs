@@ -65,13 +65,16 @@ randomInitialize' d init =
 randomInitialize :: LDAData -> RVar ModelInit
 randomInitialize = (flip randomInitialize') M.empty
                 
-updateUnits :: LDAData -> [LDAUpdateUnit]
-updateUnits =
+updateUnits :: LDAData -> [WrappedUpdateUnit LDAState]
+updateUnits = map WrappedUU . updateUnits'            
+
+updateUnits' :: LDAData -> [LDAUpdateUnit]
+updateUnits' =
     map (\(ni,(n,x))->LDAUpdateUnit {uuNI=ni, uuN=n, uuX=x}) . M.assocs . ldaNodeItems 
               
 model :: LDAData -> ModelInit -> LDAState
 model d init =
-    let uus = updateUnits d
+    let uus = updateUnits' d
         s = LDAState { stThetas = foldMap (\n->M.singleton n (symDirMulti (ldaAlphaTheta d) (toList $ ldaTopics d)))
                                   $ ldaNodes d
                      , stPhis = foldMap (\t->M.singleton t (symDirMulti (ldaAlphaPhi d) (toList $ ldaItems d)))

@@ -28,6 +28,7 @@ import Data.Traversable
 import Data.Foldable hiding (product)
 import Data.Monoid
 
+import Control.DeepSeq
 import Control.Monad (liftM)
 import Control.Monad.Trans.State
 import Data.Random
@@ -43,8 +44,10 @@ import BayesStack.Models.Topic.Types
 import GHC.Generics
 import Data.Serialize
 
-data ItemSource = Shared | Own deriving (Show, Eq, Generic, Enum, Ord)
+data ItemSource = Shared | Own
+                deriving (Show, Eq, Generic, Enum, Ord)
 instance Serialize ItemSource
+instance NFData ItemSource         
 
 data STData = STData { stAlphaPsi           :: Double
                      , stAlphaLambda        :: Double
@@ -78,19 +81,23 @@ randomInitialize' d init =
 randomInitialize :: STData -> RVar ModelInit
 randomInitialize = (flip randomInitialize') M.empty
                 
-updateUnits :: STData -> [STUpdateUnit]
-updateUnits d =
-    map (\(ni,(n,x))->STUpdateUnit { uuNI      = ni
-                                   , uuN       = n
-                                   , uuX       = x
-                                   , uuFriends = getFriends (S.toList $ stFriendships d) n
-                                   }
+updateUnits' :: STData -> [STUpdateUnit]
+updateUnits' d =
+    map (\(ni,(n,x)) ->
+               STUpdateUnit { uuNI      = ni
+                            , uuN       = n
+                            , uuX       = x
+                            , uuFriends = getFriends (S.toList $ stFriendships d) n
+                            }
         )
     $ M.assocs $ stNodeItems d
+
+updateUnits :: STData -> [WrappedUpdateUnit STState]
+updateUnits = map WrappedUU . updateUnits'            
               
 model :: STData -> ModelInit -> STState
 model d init =
-    let uus = updateUnits d
+    let uus = updateUnits' d
         s = STState { stPsis = let dist = symDirMulti (stAlphaPsi d) (toList $ stNodes d)
                                in foldMap (\n->M.singleton n dist) $ stNodes d
                     , stPhis = let dist = symDirMulti (stAlphaPhi d) (toList $ stItems d)
