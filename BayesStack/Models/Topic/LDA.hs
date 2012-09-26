@@ -78,7 +78,7 @@ model d init =
                                 $ ldaTopics d
                      , stT = M.empty
                      }
-    in execState (mapM (\uu->modify $ setUU uu (M.findWithDefault (Topic 0) (uuNI uu) init)) uus) s
+    in execState (mapM (\uu->modify $ setUU uu (Just $ M.findWithDefault (Topic 0) (uuNI uu) init)) uus) s
 
 data LDAState = LDAState { stThetas :: Map Node (Multinom Topic)
                          , stPhis   :: Map Topic (Multinom Item)
@@ -94,26 +94,22 @@ data LDAUpdateUnit = LDAUpdateUnit { uuNI :: NodeItem
                    deriving (Show, Generic)
 instance Serialize LDAUpdateUnit
 
-unsetUU :: LDAUpdateUnit -> LDAState -> LDAState
-unsetUU (LDAUpdateUnit {uuN=n, uuNI=ni, uuX=x}) ms =
-    let t = stT ms M.! ni
-    in ms { stPhis = M.adjust (decMultinom x) t (stPhis ms)
-          , stThetas = M.adjust (decMultinom t) n (stThetas ms)
+setUU :: LDAUpdateUnit -> Maybe Topic -> LDAState -> LDAState
+setUU uu@(LDAUpdateUnit {uuN=n, uuNI=ni, uuX=x}) setting ms =
+    let t = maybe (fetchSetting uu ms) id setting
+        set = maybe Unset (const Set) setting
+    in ms { stPhis = M.adjust (setMultinom set x) t (stPhis ms)
+          , stThetas = M.adjust (setMultinom set t) n (stThetas ms)
+          , stT = case setting of Just _  -> M.insert ni t $ stT ms
+                                  Nothing -> stT ms
           }
-
-setUU :: LDAUpdateUnit -> Topic -> LDAState -> LDAState
-setUU (LDAUpdateUnit {uuN=n, uuNI=ni, uuX=x}) t ms =
-    ms { stPhis = M.adjust (incMultinom x) t (stPhis ms)
-       , stThetas = M.adjust (incMultinom t) n (stThetas ms)
-       , stT = M.insert ni t $ stT ms
-       }
 
 instance UpdateUnit LDAUpdateUnit where
     type ModelState LDAUpdateUnit = LDAState
     type Setting LDAUpdateUnit = Topic
     fetchSetting (LDAUpdateUnit {uuNI=ni}) ms = stT ms M.! ni
-    evolveSetting ms uu = categorical $ ldaFullCond (unsetUU uu ms) uu
-    updateSetting uu s s' = setUU uu s' . unsetUU uu
+    evolveSetting ms uu = categorical $ ldaFullCond (setUU uu Nothing ms) uu
+    updateSetting uu s s' = setUU uu (Just s') . setUU uu Nothing
         
 uuProb :: LDAState -> LDAUpdateUnit -> Topic -> Double
 uuProb state (LDAUpdateUnit {uuN=n, uuX=x}) t =
