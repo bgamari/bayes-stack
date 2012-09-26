@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts,
-             ExistentialQuantification #-}
+             ExistentialQuantification, GADTs #-}
               
 module BayesStack.Core.Gibbs ( UpdateUnit(..)
                              , WrappedUpdateUnit(..)
