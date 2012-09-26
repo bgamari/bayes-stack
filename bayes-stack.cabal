@@ -21,6 +21,7 @@ Library
                        Data.Serialize.LogFloat,
                        Data.Random.Sequence, Data.Sequence.Chunk,
                        BayesStack.Models.Topic.Types,
-                       BayesStack.Models.Topic.LDA
+                       BayesStack.Models.Topic.LDA,
+                       BayesStack.Models.Topic.SharedTaste
   Build-depends:       base, transformers, deepseq, random-source, random-fu, rvar, containers, enummapset, ghc-prim, vector, mwc-random, pretty, cereal, logfloat, loch-th, digamma, gamma, statistics, SafeSemaphore
   
