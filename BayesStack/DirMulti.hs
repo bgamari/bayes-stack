@@ -4,6 +4,7 @@ module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                              Multinom, dirMulti, symDirMulti, multinom
                              -- | Do not do record updates with these
                            , dmTotal, dmAlpha
+                           , setMultinom, SetUnset (..)
                            , decMultinom, incMultinom
                            , prettyMultinom
                            , updatePrior
@@ -56,6 +57,12 @@ decMultinom k dm = dm { dmCounts = EM.alter maybeDec k $ dmCounts dm
                       , dmTotal = dmTotal dm - 1 }
 incMultinom k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
                       , dmTotal = dmTotal dm + 1 }
+
+data SetUnset = Set | Unset
+         
+setMultinom :: (Enum a, Ord a) => SetUnset -> a -> Multinom a -> Multinom a         
+setMultinom Set   s = incMultinom s
+setMultinom Unset s = decMultinom s
 
 -- | 'Multinom a' represents multinomial distribution over domain 'a'.
 -- Optionally, this can include a collapsed Dirichlet prior.
