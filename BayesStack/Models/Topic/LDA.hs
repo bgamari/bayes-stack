@@ -20,10 +20,8 @@ import Prelude hiding (mapM)
 import Data.Set (Set)
 import qualified Data.Set as S
 
-import Data.Map (Map)
-import qualified Data.Map as M
-
-import qualified Data.EnumSet as ES
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
 
 import Data.Traversable
 import Data.Foldable hiding (product)
@@ -90,8 +88,8 @@ data LDAState = LDAState { stThetas :: Map Node (Multinom Topic)
 instance Serialize LDAState
 
 data LDAUpdateUnit = LDAUpdateUnit { uuNI :: NodeItem
-                                   , uuN :: Node
-                                   , uuX :: Item
+                                   , uuN  :: Node
+                                   , uuX  :: Item
                                    }
                    deriving (Show, Generic)
 instance Serialize LDAUpdateUnit
