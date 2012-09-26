@@ -101,7 +101,7 @@ setUU uu@(LDAUpdateUnit {uuN=n, uuNI=ni, uuX=x}) setting ms =
     in ms { stPhis = M.adjust (setMultinom set x) t (stPhis ms)
           , stThetas = M.adjust (setMultinom set t) n (stThetas ms)
           , stT = case setting of Just _  -> M.insert ni t $ stT ms
-                                  Nothing -> error "Unset T"
+                                  Nothing -> stT ms
           }
 
 instance UpdateUnit LDAUpdateUnit where

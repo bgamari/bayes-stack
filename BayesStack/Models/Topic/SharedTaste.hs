@@ -147,11 +147,11 @@ setUU uu@(STUpdateUnit {uuN=n, uuNI=ni, uuX=x}) setting ms =
     in ms' { stPhis = M.adjust (setMultinom set x) t (stPhis ms)
            , stGammas = M.adjust (setMultinom set s) n (stGammas ms)
            , stS = case setting of Just _  -> M.insert ni s $ stS ms
-                                   Nothing -> error "Unset S"
+                                   Nothing -> stS ms
            , stF = case setting of Just _  -> M.insert ni f $ stF ms
-                                   Nothing -> error "Unset F"
+                                   Nothing -> stF ms
            , stT = case setting of Just _  -> M.insert ni t $ stT ms
-                                   Nothing -> error "Unset T"
+                                   Nothing -> stT ms
            }
 
 instance UpdateUnit STUpdateUnit where
