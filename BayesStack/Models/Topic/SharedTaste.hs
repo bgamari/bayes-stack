@@ -108,7 +108,7 @@ model d init =
                     }
         initUU uu = do
             let s = M.findWithDefault (error "Incomplete initialization") (uuNI uu) init
-            modify $ setUU uu s
+            modify $ setUU uu (Just s)
     in execState (mapM initUU uus) s
 
 data STState = STState { stGammas   :: Map Node (Multinom ItemSource)
@@ -132,21 +132,27 @@ data STUpdateUnit = STUpdateUnit { uuNI :: NodeItem
                    deriving (Show, Generic)
 instance Serialize STUpdateUnit
 
-unsetUU :: STUpdateUnit -> STState -> STState
-unsetUU uu@(STUpdateUnit {uuN=n, uuNI=ni, uuX=x}) ms =
-    let (s,f,t) = fetchSetting uu ms
+setUU :: STUpdateUnit -> Maybe (Setting STUpdateUnit) -> STState -> STState
+setUU uu@(STUpdateUnit {uuN=n, uuNI=ni, uuX=x}) setting ms =
+    let set = maybe Unset (const Set) setting
+        (s,f,t) = maybe (fetchSetting uu ms) id setting
         friendship = Friendship (n,f)
         ms' = case stS ms M.! ni of
-            Shared -> ms { stPsis = M.adjust (decMultinom f) n
-                                  $ M.adjust (decMultinom n) f
+            Shared -> ms { stPsis = M.adjust (setMultinom set f) n
+                                  $ M.adjust (setMultinom set n) f
                                   $ stPsis ms
-                         , stLambdas = M.adjust (decMultinom t) friendship (stLambdas ms)
+                         , stLambdas = M.adjust (setMultinom set t) friendship (stLambdas ms)
                          }
-            Own    -> ms { stOmegas = M.adjust (decMultinom t) n (stOmegas ms) }
-    in ms' { stPhis = M.adjust (decMultinom x) t (stPhis ms) }
-
-setUU :: STUpdateUnit -> Setting STUpdateUnit -> STState -> STState
-setUU (STUpdateUnit {uuN=n, uuNI=ni, uuX=x}) t ms = undefined
+            Own    -> ms { stOmegas = M.adjust (setMultinom set t) n (stOmegas ms) }
+    in ms' { stPhis = M.adjust (setMultinom set x) t (stPhis ms)
+           , stGammas = M.adjust (setMultinom set s) n (stGammas ms)
+           , stS = case setting of Just _  -> M.insert ni s $ stS ms
+                                   Nothing -> error "Unset S"
+           , stF = case setting of Just _  -> M.insert ni f $ stF ms
+                                   Nothing -> error "Unset F"
+           , stT = case setting of Just _  -> M.insert ni t $ stT ms
+                                   Nothing -> error "Unset T"
+           }
 
 instance UpdateUnit STUpdateUnit where
     type ModelState STUpdateUnit = STState
@@ -155,8 +161,8 @@ instance UpdateUnit STUpdateUnit where
                          , stF ms M.! uuNI uu
                          , stT ms M.! uuNI uu
                          )
-    evolveSetting ms uu = categorical $ stFullCond (unsetUU uu ms) uu
-    updateSetting uu s s' = setUU uu s' . unsetUU uu
+    evolveSetting ms uu = categorical $ stFullCond (setUU uu Nothing ms) uu
+    updateSetting uu s s' = setUU uu (Just s') . setUU uu Nothing
         
 uuProb :: STState -> STUpdateUnit -> Setting STUpdateUnit -> Double
 uuProb st (STUpdateUnit {uuNI=ni, uuN=n, uuX=x}) (s,f,t) =
