@@ -19,35 +19,35 @@ module BayesStack.Models.Topic.CitationInfluence
   , modelLikelihood
   ) where
 
-import Prelude hiding (mapM)
+import           Prelude hiding (mapM_)
 
-import Data.Set (Set)
+import           Data.Set (Set)
 import qualified Data.Set as S
 
-import Data.Map.Strict (Map)
+import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
-import Data.Traversable
-import Data.Foldable hiding (product)
-import Data.Monoid
+import           Data.Traversable
+import           Data.Foldable hiding (product)
+import           Data.Monoid
 
-import Control.Applicative ((<$>), (<*>))
-import Control.Monad (liftM)
-import Control.Monad.Trans.State
+import           Control.Applicative ((<$>), (<*>))
+import           Control.Monad (liftM)
+import           Control.Monad.Trans.State.Strict
 
-import Data.Random
-import Data.Random.Lift (lift)
-import Data.Random.Distribution.Categorical (categorical)
-import Data.Number.LogFloat hiding (realToFrac)
+import           Data.Random
+import           Data.Random.Lift (lift)
+import           Data.Random.Distribution.Categorical (categorical)
+import           Data.Number.LogFloat hiding (realToFrac)
 
-import BayesStack.Core.Types
-import BayesStack.Core.Gibbs
-import BayesStack.DirMulti
-import BayesStack.TupleEnum
-import BayesStack.Models.Topic.Types
+import           BayesStack.Core.Types
+import           BayesStack.Core.Gibbs
+import           BayesStack.DirMulti
+import           BayesStack.TupleEnum
+import           BayesStack.Models.Topic.Types
 
-import GHC.Generics
-import Data.Serialize
+import           GHC.Generics
+import           Data.Serialize
 
 data ItemSource = Shared | Own deriving (Show, Eq, Enum, Ord, Generic)
 instance Serialize ItemSource
@@ -105,31 +105,37 @@ getCitedNodes d n = S.map citedNode $ S.filter (\(Arc (citing,_))->citing==n) $ 
 type CitedModelInit = Map CitedNodeItem (Setting CitedUpdateUnit)
 type CitingModelInit = Map CitingNodeItem (Setting CitingUpdateUnit)
 data ModelInit = ModelInit CitedModelInit CitingModelInit
+               deriving (Show)
 
 randomInitializeCited :: NetData -> CitedModelInit -> RVar CitedModelInit
 randomInitializeCited d init = execStateT doInit init
-    where doInit :: StateT CitedModelInit RVar ()
-          doInit = let unset = M.keysSet (dCitedNodeItems d) `S.difference` M.keysSet init
-                   in liftM mconcat $ forM (S.toList unset) $ \ni->do
-                          t' <- lift $ randomElement $ toList $ dTopics d
-                          modify $ M.insert ni t'
+    where doInit = let unset = M.keysSet (dCitedNodeItems d) `S.difference` M.keysSet init
+                   in mapM_ (randomInitCitedUU d) (S.toList unset)
+
+randomInitCitedUU :: NetData -> CitedNodeItem -> StateT CitedModelInit RVar ()
+randomInitCitedUU d ni = do
+    t' <- lift $ randomElement $ toList $ dTopics d
+    modify $ M.insert ni t'
 
 randomInitializeCiting :: NetData -> CitingModelInit -> RVar CitingModelInit
 randomInitializeCiting d init = execStateT doInit init
     where doInit :: StateT CitingModelInit RVar ()
           doInit = let unset = M.keysSet (dCitingNodeItems d) `S.difference` M.keysSet init
-                   in liftM mconcat $ forM (S.toList unset) $ \ni->
-                          let (n,_) = dCitingNodeItems d M.! ni
-                          in case getCitedNodes d n of
-                              a | S.null a -> do
-                                  t <- lift $ randomElement $ toList $ dTopics d
-                                  modify $ M.insert ni (Own, CitedNode 0, t)
+                   in mapM_ (randomInitCitingUU d) (S.toList unset)
+   
+randomInitCitingUU :: NetData -> CitingNodeItem -> StateT CitingModelInit RVar ()
+randomInitCitingUU d ni =
+    let (n,_) = dCitingNodeItems d M.! ni
+    in case getCitedNodes d n of
+           a | S.null a -> do
+               t <- lift $ randomElement $ toList $ dTopics d
+               modify $ M.insert ni (Own, CitedNode 0, t)
 
-                              citedNodes -> do
-                                  s <- lift $ randomElement [Shared, Own]
-                                  c <- lift $ randomElement $ toList $ getCitedNodes d n
-                                  t <- lift $ randomElement $ toList $ dTopics d
-                                  modify $ M.insert ni (s,c,t)
+           citedNodes -> do
+               s <- lift $ randomElement [Shared, Own]
+               c <- lift $ randomElement $ toList $ getCitedNodes d n
+               t <- lift $ randomElement $ toList $ dTopics d
+               modify $ M.insert ni (s,c,t)
 
 randomInitialize :: NetData -> RVar ModelInit
 randomInitialize d =
@@ -156,14 +162,26 @@ model d (ModelInit citedInit citingInit) =
                                  in foldMap (\t->M.singleton t dist) $ dCitedNodes d
                    , stT' = M.empty
                    }
+
+        initCitingUU :: CitingUpdateUnit -> State MState ()
         initCitingUU uu = do
-            let s = M.findWithDefault (error "Incomplete initialization") (uuNI uu) citingInit
+            let err = error $ "CitationInference: Initial value for "++show uu++" not given\n"
+                            ++show citingInit++"\n\n"
+                            ++show (M.findMax citingInit, M.findMin citingInit)++"\n\n"
+                            ++show (fst (M.findMax citingInit) == uuNI uu)++"\n\n"
+                            ++show (M.lookup (uuNI uu) citingInit)
+                            ++show (M.findWithDefault (error "hi") (uuNI uu) citingInit)
+                s = maybe err id $ M.lookup (uuNI uu) citingInit
             modify $ setCitingUU uu (Just s)
+
+        initCitedUU :: CitedUpdateUnit -> State MState ()
         initCitedUU uu = do
-            let s = M.findWithDefault (error "Incomplete initialization") (uuNI' uu) citedInit
+            let err = error $ "CitationInference: Initial value for "++show uu++" not given"
+                s = maybe err id $ M.lookup (uuNI' uu) citedInit
             modify $ setCitedUU uu (Just s)
-    in execState (do mapM initCitingUU $ citingUpdateUnits d
-                     mapM initCitedUU $ citedUpdateUnits d
+
+    in execState (do mapM_ initCitingUU $ citingUpdateUnits d
+                     mapM_ initCitedUU $ citedUpdateUnits d
                  ) s
 
 data MState = MState { -- Citing model state
