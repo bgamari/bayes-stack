@@ -1,5 +1,9 @@
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 
+import           Options.Applicative    
+import           Data.Monoid ((<>))                 
+import           System.FilePath.Posix ((</>))
+
 import           Data.Vector (Vector)    
 import qualified Data.Vector.Generic as V    
 import           Statistics.Sample (mean)       
@@ -25,6 +29,29 @@ import           Text.Printf
                  
 newtype Node = Node Int deriving (Show, Eq, Ord)
        
+data RunCIOpts = RunCIOpts { arcsFile        :: FilePath
+                           , nodeItemsFile   :: FilePath
+                           , stopwords       :: Maybe FilePath
+                           }
+
+runCIOpts = RunCIOpts 
+    <$> strOption ( long "arcs"
+                  & metavar "FILE"
+                  & value "arcs"
+                  & help "File containing arcs"
+                  )
+    <*> strOption ( long "items"
+                  & metavar "FILE"
+                  & value "node-items"
+                  & help "File containing nodes' items"
+                  )
+    <*> nullOption ( long "stopwords"
+                   & metavar "FILE"
+                   & reader (Just . Just)
+                   & value (Just "stopwords.txt")
+                   & help "Stop words list"
+                   )
+
 readArcs :: FilePath -> IO (Set Arc)
 readArcs fname =
     S.fromList . mapMaybe parseLine . T.lines <$> TIO.readFile fname
@@ -75,12 +102,21 @@ netData abstracts arcs nTopics =
                                           return (CitingNode n, items BM.!> term)
                }
             
+opts = info (runCIOpts)
+           (  fullDesc
+           <> progDesc "Learn citation influence model"
+           <> header "run-ci - learn citation influence model"
+           )
+
 main = do
-    stopWords <- S.fromList . T.words <$> TIO.readFile "citeseer/stopwords.txt"
+    args <- execParser $ opts
+    stopWords <- case stopwords args of
+                     Just f  -> S.fromList . T.words <$> TIO.readFile f
+                     Nothing -> return S.empty
     printf "Read %d stopwords\n" (S.size stopWords)
 
-    arcs <- readArcs "citeseer/citeseer_cites"
-    abstracts <- readAbstracts stopWords "citeseer/citeseer_text"   
+    arcs <- readArcs $ arcsFile args
+    abstracts <- readAbstracts stopWords $ nodeItemsFile args
     let termCounts = V.fromListN (M.size abstracts) $ map S.size $ M.elems abstracts :: Vector Int
     printf "Read %d arcs, %d abstracts\n" (S.size arcs) (M.size abstracts)
     printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
