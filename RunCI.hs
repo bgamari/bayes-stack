@@ -4,6 +4,7 @@ import           Data.Vector (Vector)
 import qualified Data.Vector.Generic as V    
 import           Statistics.Sample (mean)       
 
+import qualified Data.Bimap as BM                 
 import qualified Data.Set as S
 import           Data.Set (Set)
 import qualified Data.Map as M
@@ -51,18 +52,28 @@ readAbstracts stopWords fname =
 
 netData :: M.Map Node (Set Term) -> Set Arc -> Int -> NetData
 netData abstracts arcs nTopics = 
-    NetData { dAlphaPsi         = 0.1
-            , dAlphaLambda      = 0.1
-            , dAlphaPhi         = 0.1
-            , dAlphaOmega       = 0.1
-            , dAlphaGammaShared = 0.8
-            , dAlphaGammaOwn    = 0.2
-            , dArcs             = arcs
-            , dItems            = undefined
-            , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
-            , dCitedNodeItems   = undefined
-            , dCitingNodeItems  = undefined
-            }
+    let items :: BM.Bimap Item Term
+        items = BM.fromList $ zip [Item i | i <- [1..]] (S.toList $ S.unions $ M.elems abstracts)
+    in NetData { dAlphaPsi         = 0.1
+               , dAlphaLambda      = 0.1
+               , dAlphaPhi         = 0.1
+               , dAlphaOmega       = 0.1
+               , dAlphaGammaShared = 0.8
+               , dAlphaGammaOwn    = 0.2
+               , dArcs             = arcs
+               , dItems            = S.fromList $ BM.keys items
+               , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
+               , dCitedNodeItems   = M.fromList
+                                     $ zip [CitedNI i | i <- [0..]]
+                                     $ do (Node n,terms) <- M.assocs abstracts
+                                          term <- S.toList terms
+                                          return (CitedNode n, items BM.!> term)
+               , dCitingNodeItems  = M.fromList
+                                     $ zip [CitingNI i | i <- [0..]]
+                                     $ do (Node n,terms) <- M.assocs abstracts
+                                          term <- S.toList terms
+                                          return (CitingNode n, items BM.!> term)
+               }
             
 main = do
     stopWords <- S.fromList . T.words <$> TIO.readFile "citeseer/stopwords.txt"
