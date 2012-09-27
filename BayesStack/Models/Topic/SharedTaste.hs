@@ -144,7 +144,7 @@ setUU uu@(STUpdateUnit {uuN=n, uuNI=ni, uuX=x}) setting ms =
     let set = maybe Unset (const Set) setting
         (s,f,t) = maybe (fetchSetting uu ms) id setting
         friendship = Friendship (n,f)
-        ms' = case stS ms M.! ni of
+        ms' = case s of
             Shared -> ms { stPsis = M.adjust (setMultinom set f) n
                                   $ M.adjust (setMultinom set n) f
                                   $ stPsis ms

@@ -297,12 +297,12 @@ setCitingUU :: CitingUpdateUnit -> Maybe (Setting CitingUpdateUnit) -> MState ->
 setCitingUU uu@(CitingUpdateUnit {uuN=n, uuNI=ni, uuX=x}) setting ms =
     let set = maybe Unset (const Set) setting
         (s,c,t) = maybe (fetchSetting uu ms) id setting
-        ms' = case stS ms M.! ni of
+        ms' = case s of
             Shared -> ms { stPsis = M.adjust (setMultinom set c) n $ stPsis ms
-                         , stLambdas = M.adjust (setMultinom set t) c (stLambdas ms)
+                         , stLambdas = M.adjust (setMultinom set t) c $ stLambdas ms
                          }
-            Own    -> ms { stOmegas = M.adjust (setMultinom set t) n (stOmegas ms) }
-    in ms' { stPhis = M.adjust (setMultinom set x) t (stPhis ms)
-           , stGammas = M.adjust (setMultinom set s) n (stGammas ms)
+            Own    -> ms { stOmegas = M.adjust (setMultinom set t) n $ stOmegas ms }
+    in ms' { stPhis = M.adjust (setMultinom set x) t $ stPhis ms
+           , stGammas = M.adjust (setMultinom set s) n $ stGammas ms
            }
 
