@@ -22,6 +22,7 @@ Library
                        Data.Random.Sequence, Data.Sequence.Chunk,
                        BayesStack.Models.Topic.Types,
                        BayesStack.Models.Topic.LDA,
-                       BayesStack.Models.Topic.SharedTaste
+                       BayesStack.Models.Topic.SharedTaste,
+                       BayesStack.Models.Topic.CitationInfluence
   Build-depends:       base, transformers, deepseq, random-source, random-fu, rvar, containers, enummapset, ghc-prim, vector, mwc-random, pretty, cereal, logfloat, loch-th, digamma, gamma, statistics
   
