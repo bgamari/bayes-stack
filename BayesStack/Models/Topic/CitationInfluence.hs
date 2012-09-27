@@ -9,7 +9,7 @@ module BayesStack.Models.Topic.CitationInfluence
   , ItemSource(..)
   , CitedNode(..), CitedNodeItem(..)
   , CitingNode(..), CitingNodeItem(..)
-  , Item(..), Topic(..)
+  , Item(..), Topic(..), Arc(..)
   , setupNodeItems
     -- * Initialization
   , ModelInit
@@ -64,9 +64,8 @@ instance Serialize CitedNodeItem
 
 -- ^ A directed edge         
 newtype Arc = Arc (CitingNode, CitedNode)
-            deriving (Show, Eq, Generic)
+            deriving (Show, Eq, Ord, Generic)
 instance Serialize Arc
-instance Ord Arc          -- FIXME
 
 -- ^ The citing node of an arc
 citingNode :: Arc -> CitingNode
