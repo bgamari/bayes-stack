@@ -13,6 +13,7 @@ module BayesStack.Models.Topic.CitationInfluence
   , Item(..), Topic(..), Arc(..), NodeItem(..), Node(..)
   , setupNodeItems
     -- * Initialization
+  , verifyNetData
   , ModelInit
   , randomInitialize
   , model
@@ -22,7 +23,6 @@ module BayesStack.Models.Topic.CitationInfluence
   ) where
 
 import           Debug.Trace
-import Control.Monad (when)                 
 
 import           Prelude hiding (mapM_)
 
@@ -34,7 +34,9 @@ import qualified Data.Map.Strict as M
 
 import           Data.Foldable hiding (product)
 import           Control.Applicative ((<$>), (<*>))
+import           Control.Monad (when)                 
 import           Control.Monad.Trans.State.Strict
+import           Control.Monad.Trans.Writer.Strict
 
 import           Data.Random
 import           Data.Random.Lift (lift)
@@ -104,6 +106,17 @@ getCitingNodes d n = S.map citingNode $ S.filter (\(Arc (_,cited))->cited==n) $ 
 
 getCitedNodes :: NetData -> CitingNode -> Set CitedNode
 getCitedNodes d n = S.map citedNode $ S.filter (\(Arc (citing,_))->citing==n) $ dArcs d
+              
+verifyNetData :: NetData -> [String]
+verifyNetData d = execWriter $ do
+    --when (dCitingNodes d /= dCitedNodes d)
+    --    $ tell ["Citing nodes and cited nodes should be identical sets"]
+    forM_ (dCitingNodes d) $ \n->
+        when (S.null $ getCitedNodes d n)
+        $ tell [show n++" is in dCitingNodeItems yet has no arcs"]
+    forM_ (dCitedNodes d) $ \n->
+        when (S.null $ getCitingNodes d n)
+        $ tell [show n++" is in dCitedNodeItems yet has no arcs"]
 
 type CitedModelInit = Map CitedNodeItem (Setting CitedUpdateUnit)
 type CitingModelInit = Map CitingNodeItem (Setting CitingUpdateUnit)

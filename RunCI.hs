@@ -165,6 +165,7 @@ main = do
     
     withSystemRandom $ \mwc->do
     let nd = netData abstracts arcs 10
+    print $ verifyNetData nd
     init <- runRVar (randomInitialize nd) mwc
     let m = model nd init
         uus = updateUnits nd
