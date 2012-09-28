@@ -107,7 +107,7 @@ readAbstracts stopWords fname =
              otherwise -> M.empty
 
 netData :: M.Map Node (Set Term) -> Set Arc -> Int -> NetData
-netData abstracts arcs nTopics = 
+netData abstracts arcs nTopics = cleanNetData $ 
     let items :: BM.Bimap Item Term
         items = BM.fromList $ zip [Item i | i <- [1..]] (S.toList $ S.unions $ M.elems abstracts)
     in NetData { dAlphaPsi         = 0.1

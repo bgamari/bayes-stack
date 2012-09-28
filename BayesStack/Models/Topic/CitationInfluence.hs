@@ -10,10 +10,11 @@ module BayesStack.Models.Topic.CitationInfluence
   , CitedNode(..), CitedNodeItem(..)
   , CitingNode(..), CitingNodeItem(..)
   , Citing(..), Cited(..)
-  , Item(..), Topic(..), Arc(..), NodeItem(..), Node(..)
+  , Item(..), Topic(..), NodeItem(..), Node(..)
+  , Arc(..), citedNode, citingNode
   , setupNodeItems
     -- * Initialization
-  , verifyNetData
+  , verifyNetData, cleanNetData
   , ModelInit
   , randomInitialize
   , model
@@ -101,10 +102,10 @@ dCitingNodeItems :: NetData -> Map CitingNodeItem (CitingNode, Item)
 dCitingNodeItems = M.mapKeys Citing . M.map (\(n,i)->(Citing n, i)) . dNodeItems
 
 dCitingNodes :: NetData -> Set CitingNode
-dCitingNodes = S.map citingNode . dArcs
+dCitingNodes = S.fromList . map (Citing . fst) . M.elems . dNodeItems
 
 dCitedNodes :: NetData -> Set CitedNode
-dCitedNodes = S.map citedNode . dArcs
+dCitedNodes = S.fromList . map (Cited . fst) . M.elems . dNodeItems
          
 getCitingNodes :: NetData -> CitedNode -> Set CitingNode
 getCitingNodes d n = S.map citingNode $ S.filter (\(Arc (_,cited))->cited==n) $ dArcs d
@@ -112,14 +113,35 @@ getCitingNodes d n = S.map citingNode $ S.filter (\(Arc (_,cited))->cited==n) $ 
 getCitedNodes :: NetData -> CitingNode -> Set CitedNode
 getCitedNodes d n = S.map citedNode $ S.filter (\(Arc (citing,_))->citing==n) $ dArcs d
               
+connectedNodes :: Set Arc -> Set Node
+connectedNodes arcs =
+    S.map ((\(Cited n)->n) . citedNode) arcs `S.union` S.map ((\(Citing n)->n) . citingNode) arcs
+
+cleanNetData :: NetData -> NetData
+cleanNetData d =
+    let nodesWithItems = S.fromList $ map fst $ M.elems $ dNodeItems d
+        nodesWithArcs = connectedNodes $ dArcs d
+        keptNodes = nodesWithItems `S.intersection` nodesWithArcs
+        keepArc (Arc (Citing citing, Cited cited)) =
+            citing `S.member` keptNodes && cited `S.member` keptNodes
+    in d { dArcs = S.filter keepArc $ dArcs d
+         , dNodeItems = M.filter (\(n,i)->n `S.member` keptNodes) $ dNodeItems d
+         }
+
 verifyNetData :: NetData -> [String]
 verifyNetData d = execWriter $ do
+    let nodesWithItems = S.fromList $ map fst $ M.elems $ dNodeItems d
+    forM_ (dArcs d) $ \(Arc (Citing citing, Cited cited))->do
+        when (cited `S.notMember` nodesWithItems)
+            $ tell [show cited++" has arc yet has no items"]
+        when (citing `S.notMember` nodesWithItems)
+            $ tell [show citing++" has arc yet has no items"]
     forM_ (dCitingNodes d) $ \n->
         when (S.null $ getCitedNodes d n)
-        $ tell [show n++" is in dCitingNodeItems yet has no arcs"]
+            $ tell [show n++" is in dCitingNodeItems yet has no arcs"]
     forM_ (dCitedNodes d) $ \n->
         when (S.null $ getCitingNodes d n)
-        $ tell [show n++" is in dCitedNodeItems yet has no arcs"]
+            $ tell [show n++" is in dCitedNodeItems yet has no arcs"]
 
 type CitedModelInit = Map CitedNodeItem (Setting CitedUpdateUnit)
 type CitingModelInit = Map CitingNodeItem (Setting CitingUpdateUnit)
@@ -157,7 +179,6 @@ randomInitCitingUU d ni =
            citedNodes -> do
                s <- lift $ randomElement [Shared, Own]
                c <- lift $ randomElement $ toList citedNodes
-               when (c `S.notMember` dCitedNodes d) $ error "uh oh"
                t <- lift $ randomElement $ toList $ dTopics d
                modify' $ M.insert ni $
                    case s of Shared -> SharedSetting t c
