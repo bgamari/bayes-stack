@@ -231,8 +231,10 @@ updateUnits d = map WrappedUU (citedUpdateUnits d)
 data CitingSetting = OwnSetting !Topic
                    | SharedSetting !Topic !CitedNode
                    deriving (Show, Eq, Generic)
-instance NFData CitingSetting
 instance Serialize CitingSetting
+instance NFData CitingSetting where
+    rnf (OwnSetting t)      = rnf t `seq` ()
+    rnf (SharedSetting t c) = rnf t `seq` rnf c `seq` ()
 
 data MState = MState { -- Citing model state
                        stGammas   :: Map CitingNode (Multinom ItemSource)
