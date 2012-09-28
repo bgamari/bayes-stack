@@ -45,6 +45,7 @@ data RunCIOpts = RunCIOpts { arcsFile        :: FilePath
                            , sweepsDir       :: FilePath
                            , sweepBlockSize  :: Int
                            , iterations      :: Maybe Int
+                           , nTopics         :: Int
                            }
 
 runCIOpts = RunCIOpts 
@@ -79,6 +80,11 @@ runCIOpts = RunCIOpts
                    & value Nothing
                    & reader (Just . auto)
                    & help "Number of sweep blocks to run for"
+                   )
+    <*> option     ( long "topics"
+                   & metavar "N"
+                   & value 20
+                   & help "Number of topics"
                    )
 
 readArcs :: FilePath -> IO (Set Arc)
