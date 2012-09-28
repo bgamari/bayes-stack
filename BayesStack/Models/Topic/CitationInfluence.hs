@@ -304,7 +304,7 @@ citingUpdateUnits d =
     map (\(ni,(n,x))->CitingUpdateUnit { uuNI      = ni
                                        , uuN       = n
                                        , uuX       = x
-                                       , uuCites = getCitedNodes d n
+                                       , uuCites   = getCitedNodes d n
                                        }
         ) $ M.assocs $ dCitingNodeItems d
         
