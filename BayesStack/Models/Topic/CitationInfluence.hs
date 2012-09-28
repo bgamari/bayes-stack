@@ -190,11 +190,6 @@ model d (ModelInit citedInit citingInit) =
         initCitingUU :: CitingUpdateUnit -> State MState ()
         initCitingUU uu = do
             let err = error $ "CitationInference: Initial value for "++show uu++" not given\n"
-                            ++show citingInit++"\n\n"
-                            ++show (M.findMax citingInit, M.findMin citingInit)++"\n\n"
-                            ++show (fst (M.findMax citingInit) == uuNI uu)++"\n\n"
-                            ++show (M.lookup (uuNI uu) citingInit)
-                            ++show (M.findWithDefault (error "hi") (uuNI uu) citingInit)
                 s = maybe err id $ M.lookup (uuNI uu) citingInit
             modify' $ setCitingUU uu (Just s)
 
