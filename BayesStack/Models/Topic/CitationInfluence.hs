@@ -47,7 +47,7 @@ import           BayesStack.TupleEnum
 import           BayesStack.Models.Topic.Types
 
 import           GHC.Generics
-import           Data.Serialize
+import           Data.Serialize (Serialize)
 
 data ItemSource = Shared | Own deriving (Show, Eq, Enum, Ord, Generic)
 instance Serialize ItemSource
@@ -112,10 +112,14 @@ randomInitializeCited d init = execStateT doInit init
     where doInit = let unset = M.keysSet (dCitedNodeItems d) `S.difference` M.keysSet init
                    in mapM_ (randomInitCitedUU d) (S.toList unset)
 
+modify' :: Monad m => (a -> a) -> StateT a m ()
+modify' f = do x <- get
+               put $! f x
+
 randomInitCitedUU :: NetData -> CitedNodeItem -> StateT CitedModelInit RVar ()
 randomInitCitedUU d ni = do
     t' <- lift $ randomElement $ toList $ dTopics d
-    modify $ M.insert ni t'
+    modify' $ M.insert ni t'
 
 randomInitializeCiting :: NetData -> CitingModelInit -> RVar CitingModelInit
 randomInitializeCiting d init = execStateT doInit init
@@ -129,13 +133,13 @@ randomInitCitingUU d ni =
     in case getCitedNodes d n of
            a | S.null a -> do
                t <- lift $ randomElement $ toList $ dTopics d
-               modify $ M.insert ni (Own, CitedNode 0, t)
+               modify' $ M.insert ni (Own, CitedNode 0, t)
 
            citedNodes -> do
                s <- lift $ randomElement [Shared, Own]
                c <- lift $ randomElement $ toList $ getCitedNodes d n
                t <- lift $ randomElement $ toList $ dTopics d
-               modify $ M.insert ni (s,c,t)
+               modify' $ M.insert ni (s,c,t)
 
 randomInitialize :: NetData -> RVar ModelInit
 randomInitialize d =
@@ -172,13 +176,13 @@ model d (ModelInit citedInit citingInit) =
                             ++show (M.lookup (uuNI uu) citingInit)
                             ++show (M.findWithDefault (error "hi") (uuNI uu) citingInit)
                 s = maybe err id $ M.lookup (uuNI uu) citingInit
-            modify $ setCitingUU uu (Just s)
+            modify' $ setCitingUU uu (Just s)
 
         initCitedUU :: CitedUpdateUnit -> State MState ()
         initCitedUU uu = do
             let err = error $ "CitationInference: Initial value for "++show uu++" not given"
                 s = maybe err id $ M.lookup (uuNI' uu) citedInit
-            modify $ setCitedUU uu (Just s)
+            modify' $ setCitedUU uu (Just s)
 
     in execState (do mapM_ initCitingUU $ citingUpdateUnits d
                      mapM_ initCitedUU $ citedUpdateUnits d
