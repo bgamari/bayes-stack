@@ -319,7 +319,7 @@ citingDomain ms uu = do
         Own    -> do return (Own, error "No C for own item", t)
 
 setCitingUU :: CitingUpdateUnit -> Maybe (Setting CitingUpdateUnit) -> MState -> MState
-setCitingUU uu@(CitingUpdateUnit {uuN=n, uuX=x}) setting ms =
+setCitingUU uu@(CitingUpdateUnit {uuNI=ni, uuN=n, uuX=x}) setting ms =
     let set = maybe Unset (const Set) setting
         (s,c,t) = maybe (fetchSetting uu ms) id setting
         ms' = case s of
@@ -329,5 +329,11 @@ setCitingUU uu@(CitingUpdateUnit {uuN=n, uuX=x}) setting ms =
             Own    -> ms { stOmegas = M.adjust (setMultinom set t) n $ stOmegas ms }
     in ms' { stPhis = M.adjust (setMultinom set x) t $ stPhis ms
            , stGammas = M.adjust (setMultinom set s) n $ stGammas ms
+           , stT = case setting of Just _  -> M.insert ni t $ stT ms
+                                   Nothing -> stT ms
+           , stC = case setting of Just _  -> M.insert ni c $ stC ms
+                                   Nothing -> stC ms
+           , stS = case setting of Just _  -> M.insert ni s $ stS ms
+                                   Nothing -> stS ms
            }
 
