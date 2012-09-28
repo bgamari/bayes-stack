@@ -15,6 +15,7 @@ module BayesStack.Models.Topic.CitationInfluence
   , ModelInit
   , randomInitialize
   , model
+  , updateUnits
     -- * Diagnostics
   , modelLikelihood
   ) where
@@ -44,12 +45,14 @@ import           BayesStack.Models.Topic.Types
 
 import           GHC.Generics
 import           Data.Serialize (Serialize)
+import           Control.DeepSeq                 
 
 data ItemSource = Shared | Own deriving (Show, Eq, Enum, Ord, Generic)
 instance Serialize ItemSource
+instance NFData ItemSource         
          
-newtype CitingNode = CitingNode Int deriving (Show, Eq, Enum, Ord, Generic)
-newtype CitedNode = CitedNode Int deriving (Show, Eq, Enum, Ord, Generic)
+newtype CitingNode = CitingNode Int deriving (Show, Eq, Enum, Ord, Generic, NFData)
+newtype CitedNode = CitedNode Int deriving (Show, Eq, Enum, Ord, Generic, NFData)
 instance Serialize CitingNode
 instance Serialize CitedNode
 
@@ -183,6 +186,10 @@ model d (ModelInit citedInit citingInit) =
     in execState (do mapM_ initCitingUU $ citingUpdateUnits d
                      mapM_ initCitedUU $ citedUpdateUnits d
                  ) s
+
+updateUnits :: NetData -> [WrappedUpdateUnit MState]
+updateUnits d = map WrappedUU (citedUpdateUnits d)
+             ++ map WrappedUU (citingUpdateUnits d)
 
 data MState = MState { -- Citing model state
                        stGammas   :: Map CitingNode (Multinom ItemSource)
