@@ -31,12 +31,11 @@ import Control.Monad (liftM)
 import Control.Monad.Trans.State
 import Data.Random
 import Data.Random.Distribution.Categorical (categorical)
-import Data.Number.LogFloat hiding (realToFrac)
 
 import BayesStack.Core.Types
 import BayesStack.Core.Gibbs
 import BayesStack.DirMulti
-import BayesStack.TupleEnum
+import BayesStack.TupleEnum ()
 import BayesStack.Models.Topic.Types
 
 import GHC.Generics
@@ -112,7 +111,7 @@ instance UpdateUnit LDAUpdateUnit where
     type Setting LDAUpdateUnit = Topic
     fetchSetting (LDAUpdateUnit {uuNI=ni}) ms = stT ms M.! ni
     evolveSetting ms uu = categorical $ ldaFullCond (setUU uu Nothing ms) uu
-    updateSetting uu s s' = setUU uu (Just s') . setUU uu Nothing
+    updateSetting uu _ s' = setUU uu (Just s') . setUU uu Nothing
         
 uuProb :: LDAState -> LDAUpdateUnit -> Topic -> Double
 uuProb state (LDAUpdateUnit {uuN=n, uuX=x}) t =

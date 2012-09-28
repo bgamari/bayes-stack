@@ -27,12 +27,8 @@ import qualified Data.Set as S
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
-import           Data.Traversable
 import           Data.Foldable hiding (product)
-import           Data.Monoid
-
 import           Control.Applicative ((<$>), (<*>))
-import           Control.Monad (liftM)
 import           Control.Monad.Trans.State.Strict
 
 import           Data.Random
@@ -43,7 +39,7 @@ import           Data.Number.LogFloat hiding (realToFrac)
 import           BayesStack.Core.Types
 import           BayesStack.Core.Gibbs
 import           BayesStack.DirMulti
-import           BayesStack.TupleEnum
+import           BayesStack.TupleEnum ()
 import           BayesStack.Models.Topic.Types
 
 import           GHC.Generics
@@ -191,7 +187,7 @@ data MState = MState { -- Citing model state
                      , stPhis     :: Map Topic (Multinom Item)
 
                      , stC        :: Map CitingNodeItem CitedNode
-                     , stS        :: Map CitingNodeItem ItemSource
+                     , stS        :: !(Map CitingNodeItem ItemSource)
                      , stT        :: Map CitingNodeItem Topic
 
                      -- Cited model state
@@ -223,10 +219,10 @@ instance UpdateUnit CitedUpdateUnit where
     type Setting CitedUpdateUnit = Topic
     fetchSetting uu ms = stT' ms M.! uuNI' uu
     evolveSetting ms uu = categorical $ citedFullCond (setCitedUU uu Nothing ms) uu
-    updateSetting uu s s' = setCitedUU uu (Just s') . setCitedUU uu Nothing
+    updateSetting uu _ s' = setCitedUU uu (Just s') . setCitedUU uu Nothing
 
 citedProb :: MState -> CitedUpdateUnit -> Setting CitedUpdateUnit -> Double
-citedProb st (CitedUpdateUnit {uuNI'=ni', uuN'=n', uuX'=x'}) t =
+citedProb st (CitedUpdateUnit {uuN'=n', uuX'=x'}) t =
     let lambda = stLambdas st M.! n'
         phi = stPhis st M.! t
     in realToFrac $ sampleProb lambda t * sampleProb phi x'
@@ -272,7 +268,7 @@ instance UpdateUnit CitingUpdateUnit where
                          , stT ms M.! uuNI uu
                          )
     evolveSetting ms uu = categorical $ citingFullCond (setCitingUU uu Nothing ms) uu
-    updateSetting uu s s' = setCitingUU uu (Just s') . setCitingUU uu Nothing
+    updateSetting uu _ s' = setCitingUU uu (Just s') . setCitingUU uu Nothing
 
 citingUpdateUnits :: NetData -> [CitingUpdateUnit]
 citingUpdateUnits d =
@@ -284,7 +280,7 @@ citingUpdateUnits d =
         ) $ M.assocs $ dCitingNodeItems d
         
 citingProb :: MState -> CitingUpdateUnit -> Setting CitingUpdateUnit -> Double
-citingProb st (CitingUpdateUnit {uuNI=ni, uuN=n, uuX=x}) (s,c,t) =
+citingProb st (CitingUpdateUnit {uuN=n, uuX=x}) (s,c,t) =
     let gamma = stGammas st M.! n
         omega = stOmegas st M.! n
         phi = stPhis st M.! t
@@ -312,7 +308,7 @@ citingDomain ms uu = do
         Own    -> do return (Own, error "No C for own item", t)
 
 setCitingUU :: CitingUpdateUnit -> Maybe (Setting CitingUpdateUnit) -> MState -> MState
-setCitingUU uu@(CitingUpdateUnit {uuN=n, uuNI=ni, uuX=x}) setting ms =
+setCitingUU uu@(CitingUpdateUnit {uuN=n, uuX=x}) setting ms =
     let set = maybe Unset (const Set) setting
         (s,c,t) = maybe (fetchSetting uu ms) id setting
         ms' = case s of

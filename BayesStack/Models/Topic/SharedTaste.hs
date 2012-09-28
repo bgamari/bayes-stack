@@ -38,7 +38,7 @@ import Data.Number.LogFloat hiding (realToFrac)
 import BayesStack.Core.Types
 import BayesStack.Core.Gibbs
 import BayesStack.DirMulti
-import BayesStack.TupleEnum
+import BayesStack.TupleEnum ()
 import BayesStack.Models.Topic.Types
 
 import GHC.Generics
@@ -169,10 +169,10 @@ instance UpdateUnit STUpdateUnit where
                          , stT ms M.! uuNI uu
                          )
     evolveSetting ms uu = categorical $ stFullCond (setUU uu Nothing ms) uu
-    updateSetting uu s s' = setUU uu (Just s') . setUU uu Nothing
+    updateSetting uu _ s' = setUU uu (Just s') . setUU uu Nothing
         
 uuProb :: STState -> STUpdateUnit -> Setting STUpdateUnit -> Double
-uuProb st (STUpdateUnit {uuNI=ni, uuN=n, uuX=x}) (s,f,t) =
+uuProb st (STUpdateUnit {uuN=n, uuX=x}) (s,f,t) =
     let gamma = stGammas st M.! n
         omega = stOmegas st M.! n
         phi = stPhis st M.! t

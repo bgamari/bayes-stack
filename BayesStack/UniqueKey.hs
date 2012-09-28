@@ -15,8 +15,6 @@ import Data.Functor.Identity
 
 import Control.Monad.Trans
 import Control.Monad.State hiding (mapM)
-import Control.Monad (liftM)
-
        
 import Data.Map (Map)
 import qualified Data.Map as M

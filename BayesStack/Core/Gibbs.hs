@@ -6,7 +6,7 @@ module BayesStack.Core.Gibbs ( UpdateUnit(..)
                              , gibbsUpdate
                              ) where
                              
-import Control.Monad (replicateM, when)
+import Control.Monad (replicateM_, when)
 import Control.Concurrent
 import Control.DeepSeq
 import Data.Random
@@ -33,7 +33,7 @@ updateUnit modelStateV (WrappedUU unit) = do
     
 maybeHead :: [a] -> ([a], Maybe a)
 maybeHead [] = ([], Nothing)
-maybeHead (head:rest) = (rest, Just head)
+maybeHead (a:rest) = (rest, Just a)
 
 updateWorker :: MVar ms -> MVar [WrappedUpdateUnit ms] -> RVarT IO ()
 updateWorker modelStateV unitsV = do
@@ -50,7 +50,7 @@ gibbsUpdate modelState units = do
     n <- getNumCapabilities
     runningWorkers <- newMVar (0 :: Int)
     done <- newEmptyMVar :: IO (MVar ())
-    replicateM n $ forkIO $ withSystemRandom $ \mwc->do 
+    replicateM_ n $ forkIO $ withSystemRandom $ \mwc->do 
         modifyMVar_ runningWorkers $ \n->return $ n+1
         runRVarT (updateWorker modelStateV unitsV) mwc
         modifyMVar_ runningWorkers $ \n->return $ n-1

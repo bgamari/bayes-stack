@@ -11,7 +11,7 @@ module BayesStack.Dirichlet ( -- * Dirichlet parameter
                             , prettyAlpha
                             ) where
 
-import Data.Foldable (toList, Foldable, fold, foldMap)
+import Data.Foldable (toList, Foldable, fold)
 
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
@@ -26,8 +26,8 @@ import Text.Printf
 import Text.PrettyPrint
 
 import Data.Serialize
-import Data.Serialize.EnumMap
-import Data.Serialize.LogFloat
+import Data.Serialize.EnumMap ()
+import Data.Serialize.LogFloat ()
 import GHC.Generics (Generic)
 
 -- | Make error handling a bit easier

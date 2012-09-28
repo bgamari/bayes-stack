@@ -11,10 +11,6 @@ import Data.Maybe
 import Data.Map (Map)
 import qualified Data.Map as M
 
-import Data.Sequence (Seq)
-import Data.Set (Set)
-
-
 newtype Node = Node Int deriving (Show, Eq, Ord, Enum, Generic, NFData)
 newtype Item = Item Int deriving (Show, Eq, Ord, Enum, Generic, NFData)
 newtype Topic = Topic Int deriving (Show, Eq, Ord, Enum, Generic, NFData)

@@ -19,7 +19,7 @@ import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
 import qualified Data.Foldable 
-import Data.Foldable (toList, Foldable, fold, foldMap)
+import Data.Foldable (toList, Foldable, foldMap)
 import Data.Function (on)
 
 import Text.PrettyPrint
@@ -27,15 +27,15 @@ import Text.Printf
 
 import GHC.Generics (Generic)
 import Data.Serialize
-import Data.Serialize.EnumMap
-import Data.Serialize.LogFloat
+import Data.Serialize.EnumMap ()
+import Data.Serialize.LogFloat ()
 
 import BayesStack.Core
 import BayesStack.Dirichlet
 
 import Data.Number.LogFloat hiding (realToFrac, isNaN, isInfinite)
 import Numeric.Digamma
-import Math.Gamma
+import Math.Gamma hiding (p)
 
 -- | Make error handling a bit easier
 checkNaN :: RealFloat a => String -> a -> a
@@ -134,7 +134,7 @@ instance HasLikelihood Multinom where
 
 instance FullConditionable Multinom where
   type FCContext Multinom a = (Ord a, Enum a)
-  sampleProb dm@(Multinom {dmProbs=prob}) k = prob EM.! k
+  sampleProb (Multinom {dmProbs=prob}) k = prob EM.! k
   sampleProb dm@(DirMulti {dmAlpha=a}) k =
   	let alpha = a `alphaOf` k
             n = realToFrac $ dmGetCounts dm k
@@ -147,8 +147,8 @@ probabilities :: (Ord a, Enum a) => Multinom a -> Seq (Double, a)
 probabilities dm = fmap (\a->(sampleProb dm a, a)) $ dmDomain dm -- FIXME
 
 prettyMultinom :: (Ord a, Enum a) => Int -> (a -> String) -> Multinom a -> Doc
-prettyMultinom n showA dm@(Multinom {}) = error "TODO: prettyMultinom"
-prettyMultinom n showA dm@(DirMulti {}) =
+prettyMultinom _ _ (Multinom {})         = error "TODO: prettyMultinom"
+prettyMultinom n showA dm@(DirMulti {})  =
   text "DirMulti" <+> parens (text "alpha=" <> prettyAlpha showA (dmAlpha dm))
   $$ nest 5 (fsep $ punctuate comma
             $ map (\(p,a)->text (showA a) <> parens (text $ printf "%1.2e" p))
@@ -157,7 +157,7 @@ prettyMultinom n showA dm@(DirMulti {}) =
 
 -- | Update the prior of a Dirichlet/multinomial
 updatePrior :: (Alpha a -> Alpha a) -> Multinom a -> Multinom a
-updatePrior f dm@(Multinom {}) = error "TODO: updatePrior"
+updatePrior _ (Multinom {}) = error "TODO: updatePrior"
 updatePrior f dm = dm {dmAlpha=f $ dmAlpha dm}
 
 -- | Relative tolerance in precision for prior estimation
