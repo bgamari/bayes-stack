@@ -68,7 +68,7 @@ nodeItems = M.fromList $ zip (map NodeItem [0..])
             , (Node 4, Item 3)
             ]
 
-d = LDAData { ldaAlphaTheta = 0.1
+d = NetData { ldaAlphaTheta = 0.1
             , ldaAlphaPhi = 0.1
             , ldaNodes = nodes
             , ldaItems = items
@@ -76,7 +76,7 @@ d = LDAData { ldaAlphaTheta = 0.1
             , ldaNodeItems = nodeItems
             }
 
-iter :: [WrappedUpdateUnit LDAState] -> StateT LDAState IO ()
+iter :: [WrappedUpdateUnit MState] -> StateT MState IO ()
 iter uus = do
     ms <- get
     ms' <- liftIO $ gibbsUpdate ms uus
@@ -91,7 +91,7 @@ main = do
     ms <- execStateT (replicateM 100 $ iter uus) state
     return ()
     
-showState :: LDAState -> IO ()
+showState :: MState -> IO ()
 showState ms = do          
     putStrLn "\n\nThetas:"
     forM_ (take 5 $ S.toList nodes) $ \n->
