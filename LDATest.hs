@@ -76,7 +76,7 @@ d = LDAData { ldaAlphaTheta = 0.1
             , ldaNodeItems = nodeItems
             }
 
-iter :: [LDAUpdateUnit] -> StateT LDAState IO ()
+iter :: [WrappedUpdateUnit LDAState] -> StateT LDAState IO ()
 iter uus = do
     ms <- get
     ms' <- liftIO $ gibbsUpdate ms uus
