@@ -29,7 +29,7 @@ updateUnit modelStateV (WrappedUU unit) = do
     let s = fetchSetting unit modelState
     s' <- lift $ evolveSetting modelState unit
     deepseq (s, s') $ return ()
-    lift $ modifyMVar_ modelStateV (return . updateSetting unit s s')
+    lift $ modifyMVar_ modelStateV $ \ms->return $! updateSetting unit s s' ms
     
 maybeHead :: [a] -> ([a], Maybe a)
 maybeHead [] = ([], Nothing)
