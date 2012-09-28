@@ -15,6 +15,11 @@ import qualified Data.Map as M
 import           Data.Maybe (mapMaybe)       
 
 import           Control.Applicative
+import           Control.Monad (when, forM_)                
+import           Control.Monad.IO.Class
+import qualified Control.Monad.Trans.State as S
+
+import           BayesStack.Core
 import           BayesStack.Models.Topic.CitationInfluence
 
 import           Data.Char (isAlpha)                 
@@ -25,31 +30,57 @@ import           Data.Text.Read (decimal)
 import           Data.Random
 import           System.Random.MWC                 
 
+import           Data.Number.LogFloat (LogFloat, logFromLogFloat)
+
 import           Text.Printf
+import qualified Data.ByteString as BS
+import Data.Serialize
+
+import           Control.Concurrent
+import           Control.Concurrent.STM       
                  
 newtype Node = Node Int deriving (Show, Eq, Ord)
        
 data RunCIOpts = RunCIOpts { arcsFile        :: FilePath
                            , nodeItemsFile   :: FilePath
                            , stopwords       :: Maybe FilePath
+                           , sweepsDir       :: FilePath
+                           , sweepBlockSize  :: Int
+                           , iterations      :: Maybe Int
                            }
 
 runCIOpts = RunCIOpts 
-    <$> strOption ( long "arcs"
-                  & metavar "FILE"
-                  & value "arcs"
-                  & help "File containing arcs"
-                  )
-    <*> strOption ( long "items"
-                  & metavar "FILE"
-                  & value "node-items"
-                  & help "File containing nodes' items"
-                  )
+    <$> strOption  ( long "arcs"
+                   & metavar "FILE"
+                   & value "arcs"
+                   & help "File containing arcs"
+                   )
+    <*> strOption  ( long "items"
+                   & metavar "FILE"
+                   & value "node-items"
+                   & help "File containing nodes' items"
+                   )
     <*> nullOption ( long "stopwords"
                    & metavar "FILE"
                    & reader (Just . Just)
                    & value (Just "stopwords.txt")
                    & help "Stop words list"
+                   )
+    <*> strOption  ( long "sweeps"
+                   & metavar "DIR"
+                   & value "sweeps"
+                   & help "Directory in which to place sweeps"
+                   )
+    <*> option     ( long "sweep-block"
+                   & metavar "N"
+                   & value 10
+                   & help "Number of sweeps to dispatch at once"
+                   )
+    <*> option     ( long "iterations"
+                   & metavar "N"
+                   & value Nothing
+                   & reader (Just . auto)
+                   & help "Number of sweep blocks to run for"
                    )
 
 readArcs :: FilePath -> IO (Set Arc)
@@ -108,6 +139,19 @@ opts = info (runCIOpts)
            <> header "run-ci - learn citation influence model"
            )
 
+serializeState :: MState -> FilePath -> IO ()
+serializeState model fname = liftIO $ BS.writeFile fname $ runPut $ put model
+
+processSweep :: FilePath -> TVar LogFloat -> Int -> MState -> IO ()
+processSweep sweepsDir lastMaxV sweepN m = do             
+    let l = modelLikelihood m
+    putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
+    newMax <- atomically $ do oldL <- readTVar lastMaxV
+                              if l > oldL then writeTVar lastMaxV l >> return True
+                                          else return False
+    when newMax
+        $ serializeState m $ printf "%s/%05d" sweepsDir sweepN
+
 main = do
     args <- execParser $ opts
     stopWords <- case stopwords args of
@@ -125,4 +169,19 @@ main = do
     let nd = netData abstracts arcs 10
     init <- runRVar (randomInitialize nd) mwc
     let m = model nd init
+        uus = updateUnits nd
     print $ modelLikelihood m
+    
+    putStrLn "Starting inference"
+    lastMaxV <- atomically $ newTVar 0
+    let update :: Int -> S.StateT MState IO ()
+        update blockN = do
+            m <- S.get
+            let sweepN = blockN * sweepBlockSize args
+            liftIO $ forkIO $ processSweep (sweepsDir args) lastMaxV sweepN m
+            m' <- liftIO $ gibbsUpdate m $ concat $ replicate (sweepBlockSize args) uus
+            S.put m'
+    
+    let nBlocks = maybe [0..] (\n->[0..n]) $ iterations args
+    S.runStateT (forM_ nBlocks update :: S.StateT MState IO ()) m
+    return ()
