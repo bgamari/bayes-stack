@@ -89,17 +89,22 @@ data NetData = NetData { dAlphaPsi           :: Double
                        , dArcs               :: Set Arc
                        , dItems              :: Set Item
                        , dTopics             :: Set Topic
-                       , dCitedNodeItems     :: Map CitedNodeItem (CitedNode, Item)
-                       , dCitingNodeItems    :: Map CitingNodeItem (CitingNode, Item)
+                       , dNodeItems          :: Map NodeItem (Node, Item)
                        }
               deriving (Show, Eq, Generic)
 instance Serialize NetData
          
+dCitedNodeItems :: NetData -> Map CitedNodeItem (CitedNode, Item)
+dCitedNodeItems = M.mapKeys Cited . M.map (\(n,i)->(Cited n, i)) . dNodeItems
+
+dCitingNodeItems :: NetData -> Map CitingNodeItem (CitingNode, Item)
+dCitingNodeItems = M.mapKeys Citing . M.map (\(n,i)->(Citing n, i)) . dNodeItems
+
 dCitingNodes :: NetData -> Set CitingNode
-dCitingNodes = S.fromList . map fst . M.elems . dCitingNodeItems
+dCitingNodes = S.map citingNode . dArcs
 
 dCitedNodes :: NetData -> Set CitedNode
-dCitedNodes = S.fromList . map fst . M.elems . dCitedNodeItems
+dCitedNodes = S.map citedNode . dArcs
          
 getCitingNodes :: NetData -> CitedNode -> Set CitingNode
 getCitingNodes d n = S.map citingNode $ S.filter (\(Arc (_,cited))->cited==n) $ dArcs d
@@ -109,8 +114,6 @@ getCitedNodes d n = S.map citedNode $ S.filter (\(Arc (citing,_))->citing==n) $ 
               
 verifyNetData :: NetData -> [String]
 verifyNetData d = execWriter $ do
-    --when (dCitingNodes d /= dCitedNodes d)
-    --    $ tell ["Citing nodes and cited nodes should be identical sets"]
     forM_ (dCitingNodes d) $ \n->
         when (S.null $ getCitedNodes d n)
         $ tell [show n++" is in dCitingNodeItems yet has no arcs"]

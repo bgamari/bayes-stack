@@ -119,16 +119,11 @@ netData abstracts arcs nTopics =
                , dArcs             = arcs
                , dItems            = S.fromList $ BM.keys items
                , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
-               , dCitedNodeItems   = M.fromList
-                                     $ zip [Cited (NodeItem i) | i <- [0..]]
-                                     $ do (Node n,terms) <- M.assocs abstracts
+               , dNodeItems        = M.fromList
+                                     $ zip [NodeItem i | i <- [0..]]
+                                     $ do (n,terms) <- M.assocs abstracts
                                           term <- S.toList terms
-                                          return (Cited (Node n), items BM.!> term)
-               , dCitingNodeItems  = M.fromList
-                                     $ zip [Citing (NodeItem i) | i <- [0..]]
-                                     $ do (Node n,terms) <- M.assocs abstracts
-                                          term <- S.toList terms
-                                          return (Citing (Node n), items BM.!> term)
+                                          return (n, items BM.!> term)
                }
             
 opts = info (runCIOpts)
@@ -169,7 +164,6 @@ main = do
     init <- runRVar (randomInitialize nd) mwc
     let m = model nd init
         uus = updateUnits nd
-    print $ modelLikelihood m
     
     putStrLn "Starting inference"
     lastMaxV <- atomically $ newTVar 0
