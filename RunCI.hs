@@ -39,8 +39,6 @@ import Data.Serialize
 import           Control.Concurrent
 import           Control.Concurrent.STM       
                  
-newtype Node = Node Int deriving (Show, Eq, Ord)
-       
 data RunCIOpts = RunCIOpts { arcsFile        :: FilePath
                            , nodeItemsFile   :: FilePath
                            , stopwords       :: Maybe FilePath
@@ -90,7 +88,7 @@ readArcs fname =
           parseLine l = case T.words l of
              [a,b] -> case (decimal a, decimal b) of
                           (Right (a',_), Right (b',_)) ->
-                              Just $ Arc (CitingNode a', CitedNode b')
+                              Just $ Arc (Citing (Node a'), Cited (Node b'))
                           otherwise -> Nothing
              otherwise -> Nothing
 
@@ -122,15 +120,15 @@ netData abstracts arcs nTopics =
                , dItems            = S.fromList $ BM.keys items
                , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
                , dCitedNodeItems   = M.fromList
-                                     $ zip [CitedNI i | i <- [0..]]
+                                     $ zip [Cited (NodeItem i) | i <- [0..]]
                                      $ do (Node n,terms) <- M.assocs abstracts
                                           term <- S.toList terms
-                                          return (CitedNode n, items BM.!> term)
+                                          return (Cited (Node n), items BM.!> term)
                , dCitingNodeItems  = M.fromList
-                                     $ zip [CitingNI i | i <- [0..]]
+                                     $ zip [Citing (NodeItem i) | i <- [0..]]
                                      $ do (Node n,terms) <- M.assocs abstracts
                                           term <- S.toList terms
-                                          return (CitingNode n, items BM.!> term)
+                                          return (Citing (Node n), items BM.!> term)
                }
             
 opts = info (runCIOpts)

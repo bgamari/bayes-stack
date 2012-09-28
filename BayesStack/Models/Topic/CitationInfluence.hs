@@ -9,7 +9,8 @@ module BayesStack.Models.Topic.CitationInfluence
   , ItemSource(..)
   , CitedNode(..), CitedNodeItem(..)
   , CitingNode(..), CitingNodeItem(..)
-  , Item(..), Topic(..), Arc(..)
+  , Citing(..), Cited(..)
+  , Item(..), Topic(..), Arc(..), NodeItem(..), Node(..)
   , setupNodeItems
     -- * Initialization
   , ModelInit
@@ -54,15 +55,15 @@ data ItemSource = Shared | Own deriving (Show, Eq, Enum, Ord, Generic)
 instance Serialize ItemSource
 instance NFData ItemSource         
          
-newtype CitingNode = CitingNode Int deriving (Show, Eq, Enum, Ord, Generic, NFData)
-newtype CitedNode = CitedNode Int deriving (Show, Eq, Enum, Ord, Generic, NFData)
-instance Serialize CitingNode
-instance Serialize CitedNode
-
-newtype CitingNodeItem = CitingNI Int deriving (Show, Eq, Enum, Ord, Generic)
-newtype CitedNodeItem = CitedNI Int deriving (Show, Eq, Enum, Ord, Generic)
-instance Serialize CitingNodeItem
-instance Serialize CitedNodeItem
+newtype Citing a = Citing a deriving (Show, Eq, Enum, Ord, Generic, NFData)
+newtype Cited a = Cited a deriving (Show, Eq, Enum, Ord, Generic, NFData)
+instance Serialize a => Serialize (Citing a)
+instance Serialize a => Serialize (Cited a)
+         
+type CitingNode = Citing Node
+type CitedNode = Cited Node
+type CitingNodeItem = Citing NodeItem
+type CitedNodeItem = Cited NodeItem
 
 -- ^ A directed edge         
 newtype Arc = Arc (CitingNode, CitedNode)
