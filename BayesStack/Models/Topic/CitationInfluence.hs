@@ -20,6 +20,9 @@ module BayesStack.Models.Topic.CitationInfluence
   , modelLikelihood
   ) where
 
+import           Debug.Trace
+import Control.Monad (when)                 
+
 import           Prelude hiding (mapM_)
 
 import           Data.Set (Set)
@@ -45,7 +48,7 @@ import           BayesStack.Models.Topic.Types
 
 import           GHC.Generics
 import           Data.Serialize (Serialize)
-import           Control.DeepSeq                 
+import           Control.DeepSeq
 
 data ItemSource = Shared | Own deriving (Show, Eq, Enum, Ord, Generic)
 instance Serialize ItemSource
@@ -132,13 +135,16 @@ randomInitCitingUU d ni =
     in case getCitedNodes d n of
            a | S.null a -> do
                t <- lift $ randomElement $ toList $ dTopics d
-               modify' $ M.insert ni (Own, CitedNode 0, t)
+               modify' $ M.insert ni $ OwnSetting t
 
            citedNodes -> do
                s <- lift $ randomElement [Shared, Own]
-               c <- lift $ randomElement $ toList $ getCitedNodes d n
+               c <- lift $ randomElement $ toList citedNodes
+               when (c `S.notMember` dCitedNodes d) $ error "uh oh"
                t <- lift $ randomElement $ toList $ dTopics d
-               modify' $ M.insert ni (s,c,t)
+               modify' $ M.insert ni $
+                   case s of Shared -> SharedSetting t c
+                             Own    -> OwnSetting t
 
 randomInitialize :: NetData -> RVar ModelInit
 randomInitialize d =
@@ -156,9 +162,7 @@ model d (ModelInit citedInit citingInit) =
                                 in foldMap (\t->M.singleton t dist) $ dCitingNodes d
                    , stOmegas = let dist = symDirMulti (dAlphaOmega d) (toList $ dTopics d)
                                 in foldMap (\t->M.singleton t dist) $ dCitingNodes d
-                   , stC = M.empty
-                   , stS = M.empty
-                   , stT = M.empty
+                   , stCiting = M.empty
 
                    -- Cited model
                    , stLambdas = let dist = symDirMulti (dAlphaLambda d) (toList $ dTopics d)
@@ -191,15 +195,19 @@ updateUnits :: NetData -> [WrappedUpdateUnit MState]
 updateUnits d = map WrappedUU (citedUpdateUnits d)
              ++ map WrappedUU (citingUpdateUnits d)
 
+data CitingSetting = OwnSetting !Topic
+                   | SharedSetting !Topic !CitedNode
+                   deriving (Show, Eq, Generic)
+instance NFData CitingSetting
+instance Serialize CitingSetting
+
 data MState = MState { -- Citing model state
                        stGammas   :: Map CitingNode (Multinom ItemSource)
                      , stOmegas   :: Map CitingNode (Multinom Topic)
                      , stPsis     :: Map CitingNode (Multinom CitedNode)
                      , stPhis     :: Map Topic (Multinom Item)
 
-                     , stC        :: Map CitingNodeItem CitedNode
-                     , stS        :: !(Map CitingNodeItem ItemSource)
-                     , stT        :: Map CitingNodeItem Topic
+                     , stCiting   :: Map CitingNodeItem CitingSetting
 
                      -- Cited model state
                      , stLambdas  :: Map CitedNode (Multinom Topic)
@@ -228,7 +236,8 @@ instance Serialize CitedUpdateUnit
 instance UpdateUnit CitedUpdateUnit where
     type ModelState CitedUpdateUnit = MState
     type Setting CitedUpdateUnit = Topic
-    fetchSetting uu ms = stT' ms M.! uuNI' uu
+    fetchSetting uu ms = maybe (error $ "Update unit "++show uu++" has no setting") id
+                         $ M.lookup (uuNI' uu) (stT' ms)
     evolveSetting ms uu = categorical $ citedFullCond (setCitedUU uu Nothing ms) uu
     updateSetting uu _ s' = setCitedUU uu (Just s') . setCitedUU uu Nothing
 
@@ -273,11 +282,8 @@ instance Serialize CitingUpdateUnit
 
 instance UpdateUnit CitingUpdateUnit where
     type ModelState CitingUpdateUnit = MState
-    type Setting CitingUpdateUnit = (ItemSource, CitedNode, Topic)
-    fetchSetting uu ms = ( stS ms M.! uuNI uu
-                         , stC ms M.! uuNI uu
-                         , stT ms M.! uuNI uu
-                         )
+    type Setting CitingUpdateUnit = CitingSetting
+    fetchSetting uu ms = stCiting ms M.! uuNI uu
     evolveSetting ms uu = categorical $ citingFullCond (setCitingUU uu Nothing ms) uu
     updateSetting uu _ s' = setCitingUU uu (Just s') . setCitingUU uu Nothing
 
@@ -290,21 +296,23 @@ citingUpdateUnits d =
                                        }
         ) $ M.assocs $ dCitingNodeItems d
         
+tr x = traceShow x x
 citingProb :: MState -> CitingUpdateUnit -> Setting CitingUpdateUnit -> Double
-citingProb st (CitingUpdateUnit {uuN=n, uuX=x}) (s,c,t) =
+citingProb st (CitingUpdateUnit {uuN=n, uuX=x}) setting =
     let gamma = stGammas st M.! n
         omega = stOmegas st M.! n
-        phi = stPhis st M.! t
         psi = stPsis st M.! n
-        lambda = stLambdas st M.! c
-    in case s of 
-        Shared ->   sampleProb gamma s
-                  * sampleProb psi c
-                  * sampleProb lambda t
-                  * sampleProb phi x
-        Own ->   sampleProb gamma s
-               * sampleProb omega t
-               * sampleProb phi x
+    in case setting of 
+        SharedSetting t c -> let phi = stPhis st M.! t
+                                 lambda = stLambdas st M.! c
+                             in sampleProb gamma Shared
+                              * sampleProb psi c
+                              * sampleProb lambda t
+                              * sampleProb phi x
+        OwnSetting t      -> let phi = stPhis st M.! t
+                             in sampleProb gamma Own
+                              * sampleProb omega t
+                              * sampleProb phi x
 
 citingFullCond :: MState -> CitingUpdateUnit -> [(Double, Setting CitingUpdateUnit)]
 citingFullCond ms uu = map (\s->(citingProb ms uu s, s)) $ citingDomain ms uu
@@ -315,25 +323,21 @@ citingDomain ms uu = do
     t <- M.keys $ stPhis ms
     case s of
         Shared -> do c <- S.toList $ uuCites uu
-                     return (Shared, c, t)
-        Own    -> do return (Own, error "No C for own item", t)
+                     return $ SharedSetting t c
+        Own    -> do return $ OwnSetting t
 
 setCitingUU :: CitingUpdateUnit -> Maybe (Setting CitingUpdateUnit) -> MState -> MState
 setCitingUU uu@(CitingUpdateUnit {uuNI=ni, uuN=n, uuX=x}) setting ms =
     let set = maybe Unset (const Set) setting
-        (s,c,t) = maybe (fetchSetting uu ms) id setting
-        ms' = case s of
-            Shared -> ms { stPsis = M.adjust (setMultinom set c) n $ stPsis ms
-                         , stLambdas = M.adjust (setMultinom set t) c $ stLambdas ms
-                         }
-            Own    -> ms { stOmegas = M.adjust (setMultinom set t) n $ stOmegas ms }
-    in ms' { stPhis = M.adjust (setMultinom set x) t $ stPhis ms
-           , stGammas = M.adjust (setMultinom set s) n $ stGammas ms
-           , stT = case setting of Just _  -> M.insert ni t $ stT ms
-                                   Nothing -> stT ms
-           , stC = case setting of Just _  -> M.insert ni c $ stC ms
-                                   Nothing -> stC ms
-           , stS = case setting of Just _  -> M.insert ni s $ stS ms
-                                   Nothing -> stS ms
-           }
+        ms' = case maybe (fetchSetting uu ms) id  setting of
+            SharedSetting t c -> ms { stPsis = M.adjust (setMultinom set c) n $ stPsis ms
+                                    , stLambdas = M.adjust (setMultinom set t) c $ stLambdas ms
+                                    , stPhis = M.adjust (setMultinom set x) t $ stPhis ms
+                                    , stGammas = M.adjust (setMultinom set Shared) n $ stGammas ms
+                                    }
+            OwnSetting t      -> ms { stOmegas = M.adjust (setMultinom set t) n $ stOmegas ms
+                                    , stPhis = M.adjust (setMultinom set x) t $ stPhis ms
+                                    , stGammas = M.adjust (setMultinom set Own) n $ stGammas ms
+                                    }
+    in ms' { stCiting = M.alter (const setting) ni $ stCiting ms' }
 
