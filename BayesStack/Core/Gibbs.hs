@@ -25,15 +25,15 @@ class UpdateUnit uu where
 data WrappedUpdateUnit ms = forall uu. (UpdateUnit uu, ModelState uu ~ ms, NFData (Setting uu))
                          => WrappedUU uu
      
-updateUnit :: WrappedUpdateUnit ms -> IORef ms -> TQueue (ms -> ms) -> RVarT IO ()
+updateUnit :: WrappedUpdateUnit ms -> IORef ms -> TBQueue (ms -> ms) -> RVarT IO ()
 updateUnit (WrappedUU unit) stateRef diffQueue = do
     modelState <- lift $ readIORef stateRef
     let s = fetchSetting unit modelState
     s' <- lift $ evolveSetting modelState unit
-    s' `deepseq` return ()
-    lift $ atomically $ writeTQueue diffQueue (updateSetting unit s s')
+    (s,s') `deepseq` return ()
+    lift $ atomically $ writeTBQueue diffQueue (updateSetting unit s s')
     
-updateWorker :: TQueue (WrappedUpdateUnit ms) -> IORef ms -> TQueue (ms -> ms) -> RVarT IO ()
+updateWorker :: TQueue (WrappedUpdateUnit ms) -> IORef ms -> TBQueue (ms -> ms) -> RVarT IO ()
 updateWorker unitsQueue stateRef diffQueue = do
     unit <- lift $ atomically $ tryReadTQueue unitsQueue
     case unit of
@@ -41,21 +41,21 @@ updateWorker unitsQueue stateRef diffQueue = do
                          updateWorker unitsQueue stateRef diffQueue
         Nothing -> return ()
 
-diffWorker :: IORef ms -> TQueue (ms -> ms) -> IO ()
+diffWorker :: IORef ms -> TBQueue (ms -> ms) -> IO ()
 diffWorker state diffQueue = forever $ do
-    diff <- atomically $ readTQueue diffQueue
+    diff <- atomically $ readTBQueue diffQueue
     atomicModifyIORef' state $ \a->(diff a, ())
 
 gibbsUpdate :: ms -> [WrappedUpdateUnit ms] -> IO ms
 gibbsUpdate modelState units = do
+    n <- getNumCapabilities
     unitsQueue <- atomically $ do q <- newTQueue
                                   mapM_ (writeTQueue q) units
                                   return q
-    diffQueue <- atomically $ newTQueue
+    diffQueue <- atomically $ newTBQueue $ 100*n -- FIXME
     stateRef <- newIORef modelState
-    forkIO $ diffWorker stateRef diffQueue
+    diffThread <- forkIO $ diffWorker stateRef diffQueue
 
-    n <- getNumCapabilities
     runningWorkers <- atomically $ newTVar (0 :: Int)
     done <- atomically $ newEmptyTMVar :: IO (TMVar ())
     replicateM_ n $ forkIO $ withSystemRandom $ \mwc->do 
