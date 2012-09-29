@@ -9,6 +9,7 @@ module BayesStack.Core.Gibbs ( UpdateUnit(..)
 import Control.Monad (replicateM_, when, forever)
 import Control.Concurrent
 import Control.Concurrent.STM
+import GHC.Conc.Sync (labelThread)
 import Data.IORef       
 import Control.DeepSeq
 import Data.Random
@@ -48,6 +49,9 @@ diffWorker state diffQueue = forever $ do
     diff <- atomically $ readTBQueue diffQueue
     atomicModifyIORef' state $ \a->(diff a, ())
 
+labelMyThread :: String -> IO ()
+labelMyThread label = myThreadId >>= \id->labelThread id label
+
 gibbsUpdate :: ms -> [WrappedUpdateUnit ms] -> IO ms
 gibbsUpdate modelState units = do
     n <- getNumCapabilities
@@ -56,11 +60,13 @@ gibbsUpdate modelState units = do
                                   return q
     diffQueue <- atomically $ newTBQueue $ 100*n -- FIXME
     stateRef <- newIORef modelState
-    diffThread <- forkIO $ diffWorker stateRef diffQueue
+    diffThread <- forkIO $ do labelMyThread "diff worker"
+                              diffWorker stateRef diffQueue
 
     runningWorkers <- atomically $ newTVar (0 :: Int)
     done <- atomically $ newEmptyTMVar :: IO (TMVar ())
-    replicateM_ n $ forkIO $ withSystemRandom $ \mwc->do 
+    replicateM_ (n-2) $ forkIO $ withSystemRandom $ \mwc->do 
+        labelMyThread "update worker"
         atomically $ modifyTVar' runningWorkers (+1)
         runRVarT (updateWorker unitsQueue stateRef diffQueue) mwc
         atomically $ do
