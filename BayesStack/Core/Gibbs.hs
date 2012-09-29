@@ -22,7 +22,8 @@ class UpdateUnit uu where
     evolveSetting  :: ModelState uu -> uu -> RVar (Setting uu)
     updateSetting  :: uu -> Setting uu -> Setting uu -> ModelState uu -> ModelState uu
 
-data WrappedUpdateUnit ms = forall uu. (UpdateUnit uu, ModelState uu ~ ms, NFData (Setting uu))
+data WrappedUpdateUnit ms = forall uu. (UpdateUnit uu, ModelState uu ~ ms,
+                                        NFData (Setting uu), Eq (Setting uu))
                          => WrappedUU uu
      
 updateUnit :: WrappedUpdateUnit ms -> IORef ms -> TBQueue (ms -> ms) -> RVarT IO ()
@@ -31,7 +32,8 @@ updateUnit (WrappedUU unit) stateRef diffQueue = do
     let s = fetchSetting unit modelState
     s' <- lift $ evolveSetting modelState unit
     (s,s') `deepseq` return ()
-    lift $ atomically $ writeTBQueue diffQueue (updateSetting unit s s')
+    when (s /= s') $
+        lift $ atomically $ writeTBQueue diffQueue (updateSetting unit s s')
     
 updateWorker :: TQueue (WrappedUpdateUnit ms) -> IORef ms -> TBQueue (ms -> ms) -> RVarT IO ()
 updateWorker unitsQueue stateRef diffQueue = do
