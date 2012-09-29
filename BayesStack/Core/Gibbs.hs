@@ -6,8 +6,10 @@ module BayesStack.Core.Gibbs ( UpdateUnit(..)
                              , gibbsUpdate
                              ) where
                              
-import Control.Monad (replicateM_, when)
+import Control.Monad (replicateM_, when, forever)
 import Control.Concurrent
+import Control.Concurrent.STM
+import Data.IORef       
 import Control.DeepSeq
 import Data.Random
 import Data.Random.Lift       
@@ -23,41 +25,47 @@ class UpdateUnit uu where
 data WrappedUpdateUnit ms = forall uu. (UpdateUnit uu, ModelState uu ~ ms, NFData (Setting uu))
                          => WrappedUU uu
      
-updateUnit :: MVar ms -> WrappedUpdateUnit ms -> RVarT IO ()
-updateUnit modelStateV (WrappedUU unit) = do
-    modelState <- lift $ readMVar modelStateV
+updateUnit :: WrappedUpdateUnit ms -> IORef ms -> TQueue (ms -> ms) -> RVarT IO ()
+updateUnit (WrappedUU unit) stateRef diffQueue = do
+    modelState <- lift $ readIORef stateRef
     let s = fetchSetting unit modelState
     s' <- lift $ evolveSetting modelState unit
-    deepseq (s, s') $ return ()
-    lift $ modifyMVar_ modelStateV $ \ms->return $! updateSetting unit s s' ms
+    s' `deepseq` return ()
+    lift $ atomically $ writeTQueue diffQueue (updateSetting unit s s')
     
-maybeHead :: [a] -> ([a], Maybe a)
-maybeHead [] = ([], Nothing)
-maybeHead (a:rest) = (rest, Just a)
-
-updateWorker :: MVar ms -> MVar [WrappedUpdateUnit ms] -> RVarT IO ()
-updateWorker modelStateV unitsV = do
-    units <- lift $ modifyMVar unitsV $ return . maybeHead
-    case units of
-        Just unit -> do updateUnit modelStateV unit
-                        updateWorker modelStateV unitsV
+updateWorker :: TQueue (WrappedUpdateUnit ms) -> IORef ms -> TQueue (ms -> ms) -> RVarT IO ()
+updateWorker unitsQueue stateRef diffQueue = do
+    unit <- lift $ atomically $ tryReadTQueue unitsQueue
+    case unit of
+        Just unit' -> do updateUnit unit' stateRef diffQueue
+                         updateWorker unitsQueue stateRef diffQueue
         Nothing -> return ()
+
+diffWorker :: IORef ms -> TQueue (ms -> ms) -> IO ()
+diffWorker state diffQueue = forever $ do
+    diff <- atomically $ readTQueue diffQueue
+    atomicModifyIORef' state $ \a->(diff a, ())
 
 gibbsUpdate :: ms -> [WrappedUpdateUnit ms] -> IO ms
 gibbsUpdate modelState units = do
-    unitsV <- newMVar units
-    modelStateV <- newMVar modelState
-    n <- getNumCapabilities
-    runningWorkers <- newMVar (0 :: Int)
-    done <- newEmptyMVar :: IO (MVar ())
-    replicateM_ n $ forkIO $ withSystemRandom $ \mwc->do 
-        modifyMVar_ runningWorkers $ \n->return $ n+1
-        runRVarT (updateWorker modelStateV unitsV) mwc
-        modifyMVar_ runningWorkers $ \n->return $ n-1
-        running <- readMVar runningWorkers
-        when (running == 0) $ putMVar done ()
+    unitsQueue <- atomically $ do q <- newTQueue
+                                  mapM_ (writeTQueue q) units
+                                  return q
+    diffQueue <- atomically $ newTQueue
+    stateRef <- newIORef modelState
+    forkIO $ diffWorker stateRef diffQueue
 
-    takeMVar done
-    modelState' <- takeMVar modelStateV
-    return modelState'
+    n <- getNumCapabilities
+    runningWorkers <- atomically $ newTVar (0 :: Int)
+    done <- atomically $ newEmptyTMVar :: IO (TMVar ())
+    replicateM_ n $ forkIO $ withSystemRandom $ \mwc->do 
+        atomically $ modifyTVar' runningWorkers (+1)
+        runRVarT (updateWorker unitsQueue stateRef diffQueue) mwc
+        atomically $ do
+            modifyTVar' runningWorkers (+(-1))
+            running <- readTVar runningWorkers
+            when (running == 0) $ putTMVar done ()
+
+    atomically $ takeTMVar done
+    readIORef stateRef
 
