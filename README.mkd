@@ -1,4 +1,4 @@
-# bayes-stack: A framework for parallel MCMC inference on graphical models
+# bayes-stack: Parallel MCMC inference on graphical models
 
 `Bayes-stack` is a framework for parallel probabilistic inference on
 graphical models.  The framework provides infrastructure for easily
