@@ -2,11 +2,11 @@
 
 module BayesStack.Models.Topic.SharedTaste
   ( -- * Primitives
-    STData(..)
-  , STState(..)
+    NetData(..)
+  , MState(..)
   , STUpdateUnit
   , ItemSource(..)
-  , Node(..), Item(..), Topic(..)
+  , Node(..), Item(..), Topic(..), Friendship(..)
   , NodeItem(..), setupNodeItems
     -- * Initialization
   , ModelInit
@@ -49,71 +49,73 @@ data ItemSource = Shared | Own
 instance Serialize ItemSource
 instance NFData ItemSource         
 
-data STData = STData { stAlphaPsi           :: Double
-                     , stAlphaLambda        :: Double
-                     , stAlphaPhi           :: Double
-                     , stAlphaOmega         :: Double
-                     , stAlphaGammaShared   :: Double
-                     , stAlphaGammaOwn      :: Double
-                     , stNodes              :: Set Node
-                     , stFriendships        :: Set Friendship
-                     , stItems              :: Set Item
-                     , stTopics             :: Set Topic
-                     , stNodeItems          :: Map NodeItem (Node, Item)
-                     }
+data NetData = NetData { dAlphaPsi           :: Double
+                       , dAlphaLambda        :: Double
+                       , dAlphaPhi           :: Double
+                       , dAlphaOmega         :: Double
+                       , dAlphaGammaShared   :: Double
+                       , dAlphaGammaOwn      :: Double
+                       , dFriendships        :: Set Friendship
+                       , dItems              :: Set Item
+                       , dTopics             :: Set Topic
+                       , dNodeItems          :: Map NodeItem (Node, Item)
+                       }
              deriving (Show, Eq, Generic)
-instance Serialize STData
+instance Serialize NetData
+         
+dNodes :: NetData -> Set Node
+dNodes = S.fromList . map fst . M.elems . dNodeItems
 
 type ModelInit = Map NodeItem (Setting STUpdateUnit)
 
-randomInit :: STData -> NodeItem -> RVar ModelInit
+randomInit :: NetData -> NodeItem -> RVar ModelInit
 randomInit d ni = do
-    let topics = S.toList $ stTopics d
+    let topics = S.toList $ dTopics d
     t <- randomElement topics
     s <- randomElement [Shared, Own]
-    let (u,_) = stNodeItems d M.! ni
-    f <- randomElement $ getFriends (S.toList $ stFriendships d) u
+    let (u,_) = dNodeItems d M.! ni
+    f <- randomElement $ getFriends (S.toList $ dFriendships d) u
     return $ M.singleton ni $
         case s of Shared -> SharedSetting t (Friendship (u,f))
                   Own    -> OwnSetting t
 
-randomInitialize' :: STData -> ModelInit -> RVar ModelInit
+randomInitialize' :: NetData -> ModelInit -> RVar ModelInit
 randomInitialize' d init = 
-  let unset = M.keysSet (stNodeItems d) `S.difference` M.keysSet init
+  let unset = M.keysSet (dNodeItems d) `S.difference` M.keysSet init
   in liftM mconcat $ forM (S.toList unset) $ randomInit d
 
 
-randomInitialize :: STData -> RVar ModelInit
+randomInitialize :: NetData -> RVar ModelInit
 randomInitialize = (flip randomInitialize') M.empty
                 
-updateUnits' :: STData -> [STUpdateUnit]
+updateUnits' :: NetData -> [STUpdateUnit]
 updateUnits' d =
     map (\(ni,(n,x)) ->
                STUpdateUnit { uuNI      = ni
                             , uuN       = n
                             , uuX       = x
-                            , uuFriends = getFriends (S.toList $ stFriendships d) n
+                            , uuFriends = getFriends (S.toList $ dFriendships d) n
                             }
         )
-    $ M.assocs $ stNodeItems d
+    $ M.assocs $ dNodeItems d
 
-updateUnits :: STData -> [WrappedUpdateUnit STState]
+updateUnits :: NetData -> [WrappedUpdateUnit MState]
 updateUnits = map WrappedUU . updateUnits'            
               
-model :: STData -> ModelInit -> STState
+model :: NetData -> ModelInit -> MState
 model d init =
     let uus = updateUnits' d
-        s = STState { stPsis = let dist = symDirMulti (stAlphaPsi d) (toList $ stNodes d)
-                               in foldMap (\n->M.singleton n dist) $ stNodes d
-                    , stPhis = let dist = symDirMulti (stAlphaPhi d) (toList $ stItems d)
-                               in foldMap (\t->M.singleton t dist) $ stTopics d
-                    , stGammas = let dist = multinom [ (Shared, stAlphaGammaShared d)
-                                                     , (Own, stAlphaGammaOwn d) ]
-                                 in foldMap (\t->M.singleton t dist) $ stNodes d
-                    , stOmegas = let dist = symDirMulti (stAlphaOmega d) (toList $ stTopics d)
-                                 in foldMap (\t->M.singleton t dist) $ stNodes d
-                    , stLambdas = let dist = symDirMulti (stAlphaLambda d) (toList $ stTopics d)
-                                  in foldMap (\t->M.singleton t dist) $ stFriendships d
+        s = MState { stPsis = let dist = symDirMulti (dAlphaPsi d) (toList $ dNodes d)
+                               in foldMap (\n->M.singleton n dist) $ dNodes d
+                    , stPhis = let dist = symDirMulti (dAlphaPhi d) (toList $ dItems d)
+                               in foldMap (\t->M.singleton t dist) $ dTopics d
+                    , stGammas = let dist = multinom [ (Shared, dAlphaGammaShared d)
+                                                     , (Own, dAlphaGammaOwn d) ]
+                                 in foldMap (\t->M.singleton t dist) $ dNodes d
+                    , stOmegas = let dist = symDirMulti (dAlphaOmega d) (toList $ dTopics d)
+                                 in foldMap (\t->M.singleton t dist) $ dNodes d
+                    , stLambdas = let dist = symDirMulti (dAlphaLambda d) (toList $ dTopics d)
+                                  in foldMap (\t->M.singleton t dist) $ dFriendships d
                     , stVars = M.empty
                     }
         initUU uu = do
@@ -130,16 +132,16 @@ instance NFData STSetting where
     rnf (OwnSetting t)      = rnf t `seq` ()
     rnf (SharedSetting t f) = rnf t `seq` rnf f `seq` ()
 
-data STState = STState { stGammas   :: Map Node (Multinom ItemSource)
-                       , stOmegas   :: Map Node (Multinom Topic)
-                       , stPsis     :: Map Node (Multinom Node)
-                       , stLambdas  :: Map Friendship (Multinom Topic)
-                       , stPhis     :: Map Topic (Multinom Item)
-
-                       , stVars     :: Map NodeItem STSetting
-                       }
-              deriving (Show, Generic)
-instance Serialize STState
+data MState = MState { stGammas   :: Map Node (Multinom ItemSource)
+                     , stOmegas   :: Map Node (Multinom Topic)
+                     , stPsis     :: Map Node (Multinom Node)
+                     , stLambdas  :: Map Friendship (Multinom Topic)
+                     , stPhis     :: Map Topic (Multinom Item)
+             
+                     , stVars     :: Map NodeItem STSetting
+                     }
+            deriving (Show, Generic)
+instance Serialize MState
 
 data STUpdateUnit = STUpdateUnit { uuNI :: NodeItem
                                  , uuN  :: Node
@@ -149,7 +151,7 @@ data STUpdateUnit = STUpdateUnit { uuNI :: NodeItem
                    deriving (Show, Generic)
 instance Serialize STUpdateUnit
 
-setUU :: STUpdateUnit -> Maybe (Setting STUpdateUnit) -> STState -> STState
+setUU :: STUpdateUnit -> Maybe (Setting STUpdateUnit) -> MState -> MState
 setUU uu@(STUpdateUnit {uuNI=ni, uuN=n, uuX=x}) setting ms =
     let set = maybe Unset (const Set) setting
         ms' = case maybe (fetchSetting uu ms) id  setting of
@@ -170,13 +172,13 @@ setUU uu@(STUpdateUnit {uuNI=ni, uuN=n, uuX=x}) setting ms =
     in ms' { stVars = M.alter (const setting) ni $ stVars ms' }
 
 instance UpdateUnit STUpdateUnit where
-    type ModelState STUpdateUnit = STState
+    type ModelState STUpdateUnit = MState
     type Setting STUpdateUnit = STSetting
     fetchSetting uu ms = stVars ms M.! uuNI uu
     evolveSetting ms uu = categorical $ stFullCond (setUU uu Nothing ms) uu
     updateSetting uu _ s' = setUU uu (Just s') . setUU uu Nothing
         
-uuProb :: STState -> STUpdateUnit -> Setting STUpdateUnit -> Double
+uuProb :: MState -> STUpdateUnit -> Setting STUpdateUnit -> Double
 uuProb st (STUpdateUnit {uuN=n, uuX=x}) setting =
     let gamma = stGammas st M.! n
         omega = stOmegas st M.! n
@@ -195,10 +197,10 @@ uuProb st (STUpdateUnit {uuN=n, uuX=x}) setting =
                          * sampleProb omega t
                          * sampleProb phi x
 
-stFullCond :: STState -> STUpdateUnit -> [(Double, Setting STUpdateUnit)]
+stFullCond :: MState -> STUpdateUnit -> [(Double, Setting STUpdateUnit)]
 stFullCond ms uu = map (\s->(uuProb ms uu s, s)) $ stDomain ms uu
             
-stDomain :: STState -> STUpdateUnit -> [Setting STUpdateUnit]
+stDomain :: MState -> STUpdateUnit -> [Setting STUpdateUnit]
 stDomain ms uu = do
     s <- [Own, Shared]
     t <- M.keys $ stPhis ms
@@ -207,7 +209,7 @@ stDomain ms uu = do
                      return $ SharedSetting t (Friendship (uuN uu, f))
         Own    -> do return $ OwnSetting t
 
-modelLikelihood :: STState -> Probability
+modelLikelihood :: MState -> Probability
 modelLikelihood model =
     product $ map likelihood (M.elems $ stGammas model)
            ++ map likelihood (M.elems $ stPhis model)
