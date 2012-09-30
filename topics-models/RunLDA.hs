@@ -52,14 +52,16 @@ data RunOpts = RunOpts { nodeItemsFile   :: FilePath
 
 runOpts = RunOpts 
     <$> strOption  ( long "items"
+                  <> short 'i'
                   <> metavar "FILE"
                   <> value "node-items"
                   <> help "File containing nodes' items"
                    )
     <*> nullOption ( long "stopwords"
+                  <> short 's'
                   <> metavar "FILE"
                   <> reader (Just . Just)
-                  <> value (Just "stopwords.txt")
+                  <> value Nothing
                   <> help "Stop words list"
                    )
     <*> strOption  ( long "sweeps"
@@ -68,17 +70,20 @@ runOpts = RunOpts
                   <> help "Directory in which to place sweeps"
                    )
     <*> option     ( long "sweep-block"
+                  <> short 'b'
                   <> metavar "N"
                   <> value 10
                   <> help "Number of sweeps to dispatch at once"
                    )
     <*> option     ( long "iterations"
+                  <> short 'n'
                   <> metavar "N"
                   <> value Nothing
                   <> reader (Just . auto)
                   <> help "Number of sweep blocks to run for"
                    )
     <*> option     ( long "topics"
+                  <> short 't'
                   <> metavar "N"
                   <> value 20
                   <> help "Number of topics"
