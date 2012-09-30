@@ -19,10 +19,6 @@ Library
                        BayesStack.TupleEnum,
                        Data.Serialize.EnumMap,
                        Data.Serialize.LogFloat,
-                       Data.Random.Sequence, Data.Sequence.Chunk,
-                       BayesStack.Models.Topic.Types,
-                       BayesStack.Models.Topic.LDA,
-                       BayesStack.Models.Topic.SharedTaste,
-                       BayesStack.Models.Topic.CitationInfluence
+                       Data.Random.Sequence, Data.Sequence.Chunk
   Build-depends:       base, stm, transformers, mtl, deepseq, random-source, random-fu, rvar, containers, enummapset, ghc-prim, vector, mwc-random, pretty, cereal, logfloat, loch-th, digamma, gamma, statistics
   
