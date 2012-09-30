@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternGuards #-}
+
 module ReadData ( Term
                 , readEdges
                 , readNodeItems
