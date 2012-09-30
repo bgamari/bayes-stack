@@ -40,15 +40,15 @@ import Data.Serialize
 import           Control.Concurrent
 import           Control.Concurrent.STM       
                  
-data RunCIOpts = RunCIOpts { nodeItemsFile   :: FilePath
-                           , stopwords       :: Maybe FilePath
-                           , sweepsDir       :: FilePath
-                           , sweepBlockSize  :: Int
-                           , iterations      :: Maybe Int
-                           , nTopics         :: Int
-                           }
+data RunOpts = RunOpts { nodeItemsFile   :: FilePath
+                       , stopwords       :: Maybe FilePath
+                       , sweepsDir       :: FilePath
+                       , sweepBlockSize  :: Int
+                       , iterations      :: Maybe Int
+                       , nTopics         :: Int
+                       }
 
-runCIOpts = RunCIOpts 
+runOpts = RunOpts 
     <$> strOption  ( long "items"
                    & metavar "FILE"
                    & value "node-items"
@@ -98,11 +98,10 @@ netData nodeItems nTopics =
                , dNodes            = M.keysSet nodeItems
                }
             
-opts = info (runCIOpts)
-           (  fullDesc
-           <> progDesc "Learn LDA model"
-           <> header "run-lda - learn LDA model"
-           )
+opts = info runOpts (  fullDesc
+                    <> progDesc "Learn LDA model"
+                    <> header "run-lda - learn LDA model"
+                    )
 
 serializeState :: MState -> FilePath -> IO ()
 serializeState model fname = liftIO $ BS.writeFile fname $ runPut $ put model
