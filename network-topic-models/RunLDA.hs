@@ -2,7 +2,6 @@
 
 import           Options.Applicative    
 import           Data.Monoid ((<>))                 
-import           System.FilePath.Posix ((</>))
 
 import           Data.Vector (Vector)    
 import qualified Data.Vector.Generic as V    
@@ -13,12 +12,8 @@ import qualified Data.Set as S
 import           Data.Set (Set)
 import qualified Data.Map as M
 
-import           Control.Applicative
-import           Control.Monad (when)
-
 import           ReadData       
 import qualified RunSampler as Sampler
-import           BayesStack.Core
 import           BayesStack.DirMulti
 import           BayesStack.Models.Topic.LDA
 
@@ -28,8 +23,6 @@ import qualified Data.Text.IO as TIO
 import           Data.Random
 import           System.Random.MWC                 
 
-import           Data.Number.LogFloat (LogFloat, logFromLogFloat)
-
 import           Text.Printf
                  
 data RunOpts = RunOpts { nodesFile       :: FilePath
@@ -38,6 +31,7 @@ data RunOpts = RunOpts { nodesFile       :: FilePath
                        , samplerOpts     :: Sampler.SamplerOpts
                        }
 
+runOpts :: Parser RunOpts
 runOpts = RunOpts 
     <$> strOption  ( long "nodes"
                   <> short 'n'
@@ -76,6 +70,7 @@ netData nodeItems nTopics =
                , dNodes            = M.keysSet nodeItems
                }
             
+opts :: ParserInfo RunOpts
 opts = info runOpts (  fullDesc
                     <> progDesc "Learn LDA model"
                     <> header "run-lda - learn LDA model"
@@ -88,8 +83,9 @@ instance Sampler.SamplerModel MState where
         "  phi  : "++show (dmAlpha $ snd $ M.findMin $ stPhis ms)++"\n"++
         "  theta: "++show (dmAlpha $ snd $ M.findMin $ stThetas ms)++"\n"
 
+main :: IO ()
 main = do
-    args <- execParser $ opts
+    args <- execParser opts
     stopWords <- case stopwords args of
                      Just f  -> S.fromList . T.words <$> TIO.readFile f
                      Nothing -> return S.empty
@@ -101,8 +97,8 @@ main = do
     printf "Mean items per node:  %1.2f\n" (mean $ V.map realToFrac termCounts)
     
     withSystemRandom $ \mwc->do
-    let nd = netData nodeItems 10
-    init <- runRVar (randomInitialize nd) mwc
-    let m = model nd init
+    let nd = netData nodeItems (nTopics args)
+    mInit <- runRVar (randomInitialize nd) mwc
+    let m = model nd mInit
     Sampler.runSampler (samplerOpts args) m (updateUnits nd)
     return ()
