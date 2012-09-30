@@ -21,6 +21,7 @@ import qualified Control.Monad.Trans.State as S
 
 import           ReadData       
 import           BayesStack.Core
+import           BayesStack.DirMulti
 import           BayesStack.Models.Topic.LDA
 
 import           Data.Char (isAlpha)                 
@@ -46,6 +47,7 @@ data RunOpts = RunOpts { nodeItemsFile   :: FilePath
                        , sweepBlockSize  :: Int
                        , iterations      :: Maybe Int
                        , nTopics         :: Int
+                       , hyperReestOpts  :: HyperReest
                        }
 
 runOpts = RunOpts 
@@ -80,6 +82,27 @@ runOpts = RunOpts
                    & metavar "N"
                    & value 20
                    & help "Number of topics"
+                   )
+    <*> hyperReestOpts'
+
+data HyperReest = HyperReest { hyperReest :: Bool
+                             , hyperHoldoff :: Int
+                             , hyperInterval :: Int
+                             }
+
+hyperReestOpts' = HyperReest
+    <$> switch     ( long "reest"
+                   & help "Enable hyperparameter reestimation"
+                   )
+    <*> option     ( long "reest-holdoff"
+                   & metavar "N"
+                   & value 10
+                   & help "Number of iterations before starting hyperparameter reestimations"
+                   )
+    <*> option     ( long "reest-interval"
+                   & metavar "N"
+                   & value 10
+                   & help "Number of iterations in between hyperparameter reestimations"
                    )
 
 netData :: M.Map Node (Set Term) -> Int -> NetData
@@ -116,6 +139,19 @@ processSweep sweepsDir lastMaxV sweepN m = do
     when newMax
         $ serializeState m $ printf "%s/%05d" sweepsDir sweepN
 
+summarizeHyperparams :: MState -> String
+summarizeHyperparams ms =
+    "  phi  : "++show (dmAlpha $ snd $ M.findMin $ stPhis ms)++"\n"++
+    "  theta: "++show (dmAlpha $ snd $ M.findMin $ stThetas ms)++"\n"
+
+reestHypers :: HyperReest -> Int -> S.StateT MState IO ()
+reestHypers (HyperReest True holdoff interval) iter            
+    | iter > holdoff && iter `mod` interval == 0  = do
+        liftIO $ putStrLn "Parameter estimation"
+        S.modify reestimate
+        S.get >>= liftIO . putStrLn . summarizeHyperparams
+reestHypers _ _  = return ()
+
 main = do
     args <- execParser $ opts
 
@@ -142,8 +178,8 @@ main = do
             m <- S.get
             let sweepN = blockN * sweepBlockSize args
             liftIO $ forkIO $ processSweep (sweepsDir args) lastMaxV sweepN m
-            m' <- liftIO $ gibbsUpdate m $ concat $ replicate (sweepBlockSize args) uus
-            S.put m'
+            S.put =<< liftIO (gibbsUpdate m $ concat $ replicate (sweepBlockSize args) uus)
+            reestHypers (hyperReestOpts args) blockN
     
     let nBlocks = maybe [0..] (\n->[0..n]) $ iterations args
     S.runStateT (forM_ nBlocks update :: S.StateT MState IO ()) m
