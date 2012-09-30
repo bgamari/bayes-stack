@@ -105,8 +105,7 @@ main = do
     printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
     
     withSystemRandom $ \mwc->do
-    let nd = netData nodeItems arcs 10
-    print $ verifyNetData nd
+    let nd = netData nodeItems arcs (nTopics args)
     mInit <- runRVar (randomInitialize nd) mwc
     let m = model nd mInit
     Sampler.runSampler (samplerOpts args) m (updateUnits nd)
