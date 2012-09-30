@@ -12,21 +12,16 @@ import qualified Data.Bimap as BM
 import qualified Data.Set as S
 import           Data.Set (Set)
 import qualified Data.Map as M
-import           Data.Maybe (mapMaybe)       
 
 import           Control.Applicative
 import           Control.Monad (when, forM_)                
 import           Control.Monad.IO.Class
 import qualified Control.Monad.Trans.State as S
 
+import           ReadData       
 import           BayesStack.Core
 import           BayesStack.Models.Topic.CitationInfluence
 
-import           Data.Char (isAlpha)                 
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
-import           Data.Text.Read (decimal)
-       
 import           Data.Random
 import           System.Random.MWC                 
 
@@ -34,6 +29,8 @@ import           Data.Number.LogFloat (LogFloat, logFromLogFloat)
 
 import           Text.Printf
 import qualified Data.ByteString as BS
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import Data.Serialize
 
 import           Control.Concurrent
@@ -87,31 +84,6 @@ runCIOpts = RunCIOpts
                    & help "Number of topics"
                    )
 
-readArcs :: FilePath -> IO (Set Arc)
-readArcs fname =
-    S.fromList . mapMaybe parseLine . T.lines <$> TIO.readFile fname
-    where parseLine :: T.Text -> Maybe Arc
-          parseLine l = case T.words l of
-             [a,b] -> case (decimal a, decimal b) of
-                          (Right (a',_), Right (b',_)) ->
-                              Just $ Arc (Citing (Node a'), Cited (Node b'))
-                          otherwise -> Nothing
-             otherwise -> Nothing
-
-type Term = T.Text
-readNodeItems :: Set Term -> FilePath -> IO (M.Map Node (Set Term))
-readNodeItems stopWords fname =
-    M.unionsWith S.union . map parseLine . T.lines <$> TIO.readFile fname
-    where parseLine :: T.Text -> M.Map Node (Set Term)
-          parseLine l = case T.words l of
-             n:words | Right (n',_) <- decimal n ->
-                 M.singleton (Node n')
-                 $ S.fromList
-                 $ filter (\word->T.length word > 4)
-                 $ map (T.filter isAlpha)
-                 $ filter (`S.notMember` stopWords) words
-             otherwise -> M.empty
-
 netData :: M.Map Node (Set Term) -> Set Arc -> Int -> NetData
 netData abstracts arcs nTopics = cleanNetData $ 
     let items :: BM.Bimap Item Term
@@ -151,6 +123,9 @@ processSweep sweepsDir lastMaxV sweepN m = do
     when newMax
         $ serializeState m $ printf "%s/%05d" sweepsDir sweepN
 
+edgesToArcs :: Set (Node, Node) -> Set Arc
+edgesToArcs = S.map (\(a,b)->Arc (Citing a, Cited b))
+
 main = do
     args <- execParser $ opts
     stopWords <- case stopwords args of
@@ -158,7 +133,7 @@ main = do
                      Nothing -> return S.empty
     printf "Read %d stopwords\n" (S.size stopWords)
 
-    arcs <- readArcs $ arcsFile args
+    arcs <- edgesToArcs <$> readEdges (arcsFile args)
     abstracts <- readNodeItems stopWords $ nodeItemsFile args
     let termCounts = V.fromListN (M.size abstracts) $ map S.size $ M.elems abstracts :: Vector Int
     printf "Read %d arcs, %d abstracts\n" (S.size arcs) (M.size abstracts)

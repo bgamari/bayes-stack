@@ -19,6 +19,7 @@ import           Control.Monad (when, forM_)
 import           Control.Monad.IO.Class
 import qualified Control.Monad.Trans.State as S
 
+import           ReadData       
 import           BayesStack.Core
 import           BayesStack.Models.Topic.LDA
 
@@ -81,20 +82,6 @@ runCIOpts = RunCIOpts
                    & help "Number of topics"
                    )
 
-type Term = T.Text
-readAbstracts :: Set Term -> FilePath -> IO (M.Map Node (Set Term))
-readAbstracts stopWords fname =
-    M.unionsWith S.union . map parseLine . T.lines <$> TIO.readFile fname
-    where parseLine :: T.Text -> M.Map Node (Set Term)
-          parseLine l = case T.words l of
-             n:words | Right (n',_) <- decimal n ->
-                 M.singleton (Node n')
-                 $ S.fromList
-                 $ filter (\word->T.length word > 4)
-                 $ map (T.filter isAlpha)
-                 $ filter (`S.notMember` stopWords) words
-             otherwise -> M.empty
-
 netData :: M.Map Node (Set Term) -> Int -> NetData
 netData abstracts nTopics = 
     let items :: BM.Bimap Item Term
@@ -137,7 +124,7 @@ main = do
                      Nothing -> return S.empty
     printf "Read %d stopwords\n" (S.size stopWords)
 
-    abstracts <- readAbstracts stopWords $ nodeItemsFile args
+    abstracts <- readNodeItems stopWords $ nodeItemsFile args
     let termCounts = V.fromListN (M.size abstracts) $ map S.size $ M.elems abstracts :: Vector Int
     printf "Read %d abstracts\n" (M.size abstracts)
     printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
