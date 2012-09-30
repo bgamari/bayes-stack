@@ -119,6 +119,7 @@ samplerIter opts uus lastMaxV lagN = do
     m <- S.get
     let uus' = concat $ replicate (lag opts) uus
     S.put =<< liftIO (gibbsUpdate m uus')
+    when (sweepN == burnin opts) $ putStrLn "Burn-in complete"
     when (sweepN >= burnin opts) $ 
         S.get >>= void . liftIO . forkIO . processSweep opts lastMaxV sweepN
     doEstimateHypers (hyperEstOpts opts) sweepN
@@ -136,6 +137,8 @@ checkOpts opts = do
 runSampler :: SamplerModel ms => SamplerOpts -> ms -> [WrappedUpdateUnit ms] -> IO ()
 runSampler opts m uus = do
     checkOpts opts
+    putStrLn "Starting sampler..."
+    printf "Burning in for %d samples" (burnin opts)
     let lagNs = maybe [0..] (\n->[0..n]) $ iterations opts           
     lastMaxV <- atomically $ newTVar 0
     void $ S.runStateT (forM_ lagNs (samplerIter opts uus lastMaxV)) m
