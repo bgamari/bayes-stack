@@ -99,8 +99,8 @@ readArcs fname =
              otherwise -> Nothing
 
 type Term = T.Text
-readAbstracts :: Set Term -> FilePath -> IO (M.Map Node (Set Term))
-readAbstracts stopWords fname =
+readNodeItems :: Set Term -> FilePath -> IO (M.Map Node (Set Term))
+readNodeItems stopWords fname =
     M.unionsWith S.union . map parseLine . T.lines <$> TIO.readFile fname
     where parseLine :: T.Text -> M.Map Node (Set Term)
           parseLine l = case T.words l of
@@ -159,7 +159,7 @@ main = do
     printf "Read %d stopwords\n" (S.size stopWords)
 
     arcs <- readArcs $ arcsFile args
-    abstracts <- readAbstracts stopWords $ nodeItemsFile args
+    abstracts <- readNodeItems stopWords $ nodeItemsFile args
     let termCounts = V.fromListN (M.size abstracts) $ map S.size $ M.elems abstracts :: Vector Int
     printf "Read %d arcs, %d abstracts\n" (S.size arcs) (M.size abstracts)
     printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
