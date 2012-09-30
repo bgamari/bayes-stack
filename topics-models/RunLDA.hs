@@ -52,36 +52,36 @@ data RunOpts = RunOpts { nodeItemsFile   :: FilePath
 
 runOpts = RunOpts 
     <$> strOption  ( long "items"
-                   & metavar "FILE"
-                   & value "node-items"
-                   & help "File containing nodes' items"
+                  <> metavar "FILE"
+                  <> value "node-items"
+                  <> help "File containing nodes' items"
                    )
     <*> nullOption ( long "stopwords"
-                   & metavar "FILE"
-                   & reader (Just . Just)
-                   & value (Just "stopwords.txt")
-                   & help "Stop words list"
+                  <> metavar "FILE"
+                  <> reader (Just . Just)
+                  <> value (Just "stopwords.txt")
+                  <> help "Stop words list"
                    )
     <*> strOption  ( long "sweeps"
-                   & metavar "DIR"
-                   & value "sweeps"
-                   & help "Directory in which to place sweeps"
+                  <> metavar "DIR"
+                  <> value "sweeps"
+                  <> help "Directory in which to place sweeps"
                    )
     <*> option     ( long "sweep-block"
-                   & metavar "N"
-                   & value 10
-                   & help "Number of sweeps to dispatch at once"
+                  <> metavar "N"
+                  <> value 10
+                  <> help "Number of sweeps to dispatch at once"
                    )
     <*> option     ( long "iterations"
-                   & metavar "N"
-                   & value Nothing
-                   & reader (Just . auto)
-                   & help "Number of sweep blocks to run for"
+                  <> metavar "N"
+                  <> value Nothing
+                  <> reader (Just . auto)
+                  <> help "Number of sweep blocks to run for"
                    )
     <*> option     ( long "topics"
-                   & metavar "N"
-                   & value 20
-                   & help "Number of topics"
+                  <> metavar "N"
+                  <> value 20
+                  <> help "Number of topics"
                    )
     <*> hyperReestOpts'
 
@@ -92,17 +92,17 @@ data HyperReest = HyperReest { hyperReest :: Bool
 
 hyperReestOpts' = HyperReest
     <$> switch     ( long "reest"
-                   & help "Enable hyperparameter reestimation"
+                  <> help "Enable hyperparameter reestimation"
                    )
     <*> option     ( long "reest-holdoff"
-                   & metavar "N"
-                   & value 10
-                   & help "Number of iterations before starting hyperparameter reestimations"
+                  <> metavar "N"
+                  <> value 10
+                  <> help "Number of iterations before starting hyperparameter reestimations"
                    )
     <*> option     ( long "reest-interval"
-                   & metavar "N"
-                   & value 10
-                   & help "Number of iterations in between hyperparameter reestimations"
+                  <> metavar "N"
+                  <> value 10
+                  <> help "Number of iterations in between hyperparameter reestimations"
                    )
 
 netData :: M.Map Node (Set Term) -> Int -> NetData
