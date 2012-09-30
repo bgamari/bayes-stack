@@ -45,9 +45,9 @@ updateWorker unitsQueue stateRef diffQueue = do
         Nothing -> return ()
 
 diffWorker :: IORef ms -> TBQueue (ms -> ms) -> IO ()
-diffWorker state diffQueue = forever $ do
+diffWorker stateRef diffQueue = forever $ do
     diff <- atomically $ readTBQueue diffQueue
-    atomicModifyIORef' state $ \a->(diff a, ())
+    atomicModifyIORef' stateRef $ \a->(diff a, ())
 
 labelMyThread :: String -> IO ()
 labelMyThread label = myThreadId >>= \id->labelThread id label
