@@ -83,19 +83,19 @@ runCIOpts = RunCIOpts
                    )
 
 netData :: M.Map Node (Set Term) -> Int -> NetData
-netData abstracts nTopics = 
+netData nodeItems nTopics = 
     let items :: BM.Bimap Item Term
-        items = BM.fromList $ zip [Item i | i <- [1..]] (S.toList $ S.unions $ M.elems abstracts)
+        items = BM.fromList $ zip [Item i | i <- [1..]] (S.toList $ S.unions $ M.elems nodeItems)
     in NetData { dAlphaTheta       = 0.1
                , dAlphaPhi         = 0.1
                , dItems            = S.fromList $ BM.keys items
                , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
                , dNodeItems        = M.fromList
                                      $ zip [NodeItem i | i <- [0..]]
-                                     $ do (n,terms) <- M.assocs abstracts
+                                     $ do (n,terms) <- M.assocs nodeItems
                                           term <- S.toList terms
                                           return (n, items BM.!> term)
-               , dNodes            = M.keysSet abstracts
+               , dNodes            = M.keysSet nodeItems
                }
             
 opts = info (runCIOpts)
@@ -119,18 +119,19 @@ processSweep sweepsDir lastMaxV sweepN m = do
 
 main = do
     args <- execParser $ opts
+
     stopWords <- case stopwords args of
                      Just f  -> S.fromList . T.words <$> TIO.readFile f
                      Nothing -> return S.empty
     printf "Read %d stopwords\n" (S.size stopWords)
 
-    abstracts <- readNodeItems stopWords $ nodeItemsFile args
-    let termCounts = V.fromListN (M.size abstracts) $ map S.size $ M.elems abstracts :: Vector Int
-    printf "Read %d abstracts\n" (M.size abstracts)
-    printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
+    nodeItems <- readNodeItems stopWords $ nodeItemsFile args
+    let termCounts = V.fromListN (M.size nodeItems) $ map S.size $ M.elems nodeItems :: Vector Int
+    printf "Read %d nodes\n" (M.size nodeItems)
+    printf "Mean items per node:  %1.2f\n" (mean $ V.map realToFrac termCounts)
     
     withSystemRandom $ \mwc->do
-    let nd = netData abstracts 10
+    let nd = netData nodeItems 10
     init <- runRVar (randomInitialize nd) mwc
     let m = model nd init
         uus = updateUnits nd
