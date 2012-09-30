@@ -36,7 +36,7 @@ import           Data.Number.LogFloat (LogFloat, logFromLogFloat)
 
 import           Text.Printf
 import qualified Data.ByteString as BS
-import Data.Serialize
+import           Data.Serialize
 
 import           Control.Concurrent
 import           Control.Concurrent.STM       
