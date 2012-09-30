@@ -57,7 +57,7 @@ runOpts = RunOpts
                    )
     <*> Sampler.samplerOpts
 
-netData :: M.Map Node (Set Term) -> Set Friendship -> Int -> NetData
+netData :: M.Map Node (Set Term) -> Set Edge -> Int -> NetData
 netData nodeItems edges nTopics = 
     let items :: BM.Bimap Item Term
         items = BM.fromList $ zip [Item i | i <- [1..]] (S.toList $ S.unions $ M.elems nodeItems)
@@ -67,7 +67,7 @@ netData nodeItems edges nTopics =
                , dAlphaOmega       = 0.1
                , dAlphaGammaShared = 0.8
                , dAlphaGammaOwn    = 0.2
-               , dFriendships      = edges
+               , dEdges            = edges
                , dItems            = S.fromList $ BM.keys items
                , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
                , dNodeItems        = M.fromList
@@ -95,7 +95,7 @@ main = do
                      Nothing -> return S.empty
     printf "Read %d stopwords\n" (S.size stopWords)
 
-    edges <- S.map Friendship <$> readEdges (arcsFile args)
+    edges <- S.map Edge <$> readEdges (arcsFile args)
     nodeItems <- readNodeItems stopWords $ nodeItemsFile args
     let termCounts = V.fromListN (M.size nodeItems) $ map S.size $ M.elems nodeItems :: Vector Int
     printf "Read %d edges, %d items\n" (S.size edges) (M.size nodeItems)

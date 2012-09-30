@@ -6,7 +6,7 @@ module BayesStack.Models.Topic.SharedTaste
   , MState(..)
   , STUpdateUnit
   , ItemSource(..)
-  , Node(..), Item(..), Topic(..), Friendship(..)
+  , Node(..), Item(..), Topic(..), Edge(..)
   , NodeItem(..), setupNodeItems
     -- * Initialization
   , ModelInit
@@ -55,7 +55,7 @@ data NetData = NetData { dAlphaPsi           :: Double
                        , dAlphaOmega         :: Double
                        , dAlphaGammaShared   :: Double
                        , dAlphaGammaOwn      :: Double
-                       , dFriendships        :: Set Friendship
+                       , dEdges              :: Set Edge
                        , dItems              :: Set Item
                        , dTopics             :: Set Topic
                        , dNodeItems          :: Map NodeItem (Node, Item)
@@ -74,9 +74,9 @@ randomInit d ni = do
     t <- randomElement topics
     s <- randomElement [Shared, Own]
     let (u,_) = dNodeItems d M.! ni
-    f <- randomElement $ getFriends (S.toList $ dFriendships d) u
+    f <- randomElement $ getFriends (S.toList $ dEdges d) u
     return $ M.singleton ni $
-        case s of Shared -> SharedSetting t (Friendship (u,f))
+        case s of Shared -> SharedSetting t (Edge (u,f))
                   Own    -> OwnSetting t
 
 randomInitialize' :: NetData -> ModelInit -> RVar ModelInit
@@ -94,7 +94,7 @@ updateUnits' d =
                STUpdateUnit { uuNI      = ni
                             , uuN       = n
                             , uuX       = x
-                            , uuFriends = getFriends (S.toList $ dFriendships d) n
+                            , uuFriends = getFriends (S.toList $ dEdges d) n
                             }
         )
     $ M.assocs $ dNodeItems d
@@ -115,7 +115,7 @@ model d init =
                     , stOmegas = let dist = symDirMulti (dAlphaOmega d) (toList $ dTopics d)
                                  in foldMap (\t->M.singleton t dist) $ dNodes d
                     , stLambdas = let dist = symDirMulti (dAlphaLambda d) (toList $ dTopics d)
-                                  in foldMap (\t->M.singleton t dist) $ dFriendships d
+                                  in foldMap (\t->M.singleton t dist) $ dEdges d
                     , stVars = M.empty
                     }
         initUU uu = do
@@ -124,7 +124,7 @@ model d init =
     in execState (mapM initUU uus) s
 
 data STSetting = OwnSetting !Topic
-               | SharedSetting !Topic !Friendship
+               | SharedSetting !Topic !Edge
                deriving (Show, Eq, Generic)
 
 instance Serialize STSetting
@@ -135,7 +135,7 @@ instance NFData STSetting where
 data MState = MState { stGammas   :: Map Node (Multinom ItemSource)
                      , stOmegas   :: Map Node (Multinom Topic)
                      , stPsis     :: Map Node (Multinom Node)
-                     , stLambdas  :: Map Friendship (Multinom Topic)
+                     , stLambdas  :: Map Edge (Multinom Topic)
                      , stPhis     :: Map Topic (Multinom Item)
              
                      , stVars     :: Map NodeItem STSetting
@@ -143,9 +143,9 @@ data MState = MState { stGammas   :: Map Node (Multinom ItemSource)
             deriving (Show, Generic)
 instance Serialize MState
 
-data STUpdateUnit = STUpdateUnit { uuNI :: NodeItem
-                                 , uuN  :: Node
-                                 , uuX  :: Item
+data STUpdateUnit = STUpdateUnit { uuNI      :: NodeItem
+                                 , uuN       :: Node
+                                 , uuX       :: Item
                                  , uuFriends :: [Node]
                                  }
                    deriving (Show, Generic)
@@ -206,7 +206,7 @@ stDomain ms uu = do
     t <- M.keys $ stPhis ms
     case s of
         Shared -> do f <- uuFriends uu
-                     return $ SharedSetting t (Friendship (uuN uu, f))
+                     return $ SharedSetting t (Edge (uuN uu, f))
         Own    -> do return $ OwnSetting t
 
 modelLikelihood :: MState -> Probability
