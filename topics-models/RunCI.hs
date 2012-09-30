@@ -85,9 +85,9 @@ runCIOpts = RunCIOpts
                    )
 
 netData :: M.Map Node (Set Term) -> Set Arc -> Int -> NetData
-netData abstracts arcs nTopics = cleanNetData $ 
+netData nodeItems arcs nTopics = cleanNetData $ 
     let items :: BM.Bimap Item Term
-        items = BM.fromList $ zip [Item i | i <- [1..]] (S.toList $ S.unions $ M.elems abstracts)
+        items = BM.fromList $ zip [Item i | i <- [1..]] (S.toList $ S.unions $ M.elems nodeItems)
     in NetData { dAlphaPsi         = 0.1
                , dAlphaLambda      = 0.1
                , dAlphaPhi         = 0.1
@@ -99,7 +99,7 @@ netData abstracts arcs nTopics = cleanNetData $
                , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
                , dNodeItems        = M.fromList
                                      $ zip [NodeItem i | i <- [0..]]
-                                     $ do (n,terms) <- M.assocs abstracts
+                                     $ do (n,terms) <- M.assocs nodeItems
                                           term <- S.toList terms
                                           return (n, items BM.!> term)
                }
@@ -134,13 +134,13 @@ main = do
     printf "Read %d stopwords\n" (S.size stopWords)
 
     arcs <- edgesToArcs <$> readEdges (arcsFile args)
-    abstracts <- readNodeItems stopWords $ nodeItemsFile args
-    let termCounts = V.fromListN (M.size abstracts) $ map S.size $ M.elems abstracts :: Vector Int
-    printf "Read %d arcs, %d abstracts\n" (S.size arcs) (M.size abstracts)
+    nodeItems <- readNodeItems stopWords $ nodeItemsFile args
+    let termCounts = V.fromListN (M.size nodeItems) $ map S.size $ M.elems nodeItems :: Vector Int
+    printf "Read %d arcs, %d nodeItems\n" (S.size arcs) (M.size nodeItems)
     printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
     
     withSystemRandom $ \mwc->do
-    let nd = netData abstracts arcs 10
+    let nd = netData nodeItems arcs 10
     print $ verifyNetData nd
     init <- runRVar (randomInitialize nd) mwc
     let m = model nd init
