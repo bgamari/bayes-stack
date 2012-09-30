@@ -1,0 +1,9 @@
+# BayesStack: A Bayesian inference framework
+
+BayesStack is a framework for building, learning, and inferring from
+probabilistic graphical models. Learning is implemented by a
+traditional Gibbs sampler, designed to scale to up to dozens of cores.
+
+Along with the framework itself, several example models are given in
+`topic-models`.
+
