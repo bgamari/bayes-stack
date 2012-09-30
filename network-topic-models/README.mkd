@@ -1,0 +1,22 @@
+# Network topic models for `bayes-stack`
+
+`network-topic-models` implements a few network topic models on top of `bayes-stack`. These include,
+
+  * LDA [1]
+  * Shared taste model [2]
+  * Citation influence model [3]
+  
+We adopt the following nomenclature,
+
+  * Node: a document or user that contains items
+  * Item: a word, tag, or other content of a node
+  * Edge: a set of two nodes (undirected edge)
+  * Arc:  a pair of two nodes (directed edge)
+  
+
+## References
+
+ 1. D. Blei, A. Ng, and M. Jordan. "Latent Dirichlet allocation." _Journal of Machine Learning Research_, 3:993–1022, 2003.
+ 2. L. Dietz, B. Gamari, J. Guiver, E. Snelson, and R. Herbrich. "De-layering social networks by shared tastes of friendships." _Proceedings of the Sixths International AAAI Conference on Weblogs and Social Media_, 2012.
+ 3. L. Dietz, S. Bickel, and T. Scheffer. "Unsupervised prediction of citation influences." _Proceedings of the 24th international conference on machine learning_, 2007.
+
