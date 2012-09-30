@@ -6,5 +6,5 @@ implementing MCMC/Gibbs sampling methods capable of scaling to dozens
 of cores.
 
 Along with the framework itself, several models using blocked Gibbs
-sampling are provided in `topic-models/`.
+sampling are provided in `network-topic-models/`.
 
