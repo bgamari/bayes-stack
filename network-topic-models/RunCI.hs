@@ -13,39 +13,27 @@ import qualified Data.Set as S
 import           Data.Set (Set)
 import qualified Data.Map as M
 
-import           Control.Applicative
-import           Control.Monad (when, forM_)                
-import           Control.Monad.IO.Class
-import qualified Control.Monad.Trans.State as S
-
 import           ReadData       
-import           BayesStack.Core
+import qualified RunSampler as Sampler
+import           BayesStack.DirMulti
 import           BayesStack.Models.Topic.CitationInfluence
 
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
+       
 import           Data.Random
 import           System.Random.MWC                 
 
-import           Data.Number.LogFloat (LogFloat, logFromLogFloat)
-
 import           Text.Printf
-import qualified Data.ByteString as BS
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
-import Data.Serialize
-
-import           Control.Concurrent
-import           Control.Concurrent.STM       
                  
-data RunCIOpts = RunCIOpts { arcsFile        :: FilePath
-                           , nodeItemsFile   :: FilePath
-                           , stopwords       :: Maybe FilePath
-                           , sweepsDir       :: FilePath
-                           , sweepBlockSize  :: Int
-                           , iterations      :: Maybe Int
-                           , nTopics         :: Int
-                           }
+data RunOpts = RunOpts { arcsFile        :: FilePath
+                       , nodeItemsFile   :: FilePath
+                       , stopwords       :: Maybe FilePath
+                       , nTopics         :: Int
+                       , samplerOpts     :: Sampler.SamplerOpts
+                       }
 
-runCIOpts = RunCIOpts 
+runOpts = RunOpts 
     <$> strOption  ( long "arcs"
                    & metavar "FILE"
                    & value "arcs"
@@ -62,27 +50,12 @@ runCIOpts = RunCIOpts
                    & value (Just "stopwords.txt")
                    & help "Stop words list"
                    )
-    <*> strOption  ( long "sweeps"
-                   & metavar "DIR"
-                   & value "sweeps"
-                   & help "Directory in which to place sweeps"
-                   )
-    <*> option     ( long "sweep-block"
-                   & metavar "N"
-                   & value 10
-                   & help "Number of sweeps to dispatch at once"
-                   )
-    <*> option     ( long "iterations"
-                   & metavar "N"
-                   & value Nothing
-                   & reader (Just . auto)
-                   & help "Number of sweep blocks to run for"
-                   )
     <*> option     ( long "topics"
                    & metavar "N"
                    & value 20
                    & help "Number of topics"
                    )
+    <*> Sampler.samplerOpts
 
 netData :: M.Map Node (Set Term) -> Set Arc -> Int -> NetData
 netData nodeItems arcs nTopics = cleanNetData $ 
@@ -104,30 +77,22 @@ netData nodeItems arcs nTopics = cleanNetData $
                                           return (n, items BM.!> term)
                }
             
-opts = info (runCIOpts)
+opts = info runOpts
            (  fullDesc
            <> progDesc "Learn citation influence model"
            <> header "run-ci - learn citation influence model"
            )
 
-serializeState :: MState -> FilePath -> IO ()
-serializeState model fname = liftIO $ BS.writeFile fname $ runPut $ put model
-
-processSweep :: FilePath -> TVar LogFloat -> Int -> MState -> IO ()
-processSweep sweepsDir lastMaxV sweepN m = do             
-    let l = modelLikelihood m
-    putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
-    newMax <- atomically $ do oldL <- readTVar lastMaxV
-                              if l > oldL then writeTVar lastMaxV l >> return True
-                                          else return False
-    when newMax
-        $ serializeState m $ printf "%s/%05d" sweepsDir sweepN
-
 edgesToArcs :: Set (Node, Node) -> Set Arc
 edgesToArcs = S.map (\(a,b)->Arc (Citing a, Cited b))
 
+instance Sampler.SamplerModel MState where
+    estimateHypers = id -- reestimate -- FIXME
+    modelLikelihood = modelLikelihood
+    summarizeHypers ms =  "" -- FIXME
+
 main = do
-    args <- execParser $ opts
+    args <- execParser opts
     stopWords <- case stopwords args of
                      Just f  -> S.fromList . T.words <$> TIO.readFile f
                      Nothing -> return S.empty
@@ -142,20 +107,7 @@ main = do
     withSystemRandom $ \mwc->do
     let nd = netData nodeItems arcs 10
     print $ verifyNetData nd
-    init <- runRVar (randomInitialize nd) mwc
-    let m = model nd init
-        uus = updateUnits nd
-    
-    putStrLn "Starting inference"
-    lastMaxV <- atomically $ newTVar 0
-    let update :: Int -> S.StateT MState IO ()
-        update blockN = do
-            m <- S.get
-            let sweepN = blockN * sweepBlockSize args
-            liftIO $ forkIO $ processSweep (sweepsDir args) lastMaxV sweepN m
-            m' <- liftIO $ gibbsUpdate m $ concat $ replicate (sweepBlockSize args) uus
-            S.put m'
-    
-    let nBlocks = maybe [0..] (\n->[0..n]) $ iterations args
-    S.runStateT (forM_ nBlocks update :: S.StateT MState IO ()) m
+    mInit <- runRVar (randomInitialize nd) mwc
+    let m = model nd mInit
+    Sampler.runSampler (samplerOpts args) m (updateUnits nd)
     return ()
