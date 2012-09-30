@@ -20,5 +20,5 @@ Library
                        Data.Serialize.EnumMap,
                        Data.Serialize.LogFloat,
                        Data.Random.Sequence, Data.Sequence.Chunk
-  Build-depends:       base, stm, transformers, mtl, deepseq, random-source, random-fu, rvar, containers, enummapset, ghc-prim, vector, mwc-random, pretty, cereal, logfloat, loch-th, digamma, gamma, statistics
+  Build-depends:       base, stm, transformers, mtl, deepseq, random-source, random-fu, rvar, containers, enummapset, ghc-prim, vector, mwc-random, pretty, cereal, logfloat, digamma, gamma, statistics
   
