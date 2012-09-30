@@ -66,17 +66,22 @@ instance Serialize STData
 
 type ModelInit = Map NodeItem (Setting STUpdateUnit)
 
+randomInit :: STData -> NodeItem -> RVar ModelInit
+randomInit d ni = do
+    let topics = S.toList $ stTopics d
+    t <- randomElement topics
+    s <- randomElement [Shared, Own]
+    let (u,_) = stNodeItems d M.! ni
+    f <- randomElement $ getFriends (S.toList $ stFriendships d) u
+    return $ M.singleton ni $
+        case s of Shared -> SharedSetting t (Friendship (u,f))
+                  Own    -> OwnSetting t
+
 randomInitialize' :: STData -> ModelInit -> RVar ModelInit
 randomInitialize' d init = 
   let unset = M.keysSet (stNodeItems d) `S.difference` M.keysSet init
-      topics = S.toList $ stTopics d
-      randomInit :: NodeItem -> RVar ModelInit
-      randomInit ni = do t <- randomElement topics
-                         s <- randomElement [Shared, Own]
-                         let (u,_) = stNodeItems d M.! ni
-                         f <- randomElement $ getFriends (S.toList $ stFriendships d) u
-                         return $ M.singleton ni (s,f,t)
-  in liftM mconcat $ forM (S.toList unset) randomInit
+  in liftM mconcat $ forM (S.toList unset) $ randomInit d
+
 
 randomInitialize :: STData -> RVar ModelInit
 randomInitialize = (flip randomInitialize') M.empty
@@ -109,14 +114,21 @@ model d init =
                                  in foldMap (\t->M.singleton t dist) $ stNodes d
                     , stLambdas = let dist = symDirMulti (stAlphaLambda d) (toList $ stTopics d)
                                   in foldMap (\t->M.singleton t dist) $ stFriendships d
-                    , stS = M.empty
-                    , stT = M.empty
-                    , stF = M.empty
+                    , stVars = M.empty
                     }
         initUU uu = do
             let s = M.findWithDefault (error "Incomplete initialization") (uuNI uu) init
             modify $ setUU uu (Just s)
     in execState (mapM initUU uus) s
+
+data STSetting = OwnSetting !Topic
+               | SharedSetting !Topic !Friendship
+               deriving (Show, Eq, Generic)
+
+instance Serialize STSetting
+instance NFData STSetting where
+    rnf (OwnSetting t)      = rnf t `seq` ()
+    rnf (SharedSetting t f) = rnf t `seq` rnf f `seq` ()
 
 data STState = STState { stGammas   :: Map Node (Multinom ItemSource)
                        , stOmegas   :: Map Node (Multinom Topic)
@@ -124,9 +136,7 @@ data STState = STState { stGammas   :: Map Node (Multinom ItemSource)
                        , stLambdas  :: Map Friendship (Multinom Topic)
                        , stPhis     :: Map Topic (Multinom Item)
 
-                       , stS        :: Map NodeItem ItemSource
-                       , stT        :: Map NodeItem Topic
-                       , stF        :: Map NodeItem Node
+                       , stVars     :: Map NodeItem STSetting
                        }
               deriving (Show, Generic)
 instance Serialize STState
@@ -140,52 +150,50 @@ data STUpdateUnit = STUpdateUnit { uuNI :: NodeItem
 instance Serialize STUpdateUnit
 
 setUU :: STUpdateUnit -> Maybe (Setting STUpdateUnit) -> STState -> STState
-setUU uu@(STUpdateUnit {uuN=n, uuNI=ni, uuX=x}) setting ms =
+setUU uu@(STUpdateUnit {uuNI=ni, uuN=n, uuX=x}) setting ms =
     let set = maybe Unset (const Set) setting
-        (s,f,t) = maybe (fetchSetting uu ms) id setting
-        friendship = Friendship (n,f)
-        ms' = case s of
-            Shared -> ms { stPsis = M.adjust (setMultinom set f) n
-                                  $ M.adjust (setMultinom set n) f
-                                  $ stPsis ms
-                         , stLambdas = M.adjust (setMultinom set t) friendship (stLambdas ms)
-                         }
-            Own    -> ms { stOmegas = M.adjust (setMultinom set t) n (stOmegas ms) }
-    in ms' { stPhis = M.adjust (setMultinom set x) t (stPhis ms)
-           , stGammas = M.adjust (setMultinom set s) n (stGammas ms)
-           , stS = case setting of Just _  -> M.insert ni s $ stS ms
-                                   Nothing -> stS ms
-           , stF = case setting of Just _  -> M.insert ni f $ stF ms
-                                   Nothing -> stF ms
-           , stT = case setting of Just _  -> M.insert ni t $ stT ms
-                                   Nothing -> stT ms
-           }
+        ms' = case maybe (fetchSetting uu ms) id  setting of
+            SharedSetting t fship ->
+                let f = maybe (error "Node isn't part of friendship") id
+                        $ otherFriend n fship
+                in ms { stPsis = M.adjust (setMultinom set n) f
+                                 $ M.adjust (setMultinom set f) n $ stPsis ms
+                      , stLambdas = M.adjust (setMultinom set t) fship $ stLambdas ms
+                      , stPhis = M.adjust (setMultinom set x) t $ stPhis ms
+                      , stGammas = M.adjust (setMultinom set Shared) n $ stGammas ms
+                      }
+            OwnSetting t ->
+                ms { stOmegas = M.adjust (setMultinom set t) n $ stOmegas ms
+                   , stPhis = M.adjust (setMultinom set x) t $ stPhis ms
+                   , stGammas = M.adjust (setMultinom set Own) n $ stGammas ms
+                   }
+    in ms' { stVars = M.alter (const setting) ni $ stVars ms' }
 
 instance UpdateUnit STUpdateUnit where
     type ModelState STUpdateUnit = STState
-    type Setting STUpdateUnit = (ItemSource, Node, Topic)
-    fetchSetting uu ms = ( stS ms M.! uuNI uu
-                         , stF ms M.! uuNI uu
-                         , stT ms M.! uuNI uu
-                         )
+    type Setting STUpdateUnit = STSetting
+    fetchSetting uu ms = stVars ms M.! uuNI uu
     evolveSetting ms uu = categorical $ stFullCond (setUU uu Nothing ms) uu
     updateSetting uu _ s' = setUU uu (Just s') . setUU uu Nothing
         
 uuProb :: STState -> STUpdateUnit -> Setting STUpdateUnit -> Double
-uuProb st (STUpdateUnit {uuN=n, uuX=x}) (s,f,t) =
+uuProb st (STUpdateUnit {uuN=n, uuX=x}) setting =
     let gamma = stGammas st M.! n
         omega = stOmegas st M.! n
-        phi = stPhis st M.! t
         psi = stPsis st M.! n
-        lambda = stLambdas st M.! Friendship (n,f)
-    in case s of 
-        Shared ->   sampleProb gamma s
-                  * sampleProb psi f
-                  * sampleProb lambda t
-                  * sampleProb phi x
-        Own ->   sampleProb gamma s
-               * sampleProb omega t
-               * sampleProb phi x
+    in case setting of 
+        SharedSetting t fship -> let phi = stPhis st M.! t
+                                     lambda = stLambdas st M.! fship
+                                     f = maybe (error "Friend isn't friends with node") id
+                                         $ otherFriend n fship
+                                 in sampleProb gamma Shared
+                                  * sampleProb psi f
+                                  * sampleProb lambda t
+                                  * sampleProb phi x
+        OwnSetting t -> let phi = stPhis st M.! t
+                        in sampleProb gamma Own
+                         * sampleProb omega t
+                         * sampleProb phi x
 
 stFullCond :: STState -> STUpdateUnit -> [(Double, Setting STUpdateUnit)]
 stFullCond ms uu = map (\s->(uuProb ms uu s, s)) $ stDomain ms uu
@@ -196,8 +204,8 @@ stDomain ms uu = do
     t <- M.keys $ stPhis ms
     case s of
         Shared -> do f <- uuFriends uu
-                     return (Shared, f, t)
-        Own    -> do return (Own, error "No friend for Own item", t)
+                     return $ SharedSetting t (Friendship (uuN uu, f))
+        Own    -> do return $ OwnSetting t
 
 modelLikelihood :: STState -> Probability
 modelLikelihood model =
