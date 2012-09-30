@@ -11,6 +11,8 @@ module BayesStack.Models.Topic.LDA
   , ModelInit
   , randomInitialize
   , model, updateUnits
+    -- * Hyperparameter estimation
+  , reestimate, reestimatePhis, reestimateThetas
     -- * Diagnostics
   , modelLikelihood
   ) where
@@ -126,6 +128,16 @@ ldaFullCond ms uu = do
 
 modelLikelihood :: MState -> Probability
 modelLikelihood model =
-  product $ map likelihood (M.elems $ stThetas model)
-         ++ map likelihood (M.elems $ stPhis model)
+    product $ map likelihood (M.elems $ stThetas model)
+           ++ map likelihood (M.elems $ stPhis model)
 
+-- | Re-estimate phi hyperparameter
+reestimatePhis :: MState -> MState
+reestimatePhis ms = ms { stPhis = reestimateSymPriors $ stPhis ms }
+
+-- | Re-estimate theta hyperparameter
+reestimateThetas :: MState -> MState
+reestimateThetas ms = ms { stThetas = reestimateSymPriors $ stThetas ms }
+
+reestimate :: MState -> MState
+reestimate = reestimatePhis . reestimateThetas
