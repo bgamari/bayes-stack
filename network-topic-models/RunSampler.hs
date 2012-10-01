@@ -18,6 +18,9 @@ import           Text.Printf
 import           Control.Concurrent
 import           Control.Concurrent.STM       
 
+import           System.Random.MWC                 
+import           Data.Random
+                 
 import           Data.Number.LogFloat (LogFloat, logFromLogFloat)
 import           BayesStack.Core
 
@@ -112,13 +115,15 @@ doEstimateHypers (HyperEstOpts True burnin lag) iterN
                   (summarizeHypers m')
 doEstimateHypers _ _  = return ()
 
+withSystemRandomIO = withSystemRandom :: (GenIO -> IO a) -> IO a
+
 samplerIter :: SamplerModel ms => SamplerOpts -> [WrappedUpdateUnit ms] -> TVar LogFloat
             -> Int -> S.StateT ms IO ()
 samplerIter opts uus lastMaxV lagN = do
     let sweepN = lagN * lag opts
     m <- S.get
-    let uus' = concat $ replicate (lag opts) uus
-    S.put =<< liftIO (gibbsUpdate m uus')
+    shuffledUus <- liftIO $ withSystemRandomIO $ \mwc->runRVar (shuffle uus) mwc
+    S.put =<< liftIO (gibbsUpdate m $ concat $ replicate (lag opts) shuffledUus)
     when (sweepN == burnin opts) $ liftIO $ putStrLn "Burn-in complete"
     when (sweepN >= burnin opts) $ 
         S.get >>= void . liftIO . forkIO . processSweep opts lastMaxV sweepN
