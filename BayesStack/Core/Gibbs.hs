@@ -56,10 +56,8 @@ diffWorker stateRef diffQueue updateBlock = forever $ do
 labelMyThread :: String -> IO ()
 labelMyThread label = myThreadId >>= \id->labelThread id label
 
-updateBlock = 100
-              
-gibbsUpdate :: ms -> [WrappedUpdateUnit ms] -> IO ms
-gibbsUpdate modelState units = do
+gibbsUpdate :: Int -> ms -> [WrappedUpdateUnit ms] -> IO ms
+gibbsUpdate updateBlock modelState units = do
     n <- getNumCapabilities
     unitsQueue <- atomically $ do q <- newTQueue
                                   mapM_ (writeTQueue q) units

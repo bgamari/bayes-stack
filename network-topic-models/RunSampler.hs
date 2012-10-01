@@ -27,6 +27,7 @@ import           BayesStack.Core
 data SamplerOpts = SamplerOpts { burnin          :: Int
                                , lag             :: Int
                                , iterations      :: Maybe Int
+                               , updateBlock     :: Int
                                , sweepsDir       :: FilePath
                                , hyperEstOpts    :: HyperEstOpts
                                }
@@ -50,6 +51,12 @@ samplerOpts = SamplerOpts
                   <> value Nothing
                   <> reader (Just . auto)
                   <> help "Number of sweeps to run for"
+                   )
+    <*> option     ( long "update-block"
+                  <> short 'u'
+                  <> metavar "N"
+                  <> value 100
+                  <> help "Number of update diffs to batch before updating global state"
                    )
     <*> strOption  ( long "sweeps"
                   <> short 'S'
@@ -123,7 +130,8 @@ samplerIter opts uus lastMaxV lagN = do
     let sweepN = lagN * lag opts
     m <- S.get
     shuffledUus <- liftIO $ withSystemRandomIO $ \mwc->runRVar (shuffle uus) mwc
-    S.put =<< liftIO (gibbsUpdate m $ concat $ replicate (lag opts) shuffledUus)
+    let uus' = concat $ replicate (lag opts) shuffledUus
+    S.put =<< liftIO (gibbsUpdate (updateBlock opts) m uus')
     when (sweepN == burnin opts) $ liftIO $ putStrLn "Burn-in complete"
     when (sweepN >= burnin opts) $ 
         S.get >>= void . liftIO . forkIO . processSweep opts lastMaxV sweepN
