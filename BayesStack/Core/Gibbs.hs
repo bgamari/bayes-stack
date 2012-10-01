@@ -15,6 +15,7 @@ import Control.DeepSeq
 import Data.Random
 import Data.Random.Lift       
 import System.Random.MWC (withSystemRandom)
+import Control.Monad.State hiding (lift)
 
 class UpdateUnit uu where
     type ModelState uu
@@ -44,24 +45,29 @@ updateWorker unitsQueue stateRef diffQueue = do
                          updateWorker unitsQueue stateRef diffQueue
         Nothing -> return ()
 
-diffWorker :: IORef ms -> TBQueue (ms -> ms) -> IO ()
-diffWorker stateRef diffQueue = forever $ do
-    diff <- atomically $ readTBQueue diffQueue
+diffWorker :: IORef ms -> TBQueue (ms -> ms) -> Int -> IO ()
+diffWorker stateRef diffQueue updateBlock = forever $ do
+    diff <- execStateT (replicateM_ updateBlock $ do
+                            diff <- lift $ atomically $ readTBQueue diffQueue
+                            modify (. diff)
+                       ) id
     atomicModifyIORef' stateRef $ \a->(diff a, ())
 
 labelMyThread :: String -> IO ()
 labelMyThread label = myThreadId >>= \id->labelThread id label
 
+updateBlock = 100
+              
 gibbsUpdate :: ms -> [WrappedUpdateUnit ms] -> IO ms
 gibbsUpdate modelState units = do
     n <- getNumCapabilities
     unitsQueue <- atomically $ do q <- newTQueue
                                   mapM_ (writeTQueue q) units
                                   return q
-    diffQueue <- atomically $ newTBQueue $ 100*n -- FIXME
+    diffQueue <- atomically $ newTBQueue $ 2*updateBlock -- FIXME
     stateRef <- newIORef modelState
     diffThread <- forkIO $ do labelMyThread "diff worker"
-                              diffWorker stateRef diffQueue
+                              diffWorker stateRef diffQueue updateBlock
 
     runningWorkers <- atomically $ newTVar (0 :: Int)
     done <- atomically $ newEmptyTMVar :: IO (TMVar ())
