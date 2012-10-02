@@ -151,7 +151,7 @@ runSampler :: SamplerModel ms => SamplerOpts -> ms -> [WrappedUpdateUnit ms] -> 
 runSampler opts m uus = do
     checkOpts opts
     putStrLn "Starting sampler..."
-    printf "Burning in for %d samples" (burnin opts)
+    putStrLn $ "Burning in for "++show (burnin opts)++" samples"
     let lagNs = maybe [0..] (\n->[0..n]) $ iterations opts           
     lastMaxV <- atomically $ newTVar 0
     void $ S.runStateT (forM_ lagNs (samplerIter opts uus lastMaxV)) m
