@@ -3,8 +3,9 @@
 module BayesStack.UniqueKey ( getUniqueKey
                             , getValueMap, getKeyMap
                             , mapTraversable
-                            , UniqueKey, runUniqueKey
-                            , UniqueKeyT, runUniqueKeyT
+                            , UniqueKey, UniqueKeyT
+                            , runUniqueKey, runUniqueKeyT
+                            , runUniqueKey', runUniqueKeyT'
                             ) where
 
 import Prelude hiding (mapM)       
@@ -59,17 +60,20 @@ runUniqueKey keys = runIdentity . runUniqueKeyT keys
 runUniqueKeyT :: (Monad m, Ord key) => [key] -> UniqueKeyT val key m a -> m a
 runUniqueKeyT keys (UniqueKeyT a) = evalStateT a (keys, M.empty)
 
-runUniqueKeyTWithInvMap :: (Monad m, Applicative m, Ord key, Ord val) => [key] -> UniqueKeyT val key m a -> m (a, Map key val)
-runUniqueKeyTWithInvMap keys action =
+-- | Run a `UniqueKeyT`, returning the result and the associated key map
+runUniqueKeyT' :: (Monad m, Applicative m, Ord key, Ord val) => [key] -> UniqueKeyT val key m a -> m (a, Map key val)
+runUniqueKeyT' keys action =
     runUniqueKeyT keys $ do result <- action
                             keyMap <- getKeyMap
                             return (result, keyMap)
 
-runUniqueKeyWithInvMap :: (Ord key, Ord val) => [key] -> UniqueKey val key a -> (a, Map key val)
-runUniqueKeyWithInvMap keys action =
+-- | Run a `UniqueKey`, returning the result and the associated key map
+runUniqueKey' :: (Ord key, Ord val) => [key] -> UniqueKey val key a -> (a, Map key val)
+runUniqueKey' keys action =
     runUniqueKey keys $ do result <- action
                            keyMap <- getKeyMap
                            return (result, keyMap)
 
 mapTraversable :: (Traversable t, Ord key, Ord val) => [key] -> t val -> (t key, Map key val)
-mapTraversable keys xs = runUniqueKeyWithInvMap keys $ mapM getUniqueKey xs
+mapTraversable keys xs = runUniqueKey' keys $ mapM getUniqueKey xs
+
