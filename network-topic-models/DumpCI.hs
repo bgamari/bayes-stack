@@ -9,11 +9,10 @@ import qualified Data.ByteString as BS
 import qualified Data.Text.Lazy.IO as TL
 import           Data.Text.Lazy.Builder.Int
 import qualified Data.Text.Lazy.Builder as TB
-import qualified Data.Text.Encoding as TE
-import qualified Data.Text as T
 import           Data.Serialize
 
 import           BayesStack.Models.Topic.SharedTaste
+import           SerializeText
 import           ReadData
 import           FormatMultinom                 
                  
@@ -95,6 +94,3 @@ main = do
         Lambdas -> dumpLambdas (nElems args) m
         Omegas  -> dumpOmegas (nElems args) m
 
-instance Serialize T.Text where
-     put = put . TE.encodeUtf8
-     get = TE.decodeUtf8 <$> get

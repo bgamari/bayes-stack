@@ -15,13 +15,13 @@ import           Data.Set (Set)
 import qualified Data.Map as M
 
 import           ReadData       
+import           SerializeText
 import qualified RunSampler as Sampler
 import           BayesStack.DirMulti
 import           BayesStack.Models.Topic.CitationInfluence
 import           BayesStack.UniqueKey
 
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
        
 import           System.FilePath.Posix ((</>))
@@ -126,7 +126,3 @@ main = do
     Sampler.runSampler (samplerOpts args) m (updateUnits nd)
     return ()
 
--- FIXME: Why isn't there already an instance?
-instance Serialize T.Text where
-     put = put . TE.encodeUtf8
-     get = TE.decodeUtf8 <$> get
