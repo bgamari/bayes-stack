@@ -10,6 +10,8 @@ module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                            , updatePrior
                              -- * Parameter estimation
                            , estimatePrior, reestimatePriors, reestimateSymPriors
+                             -- * Convenience functions
+                           , probabilities, decProbabilities
                            ) where
 
 import Data.EnumMap (EnumMap)
