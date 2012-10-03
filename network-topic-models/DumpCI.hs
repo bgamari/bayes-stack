@@ -11,7 +11,7 @@ import           Data.Text.Lazy.Builder.Int
 import qualified Data.Text.Lazy.Builder as TB
 import           Data.Serialize
 
-import           BayesStack.Models.Topic.SharedTaste
+import           BayesStack.Models.Topic.CitationInfluence
 import           SerializeText
 import           ReadData
 import           FormatMultinom                 
@@ -63,7 +63,7 @@ dumpPhis n itemMap m =
 
 dumpPsis :: Int -> MState -> TB.Builder
 dumpPsis n m =
-    formatMultinoms (\(Node n)->"Node "<>decimal n)
+    formatMultinoms (\(Citing (Node n))->"Node "<>decimal n)
                     (TB.fromString . show)
                     n (stPsis m)
 
