@@ -22,12 +22,13 @@ data Opts = Opts { nElems  :: Int
                  , sweep   :: FilePath
                  }
      
-data Distribution = Phis | Psis | Lambdas
+data Distribution = Phis | Psis | Lambdas | Omegas
      
 readDistribution :: String -> Maybe Distribution
 readDistribution "phis"   = Just Phis
 readDistribution "psis"   = Just Psis
 readDistribution "lambdas"= Just Lambdas
+readDistribution "omegas" = Just Omegas
 readDistribution _        = Nothing
 
 opts = Opts
@@ -72,6 +73,12 @@ dumpLambdas n m =
                     (TB.fromString . show)
                     n (stLambdas m)
 
+dumpOmegas :: Int -> MState -> TB.Builder
+dumpOmegas n m =
+    formatMultinoms (TB.fromString . show)
+                    (TB.fromString . show)
+                    n (stOmegas m)
+
 main = do
     args <- execParser $ info (helper <*> opts) 
          ( fullDesc 
@@ -85,6 +92,7 @@ main = do
         Phis    -> dumpPhis (nElems args) itemMap m
         Psis    -> dumpPsis (nElems args) m
         Lambdas -> dumpLambdas (nElems args) m
+        Omegas  -> dumpOmegas (nElems args) m
 
 instance Serialize T.Text where
      put = put . TE.encodeUtf8
