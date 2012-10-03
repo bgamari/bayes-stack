@@ -46,7 +46,7 @@ samplerOpts = SamplerOpts
                   <> help "Number of sweeps between diagnostic samples"
                    )
     <*> option     ( long "iterations"
-                  <> short 'n'
+                  <> short 'i'
                   <> metavar "N"
                   <> value Nothing
                   <> reader (Just . auto)
