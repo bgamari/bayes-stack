@@ -15,10 +15,10 @@ import Data.Tuple
 import Data.Functor.Identity
 
 import Control.Monad.Trans
-import Control.Monad.State hiding (mapM)
+import Control.Monad.State.Strict hiding (mapM)
        
-import Data.Map (Map)
-import qualified Data.Map as M
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as M
 
 -- | 'UniqueKey val key' is a monad for a calculation of a mapping unique keys
 -- 'key' onto values 'val'
@@ -38,7 +38,7 @@ popUniqueKey :: Monad m => UniqueKeyT val key m key
 popUniqueKey = do
     (keys, a) <- UniqueKeyT get
     case keys of
-        key:rest -> UniqueKeyT (put (rest, a)) >> return key
+        key:rest -> UniqueKeyT (put $! (rest, a)) >> return key
         []      -> error "Ran out of unique keys"
     
 -- | Find the unique key for value 'val' or 'Nothing' if the value is unknown
