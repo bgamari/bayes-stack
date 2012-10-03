@@ -74,9 +74,9 @@ main = do
 
     itemMap <- readItemMap
     m <- readSweep (sweep args)
-    case dist args of
-        Phis   -> TL.putStr $ TB.toLazyText $ dumpPhis (nElems args) itemMap m
-        Thetas -> TL.putStr $ TB.toLazyText $ dumpThetas (nElems args) m
+    TL.putStr $ TB.toLazyText $ case dist args of
+        Phis   -> dumpPhis (nElems args) itemMap m
+        Thetas -> dumpThetas (nElems args) m
 
 instance Serialize T.Text where
      put = put . TE.encodeUtf8
