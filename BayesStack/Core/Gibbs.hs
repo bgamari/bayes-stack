@@ -73,7 +73,7 @@ gibbsUpdate updateBlock modelState units = do
 
     runningWorkers <- atomically $ newTVar (0 :: Int)
     done <- atomically $ newEmptyTMVar :: IO (TMVar ())
-    replicateM_ (n-2) $ forkIO $ withSystemRandom $ \mwc->do 
+    replicateM_ n $ forkIO $ withSystemRandom $ \mwc->do 
         labelMyThread "update worker"
         atomically $ modifyTVar' runningWorkers (+1)
         runRVarT (updateWorker unitsQueue stateRef diffQueue) mwc
