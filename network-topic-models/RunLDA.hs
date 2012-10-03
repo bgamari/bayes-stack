@@ -1,25 +1,34 @@
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 
+import           Prelude hiding (mapM)    
+
 import           Options.Applicative    
 import           Data.Monoid ((<>))                 
+import           Control.Monad (liftM)
 
 import           Data.Vector (Vector)    
 import qualified Data.Vector.Generic as V    
 import           Statistics.Sample (mean)       
 
-import qualified Data.Bimap as BM                 
+import           Data.Traversable (mapM)                 
 import qualified Data.Set as S
 import           Data.Set (Set)
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 import           ReadData       
 import qualified RunSampler as Sampler
 import           BayesStack.DirMulti
 import           BayesStack.Models.Topic.LDA
+import           BayesStack.UniqueKey
 
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
        
+import           System.FilePath.Posix ((</>))
+import           Data.Serialize
+import qualified Data.ByteString as BS
+
 import           Data.Random
 import           System.Random.MWC                 
 
@@ -52,23 +61,24 @@ runOpts = RunOpts
                   <> help "Number of topics"
                    )
     <*> Sampler.samplerOpts
+    
+termsToItems :: M.Map Node (Set Term) -> (M.Map Node (Set Item), M.Map Item Term)
+termsToItems = runUniqueKey' [Item i | i <- [0..]]
+            . mapM (mapM getUniqueKey)
 
-
-netData :: M.Map Node (Set Term) -> Int -> NetData
+netData :: M.Map Node (Set Item) -> Int -> NetData
 netData nodeItems nTopics = 
-    let items :: BM.Bimap Item Term
-        items = BM.fromList $ zip [Item i | i <- [1..]] (S.toList $ S.unions $ M.elems nodeItems)
-    in NetData { dAlphaTheta       = 0.1
-               , dAlphaPhi         = 0.1
-               , dItems            = S.fromList $ BM.keys items
-               , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
-               , dNodeItems        = M.fromList
-                                     $ zip [NodeItem i | i <- [0..]]
-                                     $ do (n,terms) <- M.assocs nodeItems
-                                          term <- S.toList terms
-                                          return (n, items BM.!> term)
-               , dNodes            = M.keysSet nodeItems
-               }
+    NetData { dAlphaTheta       = 0.1
+            , dAlphaPhi         = 0.1
+            , dItems            = S.unions $ M.elems nodeItems
+            , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
+            , dNodeItems        = M.fromList
+                                  $ zip [NodeItem i | i <- [0..]]
+                                  $ do (n,items) <- M.assocs nodeItems
+                                       item <- S.toList items
+                                       return (n, item)
+            , dNodes            = M.keysSet nodeItems
+            }
             
 opts :: ParserInfo RunOpts
 opts = info runOpts (  fullDesc
@@ -91,14 +101,22 @@ main = do
                      Nothing -> return S.empty
     printf "Read %d stopwords\n" (S.size stopWords)
 
-    nodeItems <- readNodeItems stopWords $ nodesFile args
+    (nodeItems, itemMap) <- termsToItems
+                            <$> readNodeItems stopWords (nodesFile args)
+    BS.writeFile ("sweeps" </> "node-map") $ runPut $ put itemMap
     let termCounts = V.fromListN (M.size nodeItems) $ map S.size $ M.elems nodeItems :: Vector Int
     printf "Read %d nodes\n" (M.size nodeItems)
     printf "Mean items per node:  %1.2f\n" (mean $ V.map realToFrac termCounts)
     
     withSystemRandom $ \mwc->do
     let nd = netData nodeItems (nTopics args)
+    BS.writeFile ("sweeps" </> "data") $ runPut $ put nd
     mInit <- runRVar (randomInitialize nd) mwc
     let m = model nd mInit
     Sampler.runSampler (samplerOpts args) m (updateUnits nd)
     return ()
+    
+-- FIXME: Why isn't there already an instance?
+instance Serialize T.Text where
+     put = put . TE.encodeUtf8
+     get = TE.decodeUtf8 <$> get
