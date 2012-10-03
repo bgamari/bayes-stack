@@ -34,26 +34,30 @@ data RunOpts = RunOpts { arcsFile        :: FilePath
                        }
 
 runOpts = RunOpts 
-    <$> strOption  ( long "arcs"
-                   & metavar "FILE"
-                   & value "arcs"
-                   & help "File containing arcs"
+    <$> strOption  ( long "edges"
+                  <> short 'e'
+                  <> metavar "FILE"
+                  <> value "arcs"
+                  <> help "File containing arcs"
                    )
-    <*> strOption  ( long "items"
-                   & metavar "FILE"
-                   & value "node-items"
-                   & help "File containing nodes' items"
+    <*> strOption  ( long "nodes"
+                  <> short 'n'
+                  <> metavar "FILE"
+                  <> value "node-items"
+                  <> help "File containing nodes' items"
                    )
     <*> nullOption ( long "stopwords"
-                   & metavar "FILE"
-                   & reader (Just . Just)
-                   & value (Just "stopwords.txt")
-                   & help "Stop words list"
+                  <> short 's'
+                  <> metavar "FILE"
+                  <> reader (Just . Just)
+                  <> value (Just "stopwords.txt")
+                  <> help "Stop words list"
                    )
     <*> option     ( long "topics"
-                   & metavar "N"
-                   & value 20
-                   & help "Number of topics"
+                  <> short 't'
+                  <> metavar "N"
+                  <> value 20
+                  <> help "Number of topics"
                    )
     <*> Sampler.samplerOpts
 
