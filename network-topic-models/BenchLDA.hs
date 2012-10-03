@@ -43,15 +43,18 @@ randomNetwork net = do
 withSystemRandomIO :: (GenIO -> IO a) -> IO a          
 withSystemRandomIO = withSystemRandom                   
 
-data LDABenchmark = LDABenchmark { bNetParams :: NetParams
-                                 , bThreads   :: Int
+data LDABenchmark = LDABenchmark { bNetParams    :: NetParams
+                                 , bThreads      :: Int
+                                 , bUpdateBlock  :: Int
                                  }
                                  
 benchmarks = do
+    updateBlock <- [1, 10, 100, 1000]
     threads <- [3, 4, 6, 8, 10, 14, 18, 22, 26, 34, 38, 42, 48]
     topics <- [10, 50, 100, 200, 500]
     return LDABenchmark { bNetParams = netParams {nTopics=topics}
                         , bThreads = threads
+                        , bUpdateBlock = updateBlock
                         }
                         
 ldaBenchmark :: LDABenchmark -> RVar Benchmark
@@ -61,7 +64,7 @@ ldaBenchmark b = do
     let name = printf "%d topics, %d threads" (nTopics $ bNetParams b) (bThreads b)
     return $ bench name $ do
         setNumCapabilities $ bThreads b
-        gibbsUpdate (model net init) (updateUnits net)
+        gibbsUpdate (bUpdateBlock b) (model net init) (updateUnits net)
 
 main = do
     bs <- withSystemRandomIO $ runRVar (mapM ldaBenchmark benchmarks)
