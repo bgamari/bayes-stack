@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import           Data.Monoid
-import           Control.Applicative
+import           Options.Applicative
 
 import qualified Data.Map as M
 import qualified Data.ByteString as BS
@@ -16,7 +16,33 @@ import           Data.Serialize
 import           BayesStack.Models.Topic.LDA
 import           ReadData
 import           FormatMultinom                 
-                 
+
+data Opts = Opts { nElems  :: Int
+                 , dist    :: Distribution
+                 , sweep   :: FilePath
+                 }
+     
+data Distribution = Phis | Thetas
+     
+readDistribution :: String -> Maybe Distribution
+readDistribution "phis"   = Just Phis
+readDistribution "thetas" = Just Thetas
+readDistribution _        = Nothing
+
+opts = Opts
+    <$> option       ( long "n-elems"
+                    <> short 'n'
+                    <> value 30
+                    <> help "Number of elements to output from each distributino"
+                     )
+    <*> nullOption   ( long "dist"
+                    <> short 'd'
+                    <> value Phis
+                    <> reader readDistribution
+                    <> help "Which distribution to output (phis or thetas)"
+                     )
+    <*> argument str ( metavar "FILE" )
+
 readItemMap :: IO (M.Map Item Term)                 
 readItemMap =
     (either error id . runGet get) <$> BS.readFile "sweeps/node-map"
@@ -27,26 +53,30 @@ readSweep fname = (either error id . runGet get) <$> BS.readFile fname
 readNetData :: FilePath -> IO NetData
 readNetData fname = (either error id . runGet get) <$> BS.readFile fname
 
-dumpPhis :: M.Map Item Term -> MState -> TB.Builder
-dumpPhis itemMap m =
+dumpPhis :: Int -> M.Map Item Term -> MState -> TB.Builder
+dumpPhis n itemMap m =
     formatMultinoms (\(Topic n)->"Topic "<>decimal n)
                     (TB.fromString . show . (itemMap M.!))
-                    30
-                    (stPhis m)
+                    n (stPhis m)
 
-dumpThetas :: MState -> TB.Builder
-dumpThetas m =
+dumpThetas :: Int -> MState -> TB.Builder
+dumpThetas n m =
     formatMultinoms (\(Node n)->"Node "<>decimal n)
                     (TB.fromString . show)
-                    30
-                    (stThetas m)
+                    n (stThetas m)
 
 main = do
-    d <- readNetData "sweeps/data"
+    args <- execParser $ info (helper <*> opts) 
+         ( fullDesc 
+        <> progDesc "Dump distributions from an LDA sweep"
+        <> header "dump-lda - Dump distributions from an LDA sweep"
+         )
+
     itemMap <- readItemMap
-    m <- readSweep "sweeps/00010"
-    --TL.putStr $ TB.toLazyText $ dumpPhis itemMap m
-    TL.putStr $ TB.toLazyText $ dumpThetas m
+    m <- readSweep (sweep args)
+    case dist args of
+        Phis   -> TL.putStr $ TB.toLazyText $ dumpPhis (nElems args) itemMap m
+        Thetas -> TL.putStr $ TB.toLazyText $ dumpThetas (nElems args) m
 
 instance Serialize T.Text where
      put = put . TE.encodeUtf8
