@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, CPP #-}
     
 module BayesStack.UniqueKey ( getUniqueKey
                             , getValueMap, getKeyMap
@@ -17,8 +17,13 @@ import Data.Functor.Identity
 import Control.Monad.Trans
 import Control.Monad.State.Strict hiding (mapM)
        
+#if __GLASGOW_HASKELL__ >= 706
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
+#else
+import Data.Map (Map)
+import qualified Data.Map as M
+#endif
 
 -- | 'UniqueKey val key' is a monad for a calculation of a mapping unique keys
 -- 'key' onto values 'val'
