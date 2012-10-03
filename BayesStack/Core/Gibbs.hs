@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts,
-             ExistentialQuantification, GADTs #-}
+             ExistentialQuantification, GADTs, CPP #-}
               
 module BayesStack.Core.Gibbs ( UpdateUnit(..)
                              , WrappedUpdateUnit(..)
@@ -44,6 +44,10 @@ updateWorker unitsQueue stateRef diffQueue = do
         Just unit' -> do updateUnit unit' stateRef diffQueue
                          updateWorker unitsQueue stateRef diffQueue
         Nothing -> return ()
+   
+#if __GLASGOW_HASKELL__ < 706
+atomicModifyIORef' = atomicModifyIORef
+#endif
 
 diffWorker :: IORef ms -> TBQueue (ms -> ms) -> Int -> IO ()
 diffWorker stateRef diffQueue updateBlock = forever $ do
