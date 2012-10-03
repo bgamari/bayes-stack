@@ -48,7 +48,7 @@ opts = Opts
 
 readItemMap :: IO (M.Map Item Term)                 
 readItemMap =
-    (either error id . runGet get) <$> BS.readFile "sweeps/node-map"
+    (either error id . runGet get) <$> BS.readFile "sweeps/item-map"
 
 readSweep :: FilePath -> IO MState
 readSweep fname = (either error id . runGet get) <$> BS.readFile fname
