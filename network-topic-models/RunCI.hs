@@ -57,10 +57,11 @@ runOpts = RunOpts
                    )
     <*> Sampler.samplerOpts
 
-netData :: M.Map Node (Set Term) -> Set Arc -> Int -> NetData
+netData :: M.Map Node [Term] -> Set Arc -> Int -> NetData
 netData nodeItems arcs nTopics = cleanNetData $ 
     let items :: BM.Bimap Item Term
-        items = BM.fromList $ zip [Item i | i <- [1..]] (S.toList $ S.unions $ M.elems nodeItems)
+        items = BM.fromList $ zip [Item i | i <- [1..]]
+                $ S.toList $ S.unions $ map S.fromList $ M.elems nodeItems
     in NetData { dAlphaPsi         = 0.1
                , dAlphaLambda      = 0.1
                , dAlphaPhi         = 0.1
@@ -73,7 +74,7 @@ netData nodeItems arcs nTopics = cleanNetData $
                , dNodeItems        = M.fromList
                                      $ zip [NodeItem i | i <- [0..]]
                                      $ do (n,terms) <- M.assocs nodeItems
-                                          term <- S.toList terms
+                                          term <- terms
                                           return (n, items BM.!> term)
                }
             
@@ -100,7 +101,8 @@ main = do
 
     arcs <- edgesToArcs <$> readEdges (arcsFile args)
     nodeItems <- readNodeItems stopWords $ nodeItemsFile args
-    let termCounts = V.fromListN (M.size nodeItems) $ map S.size $ M.elems nodeItems :: Vector Int
+    let termCounts = V.fromListN (M.size nodeItems)
+                     $ map length $ M.elems nodeItems :: Vector Int
     printf "Read %d arcs, %d nodeItems\n" (S.size arcs) (M.size nodeItems)
     printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
     

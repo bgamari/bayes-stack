@@ -33,14 +33,13 @@ readEdges fname =
              otherwise -> Nothing
 
 type Term = T.Text
-readNodeItems :: Set Term -> FilePath -> IO (M.Map Node (Set Term))
+readNodeItems :: Set Term -> FilePath -> IO (M.Map Node [Term])
 readNodeItems stopWords fname =
-    M.unionsWith S.union . map parseLine . T.lines <$> TIO.readFile fname
-    where parseLine :: T.Text -> M.Map Node (Set Term)
+    M.unionsWith (++) . map parseLine . T.lines <$> TIO.readFile fname
+    where parseLine :: T.Text -> M.Map Node [Term]
           parseLine l = case T.words l of
              n:words | Right (n',_) <- decimal n ->
                  M.singleton (Node n')
-                 $ S.fromList
                  $ filter (\word->T.length word > 4)
                  $ map (T.filter isAlpha)
                  $ filter (`S.notMember` stopWords) words

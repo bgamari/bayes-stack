@@ -62,20 +62,20 @@ runOpts = RunOpts
                    )
     <*> Sampler.samplerOpts
     
-termsToItems :: M.Map Node (Set Term) -> (M.Map Node (Set Item), M.Map Item Term)
+termsToItems :: M.Map Node [Term] -> (M.Map Node [Item], M.Map Item Term)
 termsToItems = runUniqueKey' [Item i | i <- [0..]]
             . mapM (mapM getUniqueKey)
 
-netData :: M.Map Node (Set Item) -> Int -> NetData
+netData :: M.Map Node [Item] -> Int -> NetData
 netData nodeItems nTopics = 
     NetData { dAlphaTheta       = 0.1
             , dAlphaPhi         = 0.1
-            , dItems            = S.unions $ M.elems nodeItems
+            , dItems            = S.unions $ map S.fromList $ M.elems nodeItems
             , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
             , dNodeItems        = M.fromList
                                   $ zip [NodeItem i | i <- [0..]]
                                   $ do (n,items) <- M.assocs nodeItems
-                                       item <- S.toList items
+                                       item <- items
                                        return (n, item)
             , dNodes            = M.keysSet nodeItems
             }
@@ -104,7 +104,8 @@ main = do
     (nodeItems, itemMap) <- termsToItems
                             <$> readNodeItems stopWords (nodesFile args)
     BS.writeFile ("sweeps" </> "node-map") $ runPut $ put itemMap
-    let termCounts = V.fromListN (M.size nodeItems) $ map S.size $ M.elems nodeItems :: Vector Int
+    let termCounts = V.fromListN (M.size nodeItems)
+                     $ map length $ M.elems nodeItems :: Vector Int
     printf "Read %d nodes\n" (M.size nodeItems)
     printf "Mean items per node:  %1.2f\n" (mean $ V.map realToFrac termCounts)
     
