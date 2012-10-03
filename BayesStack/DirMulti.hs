@@ -146,14 +146,17 @@ instance FullConditionable Multinom where
 probabilities :: (Ord a, Enum a) => Multinom a -> Seq (Double, a)
 probabilities dm = fmap (\a->(sampleProb dm a, a)) $ dmDomain dm -- FIXME
 
+-- | Probabilities sorted decreasingly              
+decProbabilities :: (Ord a, Enum a) => Multinom a -> Seq (Double, a)
+decProbabilities = SQ.sortBy (flip (compare `on` fst)) . probabilities
+
 prettyMultinom :: (Ord a, Enum a) => Int -> (a -> String) -> Multinom a -> Doc
 prettyMultinom _ _ (Multinom {})         = error "TODO: prettyMultinom"
 prettyMultinom n showA dm@(DirMulti {})  =
   text "DirMulti" <+> parens (text "alpha=" <> prettyAlpha showA (dmAlpha dm))
   $$ nest 5 (fsep $ punctuate comma
             $ map (\(p,a)->text (showA a) <> parens (text $ printf "%1.2e" p))
-            $ take n $ Data.Foldable.toList
-            $ SQ.sortBy (flip (compare `on` fst)) $ probabilities dm)
+            $ take n $ Data.Foldable.toList $ decProbabilities dm)
 
 -- | Update the prior of a Dirichlet/multinomial
 updatePrior :: (Alpha a -> Alpha a) -> Multinom a -> Multinom a
