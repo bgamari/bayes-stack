@@ -35,7 +35,7 @@ opts = Opts
     <$> option       ( long "n-elems"
                     <> short 'n'
                     <> value 30
-                    <> help "Number of elements to output from each distributino"
+                    <> help "Number of elements to output from each distribution"
                      )
     <*> nullOption   ( long "dist"
                     <> short 'd'
