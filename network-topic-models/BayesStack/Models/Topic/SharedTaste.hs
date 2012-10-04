@@ -119,7 +119,7 @@ model d init =
                     , stVars = M.empty
                     }
         initUU uu = do
-            let s = M.findWithDefault (error "Incomplete initialization") (uuNI uu) init
+            let s = maybe (error "Incomplete initialization") id $ M.lookup (uuNI uu) init
             modify $ setUU uu (Just s)
     in execState (mapM initUU uus) s
 
