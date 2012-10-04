@@ -41,7 +41,7 @@ opts = Opts
                     <> short 'd'
                     <> value Phis
                     <> reader readDistribution
-                    <> help "Which distribution to output (phis or thetas)"
+                    <> help "Which distribution to output (phis, psis, lambdas, omegas, or gammas)"
                      )
     <*> argument str ( metavar "FILE" )
 
@@ -82,8 +82,8 @@ dumpOmegas n m =
 main = do
     args <- execParser $ info (helper <*> opts) 
          ( fullDesc 
-        <> progDesc "Dump distributions from an shared taste model sweep"
-        <> header "dump-lda - Dump distributions from an shared taste model sweep"
+        <> progDesc "Dump distributions from an citation influence model sweep"
+        <> header "dump-ci - Dump distributions from an citation influence model sweep"
          )
 
     itemMap <- readItemMap
