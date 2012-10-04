@@ -52,6 +52,7 @@ type DirMean a = EnumMap a Double
 type DirPrecision = Double
 
 symAlpha :: Enum a => [a] -> Double -> Alpha a
+symAlpha domain _ | null domain = error "Dirichlet over null domain is undefined"
 symAlpha domain alpha = SymAlpha { aDomain = SQ.fromList domain
                                  , aAlpha = alpha
                                  , aNorm = alphaNorm $ symAlpha domain alpha
@@ -59,6 +60,7 @@ symAlpha domain alpha = SymAlpha { aDomain = SQ.fromList domain
  
 -- | Construct an asymmetric Alpha
 asymAlpha :: Enum a => EnumMap a Double -> Alpha a
+asymAlpha alphas | EM.null alphas = error "Dirichlet over null domain is undefined"
 asymAlpha alphas = Alpha { aAlphas = alphas
                          , aSumAlphas = sum $ EM.elems alphas
                          , aNorm = alphaNorm $ asymAlpha alphas
