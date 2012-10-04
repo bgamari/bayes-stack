@@ -38,7 +38,6 @@ opts = Opts
                      )
     <*> nullOption   ( long "dist"
                     <> short 'd'
-                    <> value Phis
                     <> reader readDistribution
                     <> help "Which distribution to output (phis or thetas)"
                      )
