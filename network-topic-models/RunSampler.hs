@@ -142,9 +142,9 @@ checkOpts opts = do
     let hyperOpts = hyperEstOpts opts
     when (burnin opts `mod` lag opts /= 0)
         $ error "--burnin must be multiple of --lag"
-    when (hyperBurnin hyperOpts `mod` lag opts /= 0)
+    when (hyperEst hyperOpts && hyperBurnin hyperOpts `mod` lag opts /= 0)
         $ error "--hyper-burnin must be multiple of --lag"
-    when (hyperLag hyperOpts `mod` lag opts /= 0)
+    when (hyperEst hyperOpts && hyperLag hyperOpts `mod` lag opts /= 0)
         $ error "--hyper-lag must be multiple of --lag"
 
 runSampler :: SamplerModel ms => SamplerOpts -> ms -> [WrappedUpdateUnit ms] -> IO ()
