@@ -1,5 +1,5 @@
 module RunSampler ( SamplerModel (..)
-                  , SamplerOpts, samplerOpts
+                  , SamplerOpts (..), samplerOpts
                   , runSampler
                   ) where
                   
