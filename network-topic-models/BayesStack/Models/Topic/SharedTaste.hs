@@ -105,8 +105,8 @@ updateUnits = map WrappedUU . updateUnits'
 model :: NetData -> ModelInit -> MState
 model d init =
     let uus = updateUnits' d
-        s = MState { stPsis = let dist = symDirMulti (dAlphaPsi d) (toList $ dNodes d)
-                               in foldMap (\n->M.singleton n dist) $ dNodes d
+        s = MState { stPsis = let dist n = symDirMulti (dAlphaPsi d) (toList $ getFriends (toList $ dEdges d) n)
+                               in foldMap (\n->M.singleton n $ dist n) $ dNodes d
                     , stPhis = let dist = symDirMulti (dAlphaPhi d) (toList $ dItems d)
                                in foldMap (\t->M.singleton t dist) $ dTopics d
                     , stGammas = let dist = multinom [ (Shared, dAlphaGammaShared d)
