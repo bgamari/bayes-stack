@@ -25,6 +25,7 @@ import           BayesStack.UniqueKey
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
        
+import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath.Posix ((</>))
 import           Data.Serialize
 import qualified Data.ByteString as BS
@@ -102,7 +103,11 @@ main = do
 
     (nodeItems, itemMap) <- termsToItems
                             <$> readNodeItems stopWords (nodesFile args)
-    BS.writeFile ("sweeps" </> "item-map") $ runPut $ put itemMap
+
+    let sweepsDir = Sampler.sweepsDir $ samplerOpts args
+    createDirectoryIfMissing False sweepsDir
+    BS.writeFile (sweepsDir </> "item-map") $ runPut $ put itemMap
+
     let termCounts = V.fromListN (M.size nodeItems)
                      $ map length $ M.elems nodeItems :: Vector Int
     printf "Read %d nodes\n" (M.size nodeItems)
