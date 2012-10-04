@@ -56,7 +56,7 @@ runOpts = RunOpts
                   <> short 's'
                   <> metavar "FILE"
                   <> reader (Just . Just)
-                  <> value (Just "stopwords.txt")
+                  <> value Nothing
                   <> help "Stop words list"
                    )
     <*> option     ( long "topics"
