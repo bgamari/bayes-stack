@@ -6,6 +6,7 @@ module RunSampler ( SamplerModel (..)
 import           Options.Applicative    
 import           Data.Monoid ((<>))                 
 import           System.FilePath.Posix ((</>))
+import           System.Directory (createDirectoryIfMissing)
 
 import           Control.Monad (when, forM_, void)
 import qualified Control.Monad.Trans.State as S
@@ -150,6 +151,7 @@ checkOpts opts = do
 runSampler :: SamplerModel ms => SamplerOpts -> ms -> [WrappedUpdateUnit ms] -> IO ()
 runSampler opts m uus = do
     checkOpts opts
+    createDirectoryIfMissing False (sweepsDir opts)
     putStrLn "Starting sampler..."
     putStrLn $ "Burning in for "++show (burnin opts)++" samples"
     let lagNs = maybe [0..] (\n->[0..n]) $ iterations opts           
