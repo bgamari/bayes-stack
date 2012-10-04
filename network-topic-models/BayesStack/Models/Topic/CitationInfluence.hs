@@ -191,8 +191,11 @@ randomInitialize d =
 model :: NetData -> ModelInit -> MState
 model d (ModelInit citedInit citingInit) =
     let s = MState { -- Citing model
-                     stPsis = let dist n = symDirMulti (dAlphaPsi d) (toList $ getCitedNodes d n)
-                              in foldMap (\n->M.singleton n $ dist n) $ dCitingNodes d
+                     stPsis = let dist n = case toList $ getCitedNodes d n of
+                                               []    -> M.empty
+                                               nodes -> M.singleton n
+                                                        $ symDirMulti (dAlphaPsi d) nodes
+                              in foldMap dist $ dCitingNodes d
                    , stPhis = let dist = symDirMulti (dAlphaPhi d) (toList $ dItems d)
                               in foldMap (\t->M.singleton t dist) $ dTopics d
                    , stGammas = let dist = multinom [ (Shared, dAlphaGammaShared d)
