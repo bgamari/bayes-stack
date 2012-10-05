@@ -30,6 +30,7 @@ data SamplerOpts = SamplerOpts { burnin          :: Int
                                , iterations      :: Maybe Int
                                , updateBlock     :: Int
                                , sweepsDir       :: FilePath
+                               , nCaps           :: Int
                                , hyperEstOpts    :: HyperEstOpts
                                }
 
@@ -64,6 +65,11 @@ samplerOpts = SamplerOpts
                   <> metavar "DIR"
                   <> value "sweeps"
                   <> help "Directory in which to place model state output"
+                   )
+    <*> option     ( long "n-threads"
+                  <> short 'N'
+                  <> metavar "INT"
+                  <> help "Number of worker threads to start"
                    )
     <*> hyperEstOpts'
 
@@ -151,6 +157,7 @@ checkOpts opts = do
 runSampler :: SamplerModel ms => SamplerOpts -> ms -> [WrappedUpdateUnit ms] -> IO ()
 runSampler opts m uus = do
     checkOpts opts
+    setNumCapabilities (nCaps opts)
     createDirectoryIfMissing False (sweepsDir opts)
     putStrLn "Starting sampler..."
     putStrLn $ "Burning in for "++show (burnin opts)++" samples"
