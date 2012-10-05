@@ -44,20 +44,17 @@ runOpts = RunOpts
     <$> strOption  ( long "arcs"
                   <> short 'a'
                   <> metavar "FILE"
-                  <> value "arcs"
                   <> help "File containing arcs"
                    )
     <*> strOption  ( long "nodes"
                   <> short 'n'
                   <> metavar "FILE"
-                  <> value "node-items"
                   <> help "File containing nodes' items"
                    )
     <*> nullOption ( long "stopwords"
                   <> short 's'
                   <> metavar "FILE"
                   <> reader (Just . Just)
-                  <> value Nothing
                   <> help "Stop words list"
                    )
     <*> option     ( long "topics"
