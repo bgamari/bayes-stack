@@ -66,7 +66,7 @@ samplerOpts = SamplerOpts
                   <> value "sweeps"
                   <> help "Directory in which to place model state output"
                    )
-    <*> option     ( long "n-threads"
+    <*> option     ( long "threads"
                   <> short 'N'
                   <> metavar "INT"
                   <> help "Number of worker threads to start"
