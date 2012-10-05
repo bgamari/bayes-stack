@@ -68,6 +68,7 @@ samplerOpts = SamplerOpts
                    )
     <*> option     ( long "threads"
                   <> short 'N'
+                  <> value 1
                   <> metavar "INT"
                   <> help "Number of worker threads to start"
                    )
