@@ -3,6 +3,7 @@
 import           Data.Monoid
 import           Options.Applicative
 
+import           Data.List                 
 import qualified Data.Map as M
 import qualified Data.ByteString as BS
 
@@ -11,14 +12,19 @@ import           Data.Text.Lazy.Builder.Int
 import qualified Data.Text.Lazy.Builder as TB
 import           Data.Serialize
 
+import           System.FilePath ((</>))                 
+import           System.Directory                 
+import           Text.Printf
+
 import           BayesStack.Models.Topic.CitationInfluence
 import           SerializeText
 import           ReadData
 import           FormatMultinom                 
                  
-data Opts = Opts { nElems  :: Int
-                 , dist    :: Distribution
-                 , sweep   :: FilePath
+data Opts = Opts { nElems   :: Int
+                 , dist     :: Distribution
+                 , sweepDir :: FilePath
+                 , sweepNum :: Maybe Int
                  }
      
 data Distribution = Phis | Psis | Lambdas | Omegas | Gammas
@@ -42,11 +48,23 @@ opts = Opts
                     <> reader readDistribution
                     <> help "Which distribution to output (phis, psis, lambdas, omegas, or gammas)"
                      )
-    <*> argument str ( metavar "FILE" )
+    <*> strOption    ( long "sweeps"
+                    <> short 's'
+                    <> help "The directory of sweeps to dump"
+                     )
+    <*> option       ( long "number"
+                    <> short 'n'
+                    <> reader (Just . auto)
+                    <> help "The sweep number to dump"
+                     )
 
-readItemMap :: IO (M.Map Item Term)                 
-readItemMap =
-    (either error id . runGet get) <$> BS.readFile "sweeps/item-map"
+getLastSweep :: FilePath -> IO FilePath
+getLastSweep sweepsDir =
+    last . sort . filter (".state" `isSuffixOf`) <$> getDirectoryContents sweepsDir
+
+readItemMap :: FilePath -> IO (M.Map Item Term)                 
+readItemMap sweepsDir =
+    (either error id . runGet get) <$> BS.readFile (sweepsDir </> "item-map")
 
 readSweep :: FilePath -> IO MState
 readSweep fname = (either error id . runGet get) <$> BS.readFile fname
@@ -91,8 +109,11 @@ main = do
         <> header "dump-ci - Dump distributions from an citation influence model sweep"
          )
 
-    itemMap <- readItemMap
-    m <- readSweep (sweep args)
+    itemMap <- readItemMap $ sweepDir args
+    m <- case sweepNum args of
+             Nothing -> readSweep =<< getLastSweep (sweepDir args)
+             Just n  -> readSweep $ sweepDir args </> printf "%05d.state" n
+
     TL.putStr $ TB.toLazyText $ case dist args of
         Phis    -> dumpPhis (nElems args) itemMap m
         Psis    -> dumpPsis (nElems args) m
