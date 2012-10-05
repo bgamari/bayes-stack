@@ -40,7 +40,7 @@ opts = Opts
     <*> nullOption   ( long "dist"
                     <> short 'd'
                     <> reader readDistribution
-                    <> help "Which distribution to output (psis, phis, lambdas, or omegas)"
+                    <> help "Which distribution to output (psis, phis, lambdas, gammas, or omegas)"
                      )
     <*> argument str ( metavar "FILE" )
 
