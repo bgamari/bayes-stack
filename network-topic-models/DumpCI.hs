@@ -78,6 +78,12 @@ dumpOmegas n m =
                     (TB.fromString . show)
                     n (stOmegas m)
 
+dumpGammas :: Int -> MState -> TB.Builder
+dumpGammas n m =
+    formatMultinoms (TB.fromString . show)
+                    (TB.fromString . show)
+                    n (stGammas m)
+
 main = do
     args <- execParser $ info (helper <*> opts) 
          ( fullDesc 
@@ -92,4 +98,5 @@ main = do
         Psis    -> dumpPsis (nElems args) m
         Lambdas -> dumpLambdas (nElems args) m
         Omegas  -> dumpOmegas (nElems args) m
+        Gammas  -> dumpGammas (nElems args) m
 
