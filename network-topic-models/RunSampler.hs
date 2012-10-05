@@ -105,7 +105,7 @@ processSweep opts lastMaxV sweepN m = do
                               if l > oldL then writeTVar lastMaxV l >> return True
                                           else return False
     when newMax
-        $ serializeState m $ sweepsDir opts </> printf "%05d" sweepN
+        $ serializeState m $ sweepsDir opts </> printf "%05d.state" sweepN
 
 doEstimateHypers :: SamplerModel ms => HyperEstOpts -> Int -> S.StateT ms IO ()
 doEstimateHypers (HyperEstOpts True burnin lag) iterN
