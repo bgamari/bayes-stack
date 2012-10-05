@@ -14,20 +14,21 @@ import           Data.Serialize
 import           BayesStack.Models.Topic.SharedTaste
 import           SerializeText
 import           ReadData
-import           FormatMultinom                 
+import           FormatMultinom
                  
 data Opts = Opts { nElems  :: Int
                  , dist    :: Distribution
                  , sweep   :: FilePath
                  }
      
-data Distribution = Phis | Psis | Lambdas | Omegas
+data Distribution = Phis | Psis | Lambdas | Omegas | Gammas
      
 readDistribution :: String -> Maybe Distribution
 readDistribution "phis"   = Just Phis
 readDistribution "psis"   = Just Psis
 readDistribution "lambdas"= Just Lambdas
 readDistribution "omegas" = Just Omegas
+readDistribution "gammas" = Just Gammas
 readDistribution _        = Nothing
 
 opts = Opts
@@ -77,6 +78,12 @@ dumpOmegas n m =
                     (TB.fromString . show)
                     n (stOmegas m)
 
+dumpGammas :: Int -> MState -> TB.Builder
+dumpGammas n m =
+    formatMultinoms (TB.fromString . show)
+                    (TB.fromString . show)
+                    n (stGammas m)
+
 main = do
     args <- execParser $ info (helper <*> opts) 
          ( fullDesc 
@@ -91,4 +98,5 @@ main = do
         Psis    -> dumpPsis (nElems args) m
         Lambdas -> dumpLambdas (nElems args) m
         Omegas  -> dumpOmegas (nElems args) m
+        Gammas  -> dumpGammas (nElems args) m
 
