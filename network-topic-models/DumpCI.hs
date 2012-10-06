@@ -55,12 +55,14 @@ opts = Opts
     <*> option       ( long "number"
                     <> short 'n'
                     <> reader (Just . auto)
+                    <> value Nothing
                     <> help "The sweep number to dump"
                      )
 
 getLastSweep :: FilePath -> IO FilePath
 getLastSweep sweepsDir =
-    last . sort . filter (".state" `isSuffixOf`) <$> getDirectoryContents sweepsDir
+    (sweepsDir </>) . last . sort . filter (".state" `isSuffixOf`)
+    <$> getDirectoryContents sweepsDir
 
 readItemMap :: FilePath -> IO (M.Map Item Term)                 
 readItemMap sweepsDir =
