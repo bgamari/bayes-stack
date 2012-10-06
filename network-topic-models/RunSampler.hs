@@ -30,6 +30,7 @@ data SamplerOpts = SamplerOpts { burnin          :: Int
                                , iterations      :: Maybe Int
                                , updateBlock     :: Int
                                , sweepsDir       :: FilePath
+                               , nCaps           :: Int
                                , hyperEstOpts    :: HyperEstOpts
                                }
 
@@ -64,6 +65,12 @@ samplerOpts = SamplerOpts
                   <> metavar "DIR"
                   <> value "sweeps"
                   <> help "Directory in which to place model state output"
+                   )
+    <*> option     ( long "threads"
+                  <> short 'N'
+                  <> value 1
+                  <> metavar "INT"
+                  <> help "Number of worker threads to start"
                    )
     <*> hyperEstOpts'
 
@@ -105,7 +112,7 @@ processSweep opts lastMaxV sweepN m = do
                               if l > oldL then writeTVar lastMaxV l >> return True
                                           else return False
     when newMax
-        $ serializeState m $ sweepsDir opts </> printf "%05d" sweepN
+        $ serializeState m $ sweepsDir opts </> printf "%05d.state" sweepN
 
 doEstimateHypers :: SamplerModel ms => HyperEstOpts -> Int -> S.StateT ms IO ()
 doEstimateHypers (HyperEstOpts True burnin lag) iterN
@@ -151,6 +158,7 @@ checkOpts opts = do
 runSampler :: SamplerModel ms => SamplerOpts -> ms -> [WrappedUpdateUnit ms] -> IO ()
 runSampler opts m uus = do
     checkOpts opts
+    setNumCapabilities (nCaps opts)
     createDirectoryIfMissing False (sweepsDir opts)
     putStrLn "Starting sampler..."
     putStrLn $ "Burning in for "++show (burnin opts)++" samples"

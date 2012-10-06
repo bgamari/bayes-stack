@@ -11,14 +11,18 @@ import           Data.Text.Lazy.Builder.Int
 import qualified Data.Text.Lazy.Builder as TB
 import           Data.Serialize
 
+import           System.FilePath ((</>))                 
+import           Text.Printf
+
 import           BayesStack.Models.Topic.CitationInfluence
 import           SerializeText
 import           ReadData
 import           FormatMultinom                 
                  
-data Opts = Opts { nElems  :: Int
-                 , dist    :: Distribution
-                 , sweep   :: FilePath
+data Opts = Opts { nElems   :: Int
+                 , dist     :: Distribution
+                 , sweepDir :: FilePath
+                 , sweepNum :: Maybe Int
                  }
      
 data Distribution = Phis | Psis | Lambdas | Omegas | Gammas
@@ -42,11 +46,20 @@ opts = Opts
                     <> reader readDistribution
                     <> help "Which distribution to output (phis, psis, lambdas, omegas, or gammas)"
                      )
-    <*> argument str ( metavar "FILE" )
+    <*> strOption    ( long "sweeps"
+                    <> short 's'
+                    <> help "The directory of sweeps to dump"
+                     )
+    <*> option       ( long "number"
+                    <> short 'n'
+                    <> reader (Just . auto)
+                    <> value Nothing
+                    <> help "The sweep number to dump"
+                     )
 
-readItemMap :: IO (M.Map Item Term)                 
-readItemMap =
-    (either error id . runGet get) <$> BS.readFile "sweeps/item-map"
+readItemMap :: FilePath -> IO (M.Map Item Term)                 
+readItemMap sweepsDir =
+    (either error id . runGet get) <$> BS.readFile (sweepsDir </> "item-map")
 
 readSweep :: FilePath -> IO MState
 readSweep fname = (either error id . runGet get) <$> BS.readFile fname
@@ -78,6 +91,12 @@ dumpOmegas n m =
                     (TB.fromString . show)
                     n (stOmegas m)
 
+dumpGammas :: Int -> MState -> TB.Builder
+dumpGammas n m =
+    formatMultinoms (TB.fromString . show)
+                    (TB.fromString . show)
+                    n (stGammas m)
+
 main = do
     args <- execParser $ info (helper <*> opts) 
          ( fullDesc 
@@ -85,11 +104,15 @@ main = do
         <> header "dump-ci - Dump distributions from an citation influence model sweep"
          )
 
-    itemMap <- readItemMap
-    m <- readSweep (sweep args)
+    itemMap <- readItemMap $ sweepDir args
+    m <- case sweepNum args of
+             Nothing -> readSweep =<< getLastSweep (sweepDir args)
+             Just n  -> readSweep $ sweepDir args </> printf "%05d.state" n
+
     TL.putStr $ TB.toLazyText $ case dist args of
         Phis    -> dumpPhis (nElems args) itemMap m
         Psis    -> dumpPsis (nElems args) m
         Lambdas -> dumpLambdas (nElems args) m
         Omegas  -> dumpOmegas (nElems args) m
+        Gammas  -> dumpGammas (nElems args) m
 

@@ -11,23 +11,28 @@ import           Data.Text.Lazy.Builder.Int
 import qualified Data.Text.Lazy.Builder as TB
 import           Data.Serialize
 
+import           System.FilePath ((</>))                 
+import           Text.Printf                 
+
 import           BayesStack.Models.Topic.SharedTaste
 import           SerializeText
 import           ReadData
-import           FormatMultinom                 
+import           FormatMultinom
                  
 data Opts = Opts { nElems  :: Int
                  , dist    :: Distribution
-                 , sweep   :: FilePath
+                 , sweepDir :: FilePath
+                 , sweepNum :: Maybe Int
                  }
      
-data Distribution = Phis | Psis | Lambdas | Omegas
+data Distribution = Phis | Psis | Lambdas | Omegas | Gammas
      
 readDistribution :: String -> Maybe Distribution
 readDistribution "phis"   = Just Phis
 readDistribution "psis"   = Just Psis
 readDistribution "lambdas"= Just Lambdas
 readDistribution "omegas" = Just Omegas
+readDistribution "gammas" = Just Gammas
 readDistribution _        = Nothing
 
 opts = Opts
@@ -39,9 +44,18 @@ opts = Opts
     <*> nullOption   ( long "dist"
                     <> short 'd'
                     <> reader readDistribution
-                    <> help "Which distribution to output (psis, phis, lambdas, or omegas)"
+                    <> help "Which distribution to output (psis, phis, lambdas, gammas, or omegas)"
                      )
-    <*> argument str ( metavar "FILE" )
+    <*> strOption    ( long "sweeps"
+                    <> short 's'
+                    <> help "The directory of sweeps to dump"
+                     )
+    <*> option       ( long "number"
+                    <> short 'n'
+                    <> reader (Just . auto)
+                    <> value Nothing
+                    <> help "The sweep number to dump"
+                     )
 
 readItemMap :: IO (M.Map Item Term)                 
 readItemMap =
@@ -77,6 +91,12 @@ dumpOmegas n m =
                     (TB.fromString . show)
                     n (stOmegas m)
 
+dumpGammas :: Int -> MState -> TB.Builder
+dumpGammas n m =
+    formatMultinoms (TB.fromString . show)
+                    (TB.fromString . show)
+                    n (stGammas m)
+
 main = do
     args <- execParser $ info (helper <*> opts) 
          ( fullDesc 
@@ -85,10 +105,14 @@ main = do
          )
 
     itemMap <- readItemMap
-    m <- readSweep (sweep args)
+    m <- case sweepNum args of
+             Nothing -> readSweep =<< getLastSweep (sweepDir args)
+             Just n  -> readSweep $ sweepDir args </> printf "%05d.state" n
+
     TL.putStr $ TB.toLazyText $ case dist args of
         Phis    -> dumpPhis (nElems args) itemMap m
         Psis    -> dumpPsis (nElems args) m
         Lambdas -> dumpLambdas (nElems args) m
         Omegas  -> dumpOmegas (nElems args) m
+        Gammas  -> dumpGammas (nElems args) m
 

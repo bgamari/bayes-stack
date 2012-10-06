@@ -3,6 +3,7 @@
 module ReadData ( Term
                 , readEdges
                 , readNodeItems
+                , getLastSweep
                 ) where
 
 import           BayesStack.Models.Topic.Types
@@ -13,13 +14,17 @@ import           Data.Set (Set)
                  
 import qualified Data.Map as M
 
-import           Data.Maybe (mapMaybe)       
+import           Data.Maybe (mapMaybe)
 import           Control.Applicative
 
-import           Data.Char (isAlpha)                 
+import           Data.Char (isAlpha)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
+                 
+import           System.FilePath ((</>))
+import           System.Directory
+import           Data.List                 
 
 readEdges :: FilePath -> IO (Set (Node, Node))
 readEdges fname =
@@ -44,3 +49,8 @@ readNodeItems stopWords fname =
                  $ map (T.filter isAlpha)
                  $ filter (`S.notMember` stopWords) words
              otherwise -> M.empty
+
+getLastSweep :: FilePath -> IO FilePath
+getLastSweep sweepsDir =
+    (sweepsDir </>) . last . sort . filter (".state" `isSuffixOf`)
+    <$> getDirectoryContents sweepsDir
