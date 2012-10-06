@@ -3,7 +3,6 @@
 import           Data.Monoid
 import           Options.Applicative
 
-import           Data.List                 
 import qualified Data.Map as M
 import qualified Data.ByteString as BS
 
@@ -13,7 +12,6 @@ import qualified Data.Text.Lazy.Builder as TB
 import           Data.Serialize
 
 import           System.FilePath ((</>))                 
-import           System.Directory                 
 import           Text.Printf
 
 import           BayesStack.Models.Topic.CitationInfluence
@@ -58,11 +56,6 @@ opts = Opts
                     <> value Nothing
                     <> help "The sweep number to dump"
                      )
-
-getLastSweep :: FilePath -> IO FilePath
-getLastSweep sweepsDir =
-    (sweepsDir </>) . last . sort . filter (".state" `isSuffixOf`)
-    <$> getDirectoryContents sweepsDir
 
 readItemMap :: FilePath -> IO (M.Map Item Term)                 
 readItemMap sweepsDir =
