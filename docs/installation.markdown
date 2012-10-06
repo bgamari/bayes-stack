@@ -16,15 +16,15 @@ BayesStack/Models/Topic/SharedTaste.hs
 
 For an example on how to use is, see SharedTasteTest.hs
 
-- Install Haskell Platform from [http://hackage.haskell.org/platform/](http://hackage.haskell.org/platform/)
-- Install Haskell GHC 7.6.1 from [http://www.haskell.org/ghc/download_ghc_7_6_1](http://www.haskell.org/ghc/download_ghc_7_6_1) (our software needed a fix that is not available in the latest version of Haskell Platform)
--- $ sudo apt-get install libgmp3c2
--- unzip tarball and cd into directory
--- $ ./configure
--- make install
--- check that you have the right version with $ ghc -V
+1. Install Haskell Platform from [http://hackage.haskell.org/platform/](http://hackage.haskell.org/platform/)
+2. Install Haskell GHC 7.6.1 from [http://www.haskell.org/ghc/download_ghc_7_6_1](http://www.haskell.org/ghc/download_ghc_7_6_1) (our software needed a fix that is not available in the latest version of Haskell Platform)
+  - `$ sudo apt-get install libgmp3c2`
+  - unzip tarball and cd into directory
+  - $ ./configure
+  - make install
+  - check that you have the right version with $ ghc -V
  should return "The Glorious Glasgow Haskell Compilation System, version 7.6.1"
-
+3. bla
 
 Installing Bayes-Stack 2.0
 ----------------------------
