@@ -107,7 +107,8 @@ processSweep :: SamplerModel ms => SamplerOpts -> TVar LogFloat -> Int -> ms -> 
 processSweep opts lastMaxV sweepN m = do             
     let l = modelLikelihood m
     putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
-    appendFile "likelihood.txt" $ printf "%d\t%f\n" sweepN (logFromLogFloat l :: Double)
+    appendFile (sweepsDir opts </> "likelihood.log")
+        $ printf "%d\t%f\n" sweepN (logFromLogFloat l :: Double)
     newMax <- atomically $ do oldL <- readTVar lastMaxV
                               if l > oldL then writeTVar lastMaxV l >> return True
                                           else return False
@@ -122,7 +123,7 @@ doEstimateHypers (HyperEstOpts True burnin lag) iterN
         S.modify estimateHypers
         m' <- S.get
         void $ liftIO $ forkIO
-            $ appendFile "hyperparams.log"
+            $ appendFile (sweepsDir opts </> "hyperparams.log")
             $ printf "%5d\t%f\t%f\t%s\n"
                   iterN
                   (logFromLogFloat $ modelLikelihood m :: Double)
@@ -162,7 +163,7 @@ runSampler opts m uus = do
     createDirectoryIfMissing False (sweepsDir opts)
     putStrLn "Starting sampler..."
     putStrLn $ "Burning in for "++show (burnin opts)++" samples"
-    let lagNs = maybe [0..] (\n->[0..n]) $ iterations opts           
+    let lagNs = maybe [0..] (\n->[0..n+1]) $ iterations opts           
     lastMaxV <- atomically $ newTVar 0
     void $ S.runStateT (forM_ lagNs (samplerIter opts uus lastMaxV)) m
 
