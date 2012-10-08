@@ -34,7 +34,7 @@ import qualified Data.Map.Strict as M
 
 import           Data.Foldable hiding (product)
 import           Control.Applicative ((<$>), (<*>))
-import           Control.Monad (when)                 
+import           Control.Monad (when)
 import           Control.Monad.Trans.State.Strict
 import           Control.Monad.Trans.Writer.Strict
 
@@ -267,24 +267,25 @@ modelLikelihood model =
            ++ map likelihood (M.elems $ stPsis model)
 
 -- | The probability of a collections of items under a given topic mixture.
-itemScoreUnderTopicMix :: MState -> [Item] -> Multinom Topic -> Probability
-itemScoreUnderTopicMix m items lambda = 
+topicCompatibility :: MState -> [Item] -> Multinom Topic -> Probability
+topicCompatibility m items lambda = 
     product $ do t <- toList $ dmDomain lambda
                  x <- items
                  let phi = stPhis m M.! t
                  return $ prob lambda t * prob phi x
                  
-influenceScore :: MState -> [Item] -> CitedNode -> Probability
-influenceScore m items f =
-    itemScoreUnderTopicMix m items (stLambdas m M.! f)
-    
+topicCompatibilities :: (Functor f, Foldable f)
+                     => MState -> [Item] -> f (Multinom Topic) -> f Probability
+topicCompatibilities m items topics = 
+    let scores = fmap (topicCompatibility m items) topics
+    in fmap (/sum scores) scores
+
 -- | The influence of cited nodes on a citing node.
 influence :: NetData -> MState -> CitingNode -> Map CitedNode Probability
 influence d m u =
-    let items = itemsOfCitingNode d u
-        scores = foldMap (\f->M.singleton f $ influenceScore m items f)
+    let lambdas = foldMap (\f->M.singleton f $ stLambdas m M.! f)
                  $ S.toList $ getCitedNodes d u
-    in M.map (/sum scores) scores
+    in topicCompatibilities m (itemsOfCitingNode d u) lambdas
 
 -- Cited update unit (LDA-like)
 data CitedUpdateUnit = CitedUpdateUnit { uuNI' :: CitedNodeItem
