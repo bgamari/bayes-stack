@@ -44,13 +44,11 @@ runOpts = RunOpts
     <$> strOption  ( long "edges"
                   <> short 'e'
                   <> metavar "FILE"
-                  <> value "arcs"
                   <> help "File containing edges"
                    )
     <*> strOption  ( long "nodes"
                   <> short 'n'
                   <> metavar "FILE"
-                  <> value "node-items"
                   <> help "File containing nodes' items"
                    )
     <*> nullOption ( long "stopwords"
