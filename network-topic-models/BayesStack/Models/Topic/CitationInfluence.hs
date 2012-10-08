@@ -23,8 +23,6 @@ module BayesStack.Models.Topic.CitationInfluence
   , modelLikelihood
   ) where
 
-import           Debug.Trace
-
 import           Prelude hiding (mapM_)
 
 import           Data.Set (Set)
@@ -334,7 +332,6 @@ citingUpdateUnits d =
                                        }
         ) $ M.assocs $ dCitingNodeItems d
         
-tr x = traceShow x x
 citingProb :: MState -> CitingUpdateUnit -> Setting CitingUpdateUnit -> Double
 citingProb st (CitingUpdateUnit {uuN=n, uuX=x}) setting =
     let gamma = stGammas st M.! n
