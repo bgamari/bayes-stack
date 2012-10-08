@@ -33,7 +33,7 @@ readDistribution "thetas" = Just Thetas
 readDistribution _        = Nothing
 
 opts = Opts
-    <$> option       ( long "n-elems"
+    <$> option       ( long "top"
                     <> short 'n'
                     <> value 30
                     <> metavar "N"

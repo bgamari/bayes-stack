@@ -64,7 +64,7 @@ readDumper "influences" = Just $ \opts nd m showItem showNode ->
 readDumper _        = Nothing
 
 opts = Opts
-    <$> option       ( long "n-elems"
+    <$> option       ( long "top"
                     <> short 'n'
                     <> value 30
                     <> metavar "N"
