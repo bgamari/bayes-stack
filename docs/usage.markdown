@@ -185,7 +185,7 @@ Two kinds of input data are required. The nodes file has to be in the format
 
      `node id` \t all items (e.g. words) on one line \n
 
-If a stopwords file is given, those items are ignored from the input.
+This id is used both as a cited node id as well as a citing node id. If a stopwords file is given, those items are ignored from the input.
 
 The arcs file has to list each arc as the source node and sink node. All arcs are directed. You *can* add cycles. Follow the format:
 
