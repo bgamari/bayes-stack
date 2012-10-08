@@ -283,7 +283,7 @@ influence :: NetData -> MState -> CitingNode -> Map CitedNode Probability
 influence d m u =
     let items = itemsOfCitingNode d u
         scores = foldMap (\f->M.singleton f $ influenceScore m items f)
-                 $ S.toList $ dCitedNodes d
+                 $ S.toList $ getCitedNodes d u
     in M.map (/sum scores) scores
 
 -- Cited update unit (LDA-like)
