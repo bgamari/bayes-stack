@@ -124,6 +124,7 @@ main = do
     
     withSystemRandom $ \mwc->do
     let nd = netData nodeItems arcs (nTopics args)
+    BS.writeFile (sweepsDir </> "data") $ runPut $ put nd
     mInit <- runRVar (randomInitialize nd) mwc
     let m = model nd mInit
     Sampler.runSampler (samplerOpts args) m (updateUnits nd)
