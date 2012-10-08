@@ -23,7 +23,7 @@ import           SerializeText
 import           ReadData
 import           FormatMultinom                 
                  
-data Opts = Opts { nElems   :: Int
+data Opts = Opts { nElems   :: Maybe Int
                  , dumper   :: Dumper
                  , sweepDir :: FilePath
                  , sweepNum :: Maybe Int
@@ -66,7 +66,7 @@ readDumper _        = Nothing
 opts = Opts
     <$> option       ( long "top"
                     <> short 'n'
-                    <> value 30
+                    <> value Nothing
                     <> metavar "N"
                     <> help "Number of elements to output from each distribution"
                      )

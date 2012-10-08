@@ -19,7 +19,7 @@ import           SerializeText
 import           ReadData
 import           FormatMultinom                 
 
-data Opts = Opts { nElems  :: Int
+data Opts = Opts { nElems  :: Maybe Int
                  , dist    :: Distribution
                  , sweepDir :: FilePath
                  , sweepNum :: Maybe Int
@@ -35,7 +35,7 @@ readDistribution _        = Nothing
 opts = Opts
     <$> option       ( long "top"
                     <> short 'n'
-                    <> value 30
+                    <> value Nothing
                     <> metavar "N"
                     <> help "Number of elements to output from each distribution"
                      )
@@ -68,13 +68,13 @@ readSweep fname = (either error id . runGet get) <$> BS.readFile fname
 readNetData :: FilePath -> IO NetData
 readNetData fname = (either error id . runGet get) <$> BS.readFile fname
 
-dumpPhis :: Int -> M.Map Item Term -> MState -> TB.Builder
+dumpPhis :: Maybe Int -> M.Map Item Term -> MState -> TB.Builder
 dumpPhis n itemMap m =
     formatMultinoms (\(Topic n)->"Topic "<>decimal n)
                     (TB.fromString . show . (itemMap M.!))
                     n (stPhis m)
 
-dumpThetas :: Int -> MState -> TB.Builder
+dumpThetas :: Maybe Int -> MState -> TB.Builder
 dumpThetas n m =
     formatMultinoms (\(Node n)->"Node "<>decimal n)
                     (TB.fromString . show)
