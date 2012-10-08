@@ -36,6 +36,7 @@ opts = Opts
     <$> option       ( long "n-elems"
                     <> short 'n'
                     <> value 30
+                    <> metavar "N"
                     <> help "Number of elements to output from each distribution"
                      )
     <*> nullOption   ( long "dist"
@@ -45,12 +46,15 @@ opts = Opts
                      )
     <*> strOption    ( long "sweeps"
                     <> short 's'
+                    <> value "sweeps"
+                    <> metavar "DIR"
                     <> help "The directory of sweeps to dump"
                      )
     <*> option       ( long "number"
-                    <> short 'n'
+                    <> short 'N'
                     <> reader (Just . auto)
                     <> value Nothing
+                    <> metavar "N"
                     <> help "The sweep number to dump"
                      )
 
