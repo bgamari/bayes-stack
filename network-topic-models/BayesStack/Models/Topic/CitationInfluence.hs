@@ -21,9 +21,10 @@ module BayesStack.Models.Topic.CitationInfluence
   , updateUnits
     -- * Diagnostics
   , modelLikelihood
+  , influence
   ) where
 
-import           Prelude hiding (mapM_)
+import           Prelude hiding (mapM_, sum)
 
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -110,6 +111,10 @@ getCitingNodes d n = S.map citingNode $ S.filter (\(Arc (_,cited))->cited==n) $ 
 
 getCitedNodes :: NetData -> CitingNode -> Set CitedNode
 getCitedNodes d n = S.map citedNode $ S.filter (\(Arc (citing,_))->citing==n) $ dArcs d
+
+itemsOfCitingNode :: NetData -> CitingNode -> [Item]
+itemsOfCitingNode d u =
+    map snd $ M.elems $ M.filter (\(n,_)->n==u) $ dCitingNodeItems d
               
 connectedNodes :: Set Arc -> Set Node
 connectedNodes arcs =
@@ -260,6 +265,26 @@ modelLikelihood model =
            ++ map likelihood (M.elems $ stLambdas model)
            ++ map likelihood (M.elems $ stOmegas model)
            ++ map likelihood (M.elems $ stPsis model)
+
+-- | The probability of a collections of items under a given topic mixture.
+itemScoreUnderTopicMix :: MState -> [Item] -> Multinom Topic -> Probability
+itemScoreUnderTopicMix m items lambda = 
+    product $ do t <- toList $ dmDomain lambda
+                 x <- items
+                 let phi = stPhis m M.! t
+                 return $ realToFrac $ sampleProb lambda t * sampleProb phi x
+                 
+influenceScore :: MState -> [Item] -> CitedNode -> Probability
+influenceScore m items f =
+    itemScoreUnderTopicMix m items (stLambdas m M.! f)
+    
+-- | The influence of cited nodes on a citing node.
+influence :: NetData -> MState -> CitingNode -> Map CitedNode Probability
+influence d m u =
+    let items = itemsOfCitingNode d u
+        scores = foldMap (\f->M.singleton f $ influenceScore m items f)
+                 $ S.toList $ dCitedNodes d
+    in M.map (/sum scores) scores
 
 -- Cited update unit (LDA-like)
 data CitedUpdateUnit = CitedUpdateUnit { uuNI' :: CitedNodeItem
