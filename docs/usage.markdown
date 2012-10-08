@@ -136,13 +136,75 @@ To output the topic mixtures for each edge/friendship call
 
      bayes-stack-dump-st --dist=lambdas --sweeps stsweeps
 
-To output the topic mixtures for each edge/friendship call
+To output the strength of mutual influence of friends on a user call
 
      bayes-stack-dump-st --dist=psis --sweeps stsweeps
 
 To output the tendency of each user to prefer tastes shared with a friend versus his own call
 
      bayes-stack-dump-st --dist=gammas --sweeps stsweeps
+
+
+
+### Citation influence model
+
+The citation influence model is designed to understand for which topics a document was cited and to determine a given research paper which its citations had strong influence on it. Notice that even seminal papers, may be cited by papers on which they only have a marginal influence. We treat each document as a node, and each citation as an arc from the citing to the cited paper.
+
+Those local influences on a citing node are modeled by mixture over citations `psi`. Each cited node has a mixture over topics `lambda`. Each item in a citing node are associated with one of its citations, and a topic drawn from that cited documents's `lambda`. Further, each item in a cited node are drawn from its `lambda`. The consequence is that a cited node's topic mixture `lambda` is a shared topic mixture, estimated not only from the node's items, but also some items in citing nodes. This is a crucial distinction to LDA. `psi` and `lambda` influence each other: The more likely items in a citing document fit to a topic mixture, the higher its probability  under `psi`; The more items in citing documents are associated with the cited document, the more `lamba` will be representing it.
+
+Each node in the citation graph will be represented once as a cited document, and once as a citing document. Topics in both duplicates are synchronized via joint influence of `phi`. As some research papers include more novel ideas than others, each citing document also has a topic mixture `omega` for own topics. The propensity to re-use topics from citations versus the introduction of new topics is captured in the Bernoulli parameter `gamma`.
+
+Nomenclature:
+
+lamda
+: the cited node-specific mixture of topics (equivalent to theta in LDA, but modelling shared topics)
+
+phi
+: a topic-specific mixture of items (as in LDA)
+
+psi
+: a citing node specific distribution over citations
+
+omega
+: a citing node-specific mixture of individual topics
+
+gamma
+: for each citing node, a Bernoulli distribution for associating sharing versus own topics
+
+
+To run the shared taste model with 10 topics using 5 parallel threads call
+
+     bayes-stack-ci --arcs FILE --nodes FILE -t10 --sweeps=cisweeps --threads=5 
+
+
+Two kinds of input data are required. The nodes file has to be in the format
+
+     `node id` \t all items (e.g. words) on one line \n
+
+If a stopwords file is given, those items are ignored from the input.
+
+The arcs file has to list each arc as the source node and sink node. All arcs are directed. You *can* add cycles. Follow the format:
+
+     `citing node id` \t `cited node id` \n
+
+
+After the Gibbs sampler finished, inspect likelihood file to confirm that the model likelihood converged.
+
+To output the top 20 items for each topic call
+
+     bayes-stack-dump-ci -n20 --dist=phis --sweeps cisweeps
+
+To output the topic mixtures for each edge/friendship call
+
+     bayes-stack-dump-ci --dist=lambdas --sweeps cisweeps
+
+To output the strength of mutual influence of friends on a user call
+
+     bayes-stack-dump-ci --dist=psis --sweeps cisweeps
+
+To output the tendency of each user to prefer tastes shared with a friend versus his own call
+
+     bayes-stack-dump-ci --dici=gammas --sweeps cisweeps
 
 
 
