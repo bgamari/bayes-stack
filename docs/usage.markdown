@@ -140,7 +140,11 @@ To output the strength of mutual influence of friends on a user call
 
      bayes-stack-dump-st --dist=psis --sweeps stsweeps
 
-To output the tendency of each user to prefer tastes shared with a friend versus his own call
+To output the own topic mixture of a node call
+
+     bayes-stack-dump-st --dist=omegas --sweeps stsweeps
+
+To output the tendency of each node to prefer tastes shared with a friend versus his own call
 
      bayes-stack-dump-st --dist=gammas --sweeps stsweeps
 
@@ -202,9 +206,13 @@ To output the strength of mutual influence of friends on a user call
 
      bayes-stack-dump-ci --dist=psis --sweeps cisweeps
 
+To output the own topic mixture of a citing node call
+
+     bayes-stack-dump-ci --dist=omegas --sweeps cisweeps
+
 To output the tendency of each user to prefer tastes shared with a friend versus his own call
 
-     bayes-stack-dump-ci --dici=gammas --sweeps cisweeps
+     bayes-stack-dump-ci --dist=gammas --sweeps cisweeps
 
 
 
