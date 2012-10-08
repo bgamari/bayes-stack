@@ -272,7 +272,7 @@ itemScoreUnderTopicMix m items lambda =
     product $ do t <- toList $ dmDomain lambda
                  x <- items
                  let phi = stPhis m M.! t
-                 return $ realToFrac $ prob lambda t * prob phi x
+                 return $ prob lambda t * prob phi x
                  
 influenceScore :: MState -> [Item] -> CitedNode -> Probability
 influenceScore m items f =
