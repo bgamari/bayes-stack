@@ -45,7 +45,7 @@ runOpts = RunOpts
                   <> short 'e'
                   <> metavar "FILE"
                   <> value "arcs"
-                  <> help "File containing arcs"
+                  <> help "File containing edges"
                    )
     <*> strOption  ( long "nodes"
                   <> short 'n'
@@ -92,8 +92,8 @@ netData nodeItems edges nTopics =
             
 opts = info runOpts
            (  fullDesc
-           <> progDesc "Learn citation influence model"
-           <> header "run-ci - learn citation influence model"
+           <> progDesc "Learn shared taste model"
+           <> header "run-st - learn shared taste model"
            )
 
 instance Sampler.SamplerModel MState where
