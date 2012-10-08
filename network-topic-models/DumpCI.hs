@@ -20,20 +20,35 @@ import           ReadData
 import           FormatMultinom                 
                  
 data Opts = Opts { nElems   :: Int
-                 , dist     :: Distribution
+                 , dumper   :: Dumper
                  , sweepDir :: FilePath
                  , sweepNum :: Maybe Int
                  }
      
-data Distribution = Phis | Psis | Lambdas | Omegas | Gammas
-     
-readDistribution :: String -> Maybe Distribution
-readDistribution "phis"   = Just Phis
-readDistribution "psis"   = Just Psis
-readDistribution "lambdas"= Just Lambdas
-readDistribution "omegas" = Just Omegas
-readDistribution "gammas" = Just Gammas
-readDistribution _        = Nothing
+type Dumper = Opts -> MState
+              -> (Item -> TB.Builder) -> (Node -> TB.Builder)
+              -> TB.Builder
+
+showB :: Show a => a -> TB.Builder
+showB = TB.fromString . show
+
+readDumper :: String -> Maybe Dumper
+readDumper "phis"   = Just $ \opts m showItem showNode ->
+    formatMultinoms (\(Topic n)->"Topic "<>decimal n) showItem (nElems opts) (stPhis m)
+
+readDumper "psis"   = Just $ \opts m showItem showNode ->
+    formatMultinoms (\(Citing n)->showNode n) showB (nElems opts) (stPsis m)
+
+readDumper "lambdas"= Just $ \opts m showItem showNode ->
+    formatMultinoms showB showB (nElems opts) (stLambdas m)
+
+readDumper "omegas" = Just $ \opts m showItem showNode ->
+    formatMultinoms showB showB (nElems opts) (stOmegas m)
+
+readDumper "gammas" = Just $ \opts m showItem showNode ->
+    formatMultinoms showB showB (nElems opts) (stGammas m)
+
+readDumper _        = Nothing
 
 opts = Opts
     <$> option       ( long "n-elems"
@@ -42,10 +57,8 @@ opts = Opts
                     <> metavar "N"
                     <> help "Number of elements to output from each distribution"
                      )
-    <*> nullOption   ( long "dist"
-                    <> short 'd'
-                    <> reader readDistribution
-                    <> help "Which distribution to output (phis, psis, lambdas, omegas, or gammas)"
+    <*> argument readDumper
+                     ( metavar "STR"
                      )
     <*> strOption    ( long "sweeps"
                     <> short 's'
@@ -71,36 +84,6 @@ readSweep fname = (either error id . runGet get) <$> BS.readFile fname
 readNetData :: FilePath -> IO NetData
 readNetData fname = (either error id . runGet get) <$> BS.readFile fname
 
-dumpPhis :: Int -> M.Map Item Term -> MState -> TB.Builder
-dumpPhis n itemMap m =
-    formatMultinoms (\(Topic n)->"Topic "<>decimal n)
-                    (TB.fromString . show . (itemMap M.!))
-                    n (stPhis m)
-
-dumpPsis :: Int -> MState -> TB.Builder
-dumpPsis n m =
-    formatMultinoms (\(Citing (Node n))->"Node "<>decimal n)
-                    (TB.fromString . show)
-                    n (stPsis m)
-
-dumpLambdas :: Int -> MState -> TB.Builder
-dumpLambdas n m =
-    formatMultinoms (TB.fromString . show)
-                    (TB.fromString . show)
-                    n (stLambdas m)
-
-dumpOmegas :: Int -> MState -> TB.Builder
-dumpOmegas n m =
-    formatMultinoms (TB.fromString . show)
-                    (TB.fromString . show)
-                    n (stOmegas m)
-
-dumpGammas :: Int -> MState -> TB.Builder
-dumpGammas n m =
-    formatMultinoms (TB.fromString . show)
-                    (TB.fromString . show)
-                    n (stGammas m)
-
 main = do
     args <- execParser $ info (helper <*> opts) 
          ( fullDesc 
@@ -113,10 +96,6 @@ main = do
              Nothing -> readSweep =<< getLastSweep (sweepDir args)
              Just n  -> readSweep $ sweepDir args </> printf "%05d.state" n
 
-    TL.putStr $ TB.toLazyText $ case dist args of
-        Phis    -> dumpPhis (nElems args) itemMap m
-        Psis    -> dumpPsis (nElems args) m
-        Lambdas -> dumpLambdas (nElems args) m
-        Omegas  -> dumpOmegas (nElems args) m
-        Gammas  -> dumpGammas (nElems args) m
-
+    let showItem = showB . (itemMap M.!)
+        showNode = showB
+    TL.putStr $ TB.toLazyText $ dumper args args m showItem showNode
