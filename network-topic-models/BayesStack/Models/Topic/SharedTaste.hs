@@ -14,9 +14,10 @@ module BayesStack.Models.Topic.SharedTaste
   , model, updateUnits
     -- * Diagnostics
   , modelLikelihood
+  , influence
   ) where
 
-import Prelude hiding (mapM)
+import Prelude hiding (mapM, sum)
 
 import Data.Set (Set)
 import qualified Data.Set as S
@@ -65,6 +66,12 @@ instance Serialize NetData
          
 dNodes :: NetData -> Set Node
 dNodes = S.fromList . map fst . M.elems . dNodeItems
+       
+dAdjNodes :: NetData -> Node -> Set Node
+dAdjNodes nd n = S.fromList $ getFriends (S.toList $ dEdges nd) n
+          
+dItemsOfNode :: NetData -> Node -> [Item]
+dItemsOfNode nd u = map snd $ filter (\(n,_)->u==n) $ M.elems $ dNodeItems nd
 
 type ModelInit = Map NodeItem (Setting STUpdateUnit)
 
@@ -216,3 +223,25 @@ modelLikelihood model =
            ++ map likelihood (M.elems $ stLambdas model)
            ++ map likelihood (M.elems $ stOmegas model)
            ++ map likelihood (M.elems $ stPsis model)
+
+-- | The probability of a collections of items under a given topic mixture.
+topicCompatibility :: MState -> [Item] -> Multinom Topic -> Probability
+topicCompatibility m items lambda = 
+    product $ do t <- toList $ dmDomain lambda
+                 x <- items
+                 let phi = stPhis m M.! t
+                 return $ prob lambda t * prob phi x
+
+topicCompatibilities :: (Functor f, Foldable f)
+                     => MState -> [Item] -> f (Multinom Topic) -> f Probability
+topicCompatibilities m items topics = 
+    let scores = fmap (topicCompatibility m items) topics
+    in fmap (/sum scores) scores
+
+-- | The influence of adjacent nodes on a node.
+influence :: NetData -> MState -> Node -> Map Node Probability
+influence d m u =
+    let lambdas = foldMap (\f->M.singleton f $ stLambdas m M.! Edge (u,f))
+                  $ dAdjNodes d u
+    in topicCompatibilities m (dItemsOfNode d u) lambdas
+
