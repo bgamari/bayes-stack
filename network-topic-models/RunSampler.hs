@@ -168,7 +168,7 @@ runSampler opts m uus = do
     putStrLn $ "Burning in for "++show (burnin opts)++" samples"
     let lagNs = maybe [0..] (\n->[0..n+1]) $ iterations opts           
     lastMaxV <- atomically $ newTVar 0
-    processSweepRunning <- atomically $ newEmptyTMVar
+    processSweepRunning <- atomically $ newTMVar ()
     void $ S.runStateT (forM_ lagNs (samplerIter opts uus processSweepRunning lastMaxV)) m
     atomically $ takeTMVar processSweepRunning
 
