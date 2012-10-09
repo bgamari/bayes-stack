@@ -66,7 +66,7 @@ Nomenclature:
 Each of the mixtures are represented by a multinomial distribution with a symmetric Dirichlet prior
 
 To run an LDA topic model with 10 topics, priors for theta and phi of 0.1, using 5 parallel threads call
-    bayes-stack-lda --nodes FILE -t10 --prior-theta=0.1 --prior-phi-0.1 --sweeps=ldasweeps --threads=5
+    bayes-stack-lda --nodes FILE -t10 --prior-theta=0.1 --prior-phi=0.1 --sweeps=ldasweeps --threads=5
 
 The nodes file is in the format of
 
@@ -113,12 +113,14 @@ Nomenclature:
 : for each node, its own mixture of topics
 
 *gammas*
-: for each node, a Bernoulli distribution sharing versus own topics
+: for each node, a Bernoulli distribution sharing versus own topics. The current version does not support estimating gammas from data. The parameter is fixed and set to the mean of its given Beta prior.
 
 
 To run the shared taste model with 10 topics using 5 parallel threads call
 
      bayes-stack-st --edges FILE --nodes FILE -t10 --sweeps=stsweeps --threads=5 
+
+To set Dirichlet priors for all mixture distribution use command line arguments such as `--prior-lambda=0.1`. 
 
 
 Two kinds of input data are required. The nodes file has to be in the format
@@ -171,13 +173,14 @@ Nomenclature:
 : for each citing node, the own mixture of topics
 
 *gammas*
-: for each citing node, a Bernoulli distribution for sharing versus own topics
+: for each citing node, a Bernoulli distribution for sharing versus own topics. The current version does not support estimating gammas from data. The parameter is fixed and set to the mean of its given Beta prior.
 
 
 To run the shared taste model with 10 topics using 5 parallel threads call
 
      bayes-stack-ci --arcs FILE --nodes FILE -t10 --sweeps=cisweeps --threads=5 
 
+To set Dirichlet priors for all mixture distribution use command line arguments such as `--prior-lambda=0.1`. 
 
 Two kinds of input data are required. The nodes file has to be in the format
 
