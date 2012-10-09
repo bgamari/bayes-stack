@@ -112,11 +112,11 @@ processSweep opts lastMaxV sweepN m = do
     newMax <- atomically $ do oldL <- readTVar lastMaxV
                               if l > oldL then writeTVar lastMaxV l >> return True
                                           else return False
-    when newMax
+    when (newMax && sweepN >= burnin opts)
         $ serializeState m $ sweepsDir opts </> printf "%05d.state" sweepN
 
-doEstimateHypers :: SamplerModel ms => HyperEstOpts -> Int -> S.StateT ms IO ()
-doEstimateHypers (HyperEstOpts True burnin lag) iterN
+doEstimateHypers :: SamplerModel ms => SamplerOpts -> Int -> S.StateT ms IO ()
+doEstimateHypers opts@(SamplerOpts {hyperEstOpts=HyperEstOpts True burnin lag}) iterN
     | iterN >= burnin && iterN `mod` lag == 0  = do
         liftIO $ putStrLn "Parameter estimation"
         m <- S.get
@@ -142,9 +142,8 @@ samplerIter opts uus lastMaxV lagN = do
     let uus' = concat $ replicate (lag opts) shuffledUus
     S.put =<< liftIO (gibbsUpdate (updateBlock opts) m uus')
     when (sweepN == burnin opts) $ liftIO $ putStrLn "Burn-in complete"
-    when (sweepN >= burnin opts) $ 
-        S.get >>= void . liftIO . forkIO . processSweep opts lastMaxV sweepN
-    doEstimateHypers (hyperEstOpts opts) sweepN
+    S.get >>= void . liftIO . forkIO . processSweep opts lastMaxV sweepN
+    doEstimateHypers opts sweepN
 
 checkOpts :: SamplerOpts -> IO ()
 checkOpts opts = do
