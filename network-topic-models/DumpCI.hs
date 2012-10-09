@@ -73,6 +73,7 @@ opts = Opts
                      )
     <*> argument readDumper
                      ( metavar "STR"
+                    <> help "One of: phis, psis, lambdas, omegas, gammas, influences"
                      )
     <*> strOption    ( long "sweeps"
                     <> short 's'
