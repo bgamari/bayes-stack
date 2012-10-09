@@ -144,8 +144,9 @@ samplerIter opts uus processSweepRunning lastMaxV lagN = do
     S.put =<< liftIO (gibbsUpdate (updateBlock opts) m uus')
     when (sweepN == burnin opts) $ liftIO $ putStrLn "Burn-in complete"
     S.get >>= \m->do liftIO $ atomically $ takeTMVar processSweepRunning
-                     void $ liftIO $ forkIO $ processSweep opts lastMaxV sweepN m
-                     liftIO $ atomically $ putTMVar processSweepRunning ()
+                     void $ liftIO $ forkIO $ do
+                         processSweep opts lastMaxV sweepN m
+                         liftIO $ atomically $ putTMVar processSweepRunning ()
                      
     doEstimateHypers opts sweepN
 
