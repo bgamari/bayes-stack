@@ -167,7 +167,7 @@ runSampler opts m uus = do
     createDirectoryIfMissing False (sweepsDir opts)
     putStrLn "Starting sampler..."
     putStrLn $ "Burning in for "++show (burnin opts)++" samples"
-    let lagNs = maybe [0..] (\n->[0..n+1]) $ iterations opts           
+    let lagNs = maybe [0..] (\n->[0..n `div` lag opts]) $ iterations opts           
     lastMaxV <- atomically $ newTVar 0
     processSweepRunning <- atomically $ newTMVar ()
     void $ S.runStateT (forM_ lagNs (samplerIter opts uus processSweepRunning lastMaxV)) m
