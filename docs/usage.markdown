@@ -1,9 +1,3 @@
----
-layout: default
-title: Install Haskell and Bayes-Stack
-section: Bayes-Stack
----
-
 Using Bayes-Stack Network Topic Models
 =======================================
 
