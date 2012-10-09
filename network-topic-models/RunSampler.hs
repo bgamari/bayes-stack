@@ -38,7 +38,7 @@ samplerOpts = SamplerOpts
     <$> option     ( long "burnin"
                   <> short 'b'
                   <> metavar "N"
-                  <> value 1000
+                  <> value 100
                   <> help "Number of sweeps to run before taking samples"
                    )
     <*> option     ( long "lag"
