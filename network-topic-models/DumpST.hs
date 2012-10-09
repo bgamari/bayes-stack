@@ -62,9 +62,10 @@ readDumper "influences" = Just $ \opts nd m showItem showNode ->
        $ M.keys $ stGammas m
 
 opts = Opts
-    <$> option       ( long "top"
+    <$> nullOption   ( long "top"
                     <> short 'n'
                     <> value Nothing
+                    <> reader (Just . auto)
                     <> metavar "N"
                     <> help "Number of elements to output from each distribution"
                      )
