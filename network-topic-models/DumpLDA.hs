@@ -19,38 +19,51 @@ import           SerializeText
 import           ReadData
 import           FormatMultinom                 
 
-data Opts = Opts { nElems  :: Int
-                 , dist    :: Distribution
+data Opts = Opts { nElems   :: Maybe Int
+                 , dumper   :: Dumper
                  , sweepDir :: FilePath
                  , sweepNum :: Maybe Int
                  }
+
+type Dumper = Opts -> NetData -> MState
+              -> (Item -> TB.Builder) -> (Node -> TB.Builder)
+              -> TB.Builder
      
-data Distribution = Phis | Thetas
-     
-readDistribution :: String -> Maybe Distribution
-readDistribution "phis"   = Just Phis
-readDistribution "thetas" = Just Thetas
-readDistribution _        = Nothing
+showB :: Show a => a -> TB.Builder
+showB = TB.fromString . show
+
+readDumper :: String -> Maybe Dumper
+readDumper "thetas" = Just $ \opts nd m showItem showNode ->
+    formatMultinoms showNode showB (nElems opts) (stThetas m)
+
+readDumper "phis"   = Just $ \opts nd m showItem showNode ->
+    formatMultinoms (\(Topic n)->"Topic "<>decimal n) showItem (nElems opts) (stPhis m)
+
+readDumper _        = Nothing
 
 opts = Opts
-    <$> option       ( long "n-elems"
+    <$> nullOption   ( long "top"
                     <> short 'n'
-                    <> value 30
+                    <> value Nothing
+                    <> reader (Just . auto)
+                    <> metavar "N"
                     <> help "Number of elements to output from each distribution"
                      )
-    <*> nullOption   ( long "dist"
-                    <> short 'd'
-                    <> reader readDistribution
-                    <> help "Which distribution to output (phis or thetas)"
+    <*> argument readDumper
+                     ( metavar "STR"
+                    <> help "One of: thetas, lambdas"
                      )
     <*> strOption    ( long "sweeps"
                     <> short 's'
+                    <> value "sweeps"
+                    <> metavar "DIR"
                     <> help "The directory of sweeps to dump"
                      )
     <*> option       ( long "number"
-                    <> short 'n'
+                    <> short 'N'
                     <> reader (Just . auto)
                     <> value Nothing
+                    <> metavar "N"
                     <> help "The sweep number to dump"
                      )
 
@@ -64,18 +77,6 @@ readSweep fname = (either error id . runGet get) <$> BS.readFile fname
 readNetData :: FilePath -> IO NetData
 readNetData fname = (either error id . runGet get) <$> BS.readFile fname
 
-dumpPhis :: Int -> M.Map Item Term -> MState -> TB.Builder
-dumpPhis n itemMap m =
-    formatMultinoms (\(Topic n)->"Topic "<>decimal n)
-                    (TB.fromString . show . (itemMap M.!))
-                    n (stPhis m)
-
-dumpThetas :: Int -> MState -> TB.Builder
-dumpThetas n m =
-    formatMultinoms (\(Node n)->"Node "<>decimal n)
-                    (TB.fromString . show)
-                    n (stThetas m)
-
 main = do
     args <- execParser $ info (helper <*> opts) 
          ( fullDesc 
@@ -83,12 +84,13 @@ main = do
         <> header "dump-lda - Dump distributions from an LDA sweep"
          )
 
+    nd <- readNetData $ sweepDir args </> "data"
     itemMap <- readItemMap
     m <- case sweepNum args of
              Nothing -> readSweep =<< getLastSweep (sweepDir args)
              Just n  -> readSweep $ sweepDir args </> printf "%05d.state" n
     
-    TL.putStr $ TB.toLazyText $ case dist args of
-        Phis   -> dumpPhis (nElems args) itemMap m
-        Thetas -> dumpThetas (nElems args) m
+    let showItem = showB . (itemMap M.!)
+        showNode = showB
+    TL.putStr $ TB.toLazyText $ dumper args args nd m showItem showNode
 

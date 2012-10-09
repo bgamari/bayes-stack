@@ -3,7 +3,7 @@
 module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                              Multinom, dirMulti, symDirMulti, multinom
                              -- | Do not do record updates with these
-                           , dmTotal, dmAlpha
+                           , dmTotal, dmAlpha, dmDomain
                            , setMultinom, SetUnset (..)
                            , decMultinom, incMultinom
                            , prettyMultinom
@@ -124,15 +124,25 @@ dmGetCounts dm k =
 instance HasLikelihood Multinom where
   type LContext Multinom a = (Ord a, Enum a)
   likelihood dm@(Multinom {}) =
-    product $ map (\(k,n)->(realToFrac $ dmProbs dm EM.! k)^n) $ EM.assocs $ dmCounts dm
+      product $ map (\(k,n)->(realToFrac $ dmProbs dm EM.! k)^n) $ EM.assocs $ dmCounts dm
   likelihood dm =
-        let alpha = dmAlpha dm
-            f k = logToLogFloat $ checkNaN "likelihood(factor)"
-                  $ lnGamma (realToFrac (dmGetCounts dm k) + alpha `alphaOf` k)
-        in 1 / alphaNormalizer alpha
-           * product (map f $ toList $ dmDomain dm)
-           / logToLogFloat (checkNaN "likelihood" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha) 
+      let alpha = dmAlpha dm
+          f k = logToLogFloat $ checkNaN "likelihood(factor)"
+                $ lnGamma (realToFrac (dmGetCounts dm k) + alpha `alphaOf` k)
+      in 1 / alphaNormalizer alpha
+         * product (map f $ toList $ dmDomain dm)
+         / logToLogFloat (checkNaN "likelihood" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha) 
   {-# INLINEABLE likelihood #-}
+  
+  prob dm@(Multinom {}) k = realToFrac $ dmProbs dm EM.! k
+  prob dm k =
+      let alpha = dmAlpha dm
+          f k = logToLogFloat $ checkNaN "prob(factor)"
+                $ lnGamma (realToFrac (dmGetCounts dm k) + alpha `alphaOf` k)
+      in 1 / alphaNormalizer alpha
+         * f k
+         / logToLogFloat (checkNaN "prob" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha) 
+  {-# INLINEABLE prob #-}
 
 instance FullConditionable Multinom where
   type FCContext Multinom a = (Ord a, Enum a)

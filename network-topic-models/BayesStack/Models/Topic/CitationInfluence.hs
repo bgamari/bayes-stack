@@ -21,11 +21,10 @@ module BayesStack.Models.Topic.CitationInfluence
   , updateUnits
     -- * Diagnostics
   , modelLikelihood
+  , influence
   ) where
 
-import           Debug.Trace
-
-import           Prelude hiding (mapM_)
+import           Prelude hiding (mapM_, sum)
 
 import           Data.Set (Set)
 import qualified Data.Set as S
@@ -35,7 +34,7 @@ import qualified Data.Map.Strict as M
 
 import           Data.Foldable hiding (product)
 import           Control.Applicative ((<$>), (<*>))
-import           Control.Monad (when)                 
+import           Control.Monad (when)
 import           Control.Monad.Trans.State.Strict
 import           Control.Monad.Trans.Writer.Strict
 
@@ -112,6 +111,10 @@ getCitingNodes d n = S.map citingNode $ S.filter (\(Arc (_,cited))->cited==n) $ 
 
 getCitedNodes :: NetData -> CitingNode -> Set CitedNode
 getCitedNodes d n = S.map citedNode $ S.filter (\(Arc (citing,_))->citing==n) $ dArcs d
+
+itemsOfCitingNode :: NetData -> CitingNode -> [Item]
+itemsOfCitingNode d u =
+    map snd $ M.elems $ M.filter (\(n,_)->n==u) $ dCitingNodeItems d
               
 connectedNodes :: Set Arc -> Set Node
 connectedNodes arcs =
@@ -263,6 +266,27 @@ modelLikelihood model =
            ++ map likelihood (M.elems $ stOmegas model)
            ++ map likelihood (M.elems $ stPsis model)
 
+-- | The probability of a collections of items under a given topic mixture.
+topicCompatibility :: MState -> [Item] -> Multinom Topic -> Probability
+topicCompatibility m items lambda = 
+    product $ do t <- toList $ dmDomain lambda
+                 x <- items
+                 let phi = stPhis m M.! t
+                 return $ prob lambda t * prob phi x
+                 
+topicCompatibilities :: (Functor f, Foldable f)
+                     => MState -> [Item] -> f (Multinom Topic) -> f Probability
+topicCompatibilities m items topics = 
+    let scores = fmap (topicCompatibility m items) topics
+    in fmap (/sum scores) scores
+
+-- | The influence of cited nodes on a citing node.
+influence :: NetData -> MState -> CitingNode -> Map CitedNode Probability
+influence d m u =
+    let lambdas = foldMap (\f->M.singleton f $ stLambdas m M.! f)
+                 $ S.toList $ getCitedNodes d u
+    in topicCompatibilities m (itemsOfCitingNode d u) lambdas
+
 -- Cited update unit (LDA-like)
 data CitedUpdateUnit = CitedUpdateUnit { uuNI' :: CitedNodeItem
                                        , uuN'  :: CitedNode
@@ -334,7 +358,6 @@ citingUpdateUnits d =
                                        }
         ) $ M.assocs $ dCitingNodeItems d
         
-tr x = traceShow x x
 citingProb :: MState -> CitingUpdateUnit -> Setting CitingUpdateUnit -> Double
 citingProb st (CitingUpdateUnit {uuN=n, uuX=x}) setting =
     let gamma = stGammas st M.! n

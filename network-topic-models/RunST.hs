@@ -38,19 +38,28 @@ data RunOpts = RunOpts { arcsFile        :: FilePath
                        , stopwords       :: Maybe FilePath
                        , nTopics         :: Int
                        , samplerOpts     :: Sampler.SamplerOpts
+                       , hyperParams     :: HyperParams
                        }
+     
+data HyperParams = HyperParams
+                   { alphaPsi         :: Double
+                   , alphaLambda      :: Double
+                   , alphaPhi         :: Double
+                   , alphaOmega       :: Double
+                   , alphaGammaShared :: Double
+                   , alphaGammaOwn    :: Double
+                   }
+                 deriving (Show, Eq)
 
 runOpts = RunOpts 
     <$> strOption  ( long "edges"
                   <> short 'e'
                   <> metavar "FILE"
-                  <> value "arcs"
-                  <> help "File containing arcs"
+                  <> help "File containing edges"
                    )
     <*> strOption  ( long "nodes"
                   <> short 'n'
                   <> metavar "FILE"
-                  <> value "node-items"
                   <> help "File containing nodes' items"
                    )
     <*> nullOption ( long "stopwords"
@@ -67,19 +76,46 @@ runOpts = RunOpts
                   <> help "Number of topics"
                    )
     <*> Sampler.samplerOpts
+    <*> hyperOpts
+    
+hyperOpts = HyperParams
+    <$> option     ( long "prior-psi"
+                  <> value 1
+                  <> help "Dirichlet parameter for prior on psi"
+                   )
+    <*> option     ( long "prior-lambda"
+                  <> value 0.1
+                  <> help "Dirichlet parameter for prior on lambda"
+                   )
+    <*> option     ( long "prior-phi"
+                  <> value 0.1
+                  <> help "Dirichlet parameter for prior on phi"
+                   )
+    <*> option     ( long "prior-omega"
+                  <> value 0.1
+                  <> help "Dirichlet parameter for prior on omega"
+                   )
+    <*> option     ( long "prior-gamma-shared"
+                  <> value 0.9
+                  <> help "Beta parameter for prior on gamma (shared)"
+                   )
+    <*> option     ( long "prior-gamma-own"
+                  <> value 0.1
+                  <> help "Beta parameter for prior on gamma (own)"
+                   )
     
 termsToItems :: M.Map Node [Term] -> (M.Map Node [Item], M.Map Item Term)
 termsToItems = runUniqueKey' [Item i | i <- [0..]]
             . mapM (mapM getUniqueKey)
 
-netData :: M.Map Node [Item] -> Set Edge -> Int -> NetData
-netData nodeItems edges nTopics = 
-    NetData { dAlphaPsi         = 0.1
-            , dAlphaLambda      = 0.1
-            , dAlphaPhi         = 0.1
-            , dAlphaOmega       = 0.1
-            , dAlphaGammaShared = 0.8
-            , dAlphaGammaOwn    = 0.2
+netData :: HyperParams -> M.Map Node [Item] -> Set Edge -> Int -> NetData
+netData hp nodeItems edges nTopics = 
+    NetData { dAlphaPsi         = alphaPsi hp
+            , dAlphaLambda      = alphaLambda hp
+            , dAlphaPhi         = alphaPhi hp
+            , dAlphaOmega       = alphaOmega hp
+            , dAlphaGammaShared = alphaGammaShared hp
+            , dAlphaGammaOwn    = alphaGammaOwn hp
             , dEdges            = edges
             , dItems            = S.unions $ map S.fromList $ M.elems nodeItems
             , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
@@ -92,8 +128,8 @@ netData nodeItems edges nTopics =
             
 opts = info runOpts
            (  fullDesc
-           <> progDesc "Learn citation influence model"
-           <> header "run-ci - learn citation influence model"
+           <> progDesc "Learn shared taste model"
+           <> header "run-st - learn shared taste model"
            )
 
 instance Sampler.SamplerModel MState where
@@ -122,7 +158,8 @@ main = do
     printf "Mean items per node:  %1.2f\n" (mean $ V.map realToFrac termCounts)
     
     withSystemRandom $ \mwc->do
-    let nd = netData nodeItems edges 10
+    let nd = netData (hyperParams args) nodeItems edges 10
+    BS.writeFile (sweepsDir </> "data") $ runPut $ put nd
     mInit <- runRVar (randomInitialize nd) mwc
     let m = model nd mInit
     Sampler.runSampler (samplerOpts args) m (updateUnits nd)

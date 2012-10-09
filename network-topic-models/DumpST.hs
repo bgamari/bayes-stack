@@ -1,14 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 import           Data.Monoid
+import           Data.Foldable
+import           Data.List
+import           Data.Function (on)
 import           Options.Applicative
 
 import qualified Data.Map as M
 import qualified Data.ByteString as BS
 
 import qualified Data.Text.Lazy.IO as TL
-import           Data.Text.Lazy.Builder.Int
 import qualified Data.Text.Lazy.Builder as TB
+import           Data.Text.Lazy.Builder.Int
+import           Data.Text.Lazy.Builder.RealFloat
 import           Data.Serialize
 
 import           System.FilePath ((</>))                 
@@ -19,41 +23,67 @@ import           SerializeText
 import           ReadData
 import           FormatMultinom
                  
-data Opts = Opts { nElems  :: Int
-                 , dist    :: Distribution
+data Opts = Opts { nElems   :: Maybe Int
+                 , dumper   :: Dumper
                  , sweepDir :: FilePath
                  , sweepNum :: Maybe Int
                  }
      
-data Distribution = Phis | Psis | Lambdas | Omegas | Gammas
-     
-readDistribution :: String -> Maybe Distribution
-readDistribution "phis"   = Just Phis
-readDistribution "psis"   = Just Psis
-readDistribution "lambdas"= Just Lambdas
-readDistribution "omegas" = Just Omegas
-readDistribution "gammas" = Just Gammas
-readDistribution _        = Nothing
+type Dumper = Opts -> NetData -> MState
+              -> (Item -> TB.Builder) -> (Node -> TB.Builder)
+              -> TB.Builder
+
+showB :: Show a => a -> TB.Builder
+showB = TB.fromString . show
+
+readDumper :: String -> Maybe Dumper
+readDumper "phis"   = Just $ \opts nd m showItem showNode ->
+    formatMultinoms (\(Topic n)->"Topic "<>decimal n) showItem (nElems opts) (stPhis m)
+
+readDumper "psis"   = Just $ \opts nd m showItem showNode ->
+    formatMultinoms showNode showB (nElems opts) (stPsis m)
+
+readDumper "lambdas"= Just $ \opts nd m showItem showNode ->
+    formatMultinoms showB showB (nElems opts) (stLambdas m)
+
+readDumper "omegas" = Just $ \opts nd m showItem showNode ->
+    formatMultinoms showB showB (nElems opts) (stOmegas m)
+
+readDumper "gammas" = Just $ \opts nd m showItem showNode ->
+    formatMultinoms showB showB (nElems opts) (stGammas m)
+    
+readDumper "influences" = Just $ \opts nd m showItem showNode ->
+    let formatProb = formatRealFloat Exponent (Just 3) . realToFrac
+        formatInfluences u =
+            foldMap (\(n,p)->"\t" <> showNode n <> "\t" <> formatProb p <> "\n")
+            $ sortBy (flip (compare `on` snd))
+            $ M.assocs $ influence nd m u
+    in foldMap (\u->"\n" <> showB u <> "\n" <> formatInfluences u)
+       $ M.keys $ stGammas m
 
 opts = Opts
-    <$> option       ( long "n-elems"
+    <$> nullOption   ( long "top"
                     <> short 'n'
-                    <> value 30
+                    <> value Nothing
+                    <> reader (Just . auto)
+                    <> metavar "N"
                     <> help "Number of elements to output from each distribution"
                      )
-    <*> nullOption   ( long "dist"
-                    <> short 'd'
-                    <> reader readDistribution
-                    <> help "Which distribution to output (psis, phis, lambdas, gammas, or omegas)"
+    <*> argument readDumper
+                     ( metavar "STR"
+                    <> help "One of: phis, psis, lambdas, omegas, gammas, influences"
                      )
     <*> strOption    ( long "sweeps"
                     <> short 's'
+                    <> value "sweeps"
+                    <> metavar "DIR"
                     <> help "The directory of sweeps to dump"
                      )
     <*> option       ( long "number"
-                    <> short 'n'
+                    <> short 'N'
                     <> reader (Just . auto)
                     <> value Nothing
+                    <> metavar "N"
                     <> help "The sweep number to dump"
                      )
 
@@ -67,36 +97,6 @@ readSweep fname = (either error id . runGet get) <$> BS.readFile fname
 readNetData :: FilePath -> IO NetData
 readNetData fname = (either error id . runGet get) <$> BS.readFile fname
 
-dumpPhis :: Int -> M.Map Item Term -> MState -> TB.Builder
-dumpPhis n itemMap m =
-    formatMultinoms (\(Topic n)->"Topic "<>decimal n)
-                    (TB.fromString . show . (itemMap M.!))
-                    n (stPhis m)
-
-dumpPsis :: Int -> MState -> TB.Builder
-dumpPsis n m =
-    formatMultinoms (\(Node n)->"Node "<>decimal n)
-                    (TB.fromString . show)
-                    n (stPsis m)
-
-dumpLambdas :: Int -> MState -> TB.Builder
-dumpLambdas n m =
-    formatMultinoms (TB.fromString . show)
-                    (TB.fromString . show)
-                    n (stLambdas m)
-
-dumpOmegas :: Int -> MState -> TB.Builder
-dumpOmegas n m =
-    formatMultinoms (TB.fromString . show)
-                    (TB.fromString . show)
-                    n (stOmegas m)
-
-dumpGammas :: Int -> MState -> TB.Builder
-dumpGammas n m =
-    formatMultinoms (TB.fromString . show)
-                    (TB.fromString . show)
-                    n (stGammas m)
-
 main = do
     args <- execParser $ info (helper <*> opts) 
          ( fullDesc 
@@ -104,15 +104,13 @@ main = do
         <> header "dump-lda - Dump distributions from an shared taste model sweep"
          )
 
+    nd <- readNetData $ sweepDir args </> "data"
     itemMap <- readItemMap
     m <- case sweepNum args of
              Nothing -> readSweep =<< getLastSweep (sweepDir args)
              Just n  -> readSweep $ sweepDir args </> printf "%05d.state" n
 
-    TL.putStr $ TB.toLazyText $ case dist args of
-        Phis    -> dumpPhis (nElems args) itemMap m
-        Psis    -> dumpPsis (nElems args) m
-        Lambdas -> dumpLambdas (nElems args) m
-        Omegas  -> dumpOmegas (nElems args) m
-        Gammas  -> dumpGammas (nElems args) m
+    let showItem = showB . (itemMap M.!)
+        showNode = showB
+    TL.putStr $ TB.toLazyText $ dumper args args nd m showItem showNode
 

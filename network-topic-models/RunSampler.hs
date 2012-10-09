@@ -54,7 +54,7 @@ samplerOpts = SamplerOpts
                   <> reader (Just . auto)
                   <> help "Number of sweeps to run for"
                    )
-    <*> option     ( long "update-block"
+    <*> option     ( long "diff-batch"
                   <> short 'u'
                   <> metavar "N"
                   <> value 100
@@ -107,22 +107,24 @@ processSweep :: SamplerModel ms => SamplerOpts -> TVar LogFloat -> Int -> ms -> 
 processSweep opts lastMaxV sweepN m = do             
     let l = modelLikelihood m
     putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
-    appendFile "likelihood.txt" $ printf "%d\t%f\n" sweepN (logFromLogFloat l :: Double)
-    newMax <- atomically $ do oldL <- readTVar lastMaxV
-                              if l > oldL then writeTVar lastMaxV l >> return True
-                                          else return False
-    when newMax
-        $ serializeState m $ sweepsDir opts </> printf "%05d.state" sweepN
+    appendFile (sweepsDir opts </> "likelihood.log")
+        $ printf "%d\t%f\n" sweepN (logFromLogFloat l :: Double)
+    when (sweepN >= burnin opts) $ do
+        newMax <- atomically $ do oldL <- readTVar lastMaxV
+                                  if l > oldL then writeTVar lastMaxV l >> return True
+                                              else return False
+        when (newMax && sweepN >= burnin opts)
+            $ serializeState m $ sweepsDir opts </> printf "%05d.state" sweepN
 
-doEstimateHypers :: SamplerModel ms => HyperEstOpts -> Int -> S.StateT ms IO ()
-doEstimateHypers (HyperEstOpts True burnin lag) iterN
+doEstimateHypers :: SamplerModel ms => SamplerOpts -> Int -> S.StateT ms IO ()
+doEstimateHypers opts@(SamplerOpts {hyperEstOpts=HyperEstOpts True burnin lag}) iterN
     | iterN >= burnin && iterN `mod` lag == 0  = do
         liftIO $ putStrLn "Parameter estimation"
         m <- S.get
         S.modify estimateHypers
         m' <- S.get
         void $ liftIO $ forkIO
-            $ appendFile "hyperparams.log"
+            $ appendFile (sweepsDir opts </> "hyperparams.log")
             $ printf "%5d\t%f\t%f\t%s\n"
                   iterN
                   (logFromLogFloat $ modelLikelihood m :: Double)
@@ -132,18 +134,22 @@ doEstimateHypers _ _  = return ()
 
 withSystemRandomIO = withSystemRandom :: (GenIO -> IO a) -> IO a
 
-samplerIter :: SamplerModel ms => SamplerOpts -> [WrappedUpdateUnit ms] -> TVar LogFloat
+samplerIter :: SamplerModel ms => SamplerOpts -> [WrappedUpdateUnit ms]
+            -> TMVar () -> TVar LogFloat
             -> Int -> S.StateT ms IO ()
-samplerIter opts uus lastMaxV lagN = do
+samplerIter opts uus processSweepRunning lastMaxV lagN = do
     let sweepN = lagN * lag opts
-    m <- S.get
     shuffledUus <- liftIO $ withSystemRandomIO $ \mwc->runRVar (shuffle uus) mwc
     let uus' = concat $ replicate (lag opts) shuffledUus
+    m <- S.get
     S.put =<< liftIO (gibbsUpdate (updateBlock opts) m uus')
     when (sweepN == burnin opts) $ liftIO $ putStrLn "Burn-in complete"
-    when (sweepN >= burnin opts) $ 
-        S.get >>= void . liftIO . forkIO . processSweep opts lastMaxV sweepN
-    doEstimateHypers (hyperEstOpts opts) sweepN
+    S.get >>= \m->do liftIO $ atomically $ takeTMVar processSweepRunning
+                     void $ liftIO $ forkIO $ do
+                         processSweep opts lastMaxV sweepN m
+                         liftIO $ atomically $ putTMVar processSweepRunning ()
+                     
+    doEstimateHypers opts sweepN
 
 checkOpts :: SamplerOpts -> IO ()
 checkOpts opts = do
@@ -162,7 +168,9 @@ runSampler opts m uus = do
     createDirectoryIfMissing False (sweepsDir opts)
     putStrLn "Starting sampler..."
     putStrLn $ "Burning in for "++show (burnin opts)++" samples"
-    let lagNs = maybe [0..] (\n->[0..n]) $ iterations opts           
+    let lagNs = maybe [0..] (\n->[0..n `div` lag opts]) $ iterations opts           
     lastMaxV <- atomically $ newTVar 0
-    void $ S.runStateT (forM_ lagNs (samplerIter opts uus lastMaxV)) m
+    processSweepRunning <- atomically $ newTMVar ()
+    void $ S.runStateT (forM_ lagNs (samplerIter opts uus processSweepRunning lastMaxV)) m
+    atomically $ takeTMVar processSweepRunning
 
