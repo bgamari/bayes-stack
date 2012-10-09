@@ -109,11 +109,12 @@ processSweep opts lastMaxV sweepN m = do
     putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
     appendFile (sweepsDir opts </> "likelihood.log")
         $ printf "%d\t%f\n" sweepN (logFromLogFloat l :: Double)
-    newMax <- atomically $ do oldL <- readTVar lastMaxV
-                              if l > oldL then writeTVar lastMaxV l >> return True
-                                          else return False
-    when (newMax && sweepN >= burnin opts)
-        $ serializeState m $ sweepsDir opts </> printf "%05d.state" sweepN
+    when (sweepN >= burnin opts) $ do
+        newMax <- atomically $ do oldL <- readTVar lastMaxV
+                                  if l > oldL then writeTVar lastMaxV l >> return True
+                                              else return False
+        when (newMax && sweepN >= burnin opts)
+            $ serializeState m $ sweepsDir opts </> printf "%05d.state" sweepN
 
 doEstimateHypers :: SamplerModel ms => SamplerOpts -> Int -> S.StateT ms IO ()
 doEstimateHypers opts@(SamplerOpts {hyperEstOpts=HyperEstOpts True burnin lag}) iterN
