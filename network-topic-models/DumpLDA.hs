@@ -67,9 +67,9 @@ opts = Opts
                     <> help "The sweep number to dump"
                      )
 
-readItemMap :: IO (M.Map Item Term)                 
-readItemMap =
-    (either error id . runGet get) <$> BS.readFile "sweeps/item-map"
+readItemMap :: FilePath -> IO (M.Map Item Term)                 
+readItemMap sweepsDir =
+    (either error id . runGet get) <$> BS.readFile (sweepsDir </> "item-map")
 
 readSweep :: FilePath -> IO MState
 readSweep fname = (either error id . runGet get) <$> BS.readFile fname
@@ -85,7 +85,7 @@ main = do
          )
 
     nd <- readNetData $ sweepDir args </> "data"
-    itemMap <- readItemMap
+    itemMap <- readItemMap $ sweepDir args
     m <- case sweepNum args of
              Nothing -> readSweep =<< getLastSweep (sweepDir args)
              Just n  -> readSweep $ sweepDir args </> printf "%05d.state" n
