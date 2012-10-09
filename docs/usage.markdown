@@ -19,7 +19,7 @@ Bayes-stack comes with implementations of a various topic models for social netw
 
 ### Gibbs sampling in Bayes-Stack
 
-All models are implemented using the bayes-stack framework, which makes it very easy to implement multi-threaded blocked collapsed Gibbs samplers for latent variable and parameter estimation. Gibbs sampling starts with a random initialization of unknown variables, which are iteratively updated in sweeps over all variables for a number of iterations. Every `lag` iterations, bayes-stack will dump the model likelihood - a diagnostic measure which should improve on average. Bayes-stack will dump a state of latent variables to the `sweeps` directory whenever a new "best" likelihood is achieved. As early iterations are dominated by the random initialization, the first `burnin` iterations won't lead to a dump. Bayes-stack provides support for updating sets of variables from their joint distribution (aka blocked Gibbs sampler) via the concept of an update unit.
+All models are implemented using the bayes-stack framework, which makes it very easy to implement multi-threaded blocked collapsed Gibbs samplers for latent variable and parameter estimation. Gibbs sampling starts with a random initialization of unknown variables, which are iteratively updated in sweeps over all variables for a number of iterations. Every `lag` iterations, bayes-stack will dump the model likelihood to `sweeps/likelihood.log` - a diagnostic measure which should improve on average. Bayes-stack will dump a state of latent variables to the `sweeps` directory whenever a new "best" likelihood is achieved. As early iterations are dominated by the random initialization, the first `burnin` iterations won't lead to a dump. Bayes-stack provides support for updating sets of variables from their joint distribution (aka blocked Gibbs sampler) via the concept of an update unit.
 
 ### Parallel inference in Bayes-Stack
 
@@ -32,7 +32,7 @@ Bayes-stack is different to other parallel topic model frameworks in that *it do
 
 ### Hyper-parameter optimization
 
-Bayes-stack supports optimizing symmetric Dirichlet hyper-parameters (`alpha` in LDA) using Tom Minka's fixed point method. If enabled, an optimization phase is inserted every `hyper-lag` iterations (after `hyper-burnin` iterations). Diagnostic information about new settins of hyper-parameters as well as model likelihood before and after the change are written to XXXXXX.
+Bayes-stack supports optimizing symmetric Dirichlet hyper-parameters (`alpha` in LDA) using Tom Minka's fixed point method. If enabled, an optimization phase is inserted every `hyper-lag` iterations (after `hyper-burnin` iterations). Diagnostic information about new settins of hyper-parameters as well as model likelihood before and after the change are written to `sweeps/hyperparams.log`. It is highly recommended to inspect diagnostic information before proceeding.
 
 
 ### Model inference and analysis
@@ -57,11 +57,11 @@ The intuition of topic model is that two tokens are likely about the same `topic
 
 Nomenclature:
 
-theta
-: a node-specific mixture of topics (e.g. document 1 is one third about topic 1, two thirds about topic 5)
+*thetas*
+: for all nodes, the mixture of topics (e.g. document 1 is one third about topic 1, two thirds about topic 5)
 
-phi
-: a topic-specific mixture of items. (e.g. topic 1 has item "soccer" with 0.1 and item "ball" with 0.05)
+*phis*
+: for all topics, the mixture of items. (e.g. topic 1 has item "soccer" with 0.1 and item "ball" with 0.05)
 
 To run an LDA topic model with 10 topics using 5 parallel threads call
     bayes-stack-lda --nodes FILE -t10 --sweeps=ldasweeps --threads=5
@@ -73,20 +73,24 @@ The nodes file is in the format of
 If a stopwords file is given, those items are ignored from the input.
 
 
-After the Gibbs sampler finished, inspect likelihood file to confirm that the model likelihood converged.
+After the Gibbs sampler finished, inspect `likelihood.log` file (in the sweeps directory) to confirm that the model likelihood converged. If hyperparameter estimation is turned on, also inspect `hyperparams.log` to ensure that parameters are in a reasonable range.
 
 To output the top 20 items for each topic call
 
-   bayes-stack-dump-lda -n20 --dist=phis --sweeps ldasweeps
+    bayes-stack-dump-lda phis -n20 --sweeps ldasweeps
 
 To output the topic mixtures for each node/document call
 
-   bayes-stack-dump-lda --dist=thetas --sweeps ldasweeps
+    bayes-stack-dump-lda thetas --sweeps ldasweeps
 
-The output format for `N` multinomial parameters over support `S` is
+The output format for `N` multinomial parameters over support `S1`, `S2`, ... is
 
-|`N` | `S` | probability |
-
+<table border="yes">
+<tr><td>N</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+<tr><td>&nbsp;</td><td>S1</td><td>probability</td></tr>
+<tr><td>&nbsp;</td><td>S2</td><td>probability</td></tr>
+<tr><td>&nbsp;</td><td>...</td><td>&nbsp;</td></tr>
+</table>
 
 ### Shared Taste Model
 
@@ -94,20 +98,20 @@ The shared taste model is a probabilistic network topic model to understand shar
 
 Nomenclature:
 
-lamda
-: an edge-specific mixture of topics (equivalent to theta in LDA)
+*lamdas*
+: for all edges, the mixture of topics (equivalent to theta in LDA, but shared by two nodes)
 
-phi
-: a topic-specific mixture of items (as in LDA)
+*phis*
+: for all topics,  mixture of items (as in LDA)
 
-psi
-: a global mixture over all edges (for convenience, projected to a restricted mixture of friendships a given user is involved in)
+*psis*
+: one global mixture over all edges (for convenience, it provides for each user the restricted mixture over friendships a given user is involved in)
 
-omega
-: a node-specific mixture of individual topics
+*omegas*
+: for each node, its own mixture of topics
 
-gamma
-: for each node, a Bernoulli distribution for associating sharing versus own tastes
+*gammas*
+: for each node, a Bernoulli distribution sharing versus own topics
 
 
 To run the shared taste model with 10 topics using 5 parallel threads call
@@ -126,27 +130,19 @@ The edges file has to list each edge as the two nodes it connects. All edges are
      `node id` \t `node id` \n
 
 
-After the Gibbs sampler finished, inspect likelihood file to confirm that the model likelihood converged.
+After the Gibbs sampler finished, inspect `likelihood.log` file (in the sweeps directory) to confirm that the model likelihood converged. If hyperparameter estimation is turned on, also inspect `hyperparams.log` to ensure that parameters are in a reasonable range.
 
-To output the top 20 items for each topic call
+To output any of the multinomial or Bernoulli parameters listed above (say lambdas) call
 
-     bayes-stack-dump-st -n20 --dist=phis --sweeps stsweeps
+     bayes-stack-dump-st lambdas --sweeps stsweeps
 
-To output the topic mixtures for each edge/friendship call
+For multinomial distributions with many dimentions (such as phis) it is advisable to restrict the range, e.g. "-n20".
 
-     bayes-stack-dump-st --dist=lambdas --sweeps stsweeps
+To identify the influencial friends for a particular user call
 
-To output the strength of mutual influence of friends on a user call
+     bayes-stack-dump-st influences --sweeps stsweeps
 
-     bayes-stack-dump-st --dist=psis --sweeps stsweeps
-
-To output the own topic mixture of a node call
-
-     bayes-stack-dump-st --dist=omegas --sweeps stsweeps
-
-To output the tendency of each node to prefer tastes shared with a friend versus his own call
-
-     bayes-stack-dump-st --dist=gammas --sweeps stsweeps
+Notice that `influences` is different from `psis`. Any friend that shares a frequent topic with the user will have a high `influence`. But for generating items, those friends would have to compete with each other, which is reflected in `psis`. We recommend to use `influences` for any social network analysis.
 
 
 
@@ -160,20 +156,20 @@ Each node in the citation graph will be represented once as a cited document, an
 
 Nomenclature:
 
-lamda
-: the cited node-specific mixture of topics (equivalent to theta in LDA, but modelling shared topics)
+*lambdas*
+: for each cited node, the mixture of topics (equivalent to theta in LDA, but modeling shared across the cited node and its citations)
 
-phi
-: a topic-specific mixture of items (as in LDA)
+*phis*
+: for each topic, the mixture of items (as in LDA)
 
-psi
-: a citing node specific distribution over citations
+*psis*
+: for each citing node, the mixture over its cited nodes
 
-omega
-: a citing node-specific mixture of individual topics
+*omegas*
+: for each citing node, the own mixture of topics
 
-gamma
-: for each citing node, a Bernoulli distribution for associating sharing versus own topics
+*gammas*
+: for each citing node, a Bernoulli distribution for sharing versus own topics
 
 
 To run the shared taste model with 10 topics using 5 parallel threads call
@@ -192,27 +188,20 @@ The arcs file has to list each arc as the source node and sink node. All arcs ar
      `citing node id` \t `cited node id` \n
 
 
-After the Gibbs sampler finished, inspect likelihood file to confirm that the model likelihood converged.
+After the Gibbs sampler finished, inspect `likelihood.log` file (in the sweeps directory) to confirm that the model likelihood converged. If hyperparameter estimation is turned on, also inspect `hyperparams.log` to ensure that parameters are in a reasonable range.
 
-To output the top 20 items for each topic call
+To output any of the multinomial or Bernoulli parameters listed above (say lambdas) call
 
-     bayes-stack-dump-ci -n20 --dist=phis --sweeps cisweeps
+     bayes-stack-dump-ci lambdas --sweeps cisweeps
 
-To output the topic mixtures for each edge/friendship call
+For multinomial distributions with many dimentions (such as `phis`) it is advisable to restrict the range, e.g. "-n20".
 
-     bayes-stack-dump-ci --dist=lambdas --sweeps cisweeps
+To identify the influencial cited nodes for a particular citing node call
 
-To output the strength of mutual influence of friends on a user call
+     bayes-stack-dump-ci influences --sweeps cisweeps
 
-     bayes-stack-dump-ci --dist=psis --sweeps cisweeps
+Notice that `influences` is different from `psis`. Any citation that shares a frequent topic with the node will have a high `influence`. But for generating items, those citations would have to compete with each other, which is reflected in `psis`. We recommend to use `influences` for any social network analysis.
 
-To output the own topic mixture of a citing node call
-
-     bayes-stack-dump-ci --dist=omegas --sweeps cisweeps
-
-To output the tendency of each user to prefer tastes shared with a friend versus his own call
-
-     bayes-stack-dump-ci --dist=gammas --sweeps cisweeps
 
 
 
