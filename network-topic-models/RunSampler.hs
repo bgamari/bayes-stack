@@ -133,16 +133,20 @@ doEstimateHypers _ _  = return ()
 
 withSystemRandomIO = withSystemRandom :: (GenIO -> IO a) -> IO a
 
-samplerIter :: SamplerModel ms => SamplerOpts -> [WrappedUpdateUnit ms] -> TVar LogFloat
+samplerIter :: SamplerModel ms => SamplerOpts -> [WrappedUpdateUnit ms]
+            -> TMVar () -> TVar LogFloat
             -> Int -> S.StateT ms IO ()
-samplerIter opts uus lastMaxV lagN = do
+samplerIter opts uus processSweepRunning lastMaxV lagN = do
     let sweepN = lagN * lag opts
-    m <- S.get
     shuffledUus <- liftIO $ withSystemRandomIO $ \mwc->runRVar (shuffle uus) mwc
     let uus' = concat $ replicate (lag opts) shuffledUus
+    m <- S.get
     S.put =<< liftIO (gibbsUpdate (updateBlock opts) m uus')
     when (sweepN == burnin opts) $ liftIO $ putStrLn "Burn-in complete"
-    S.get >>= void . liftIO . forkIO . processSweep opts lastMaxV sweepN
+    S.get >>= \m->do liftIO $ atomically $ takeTMVar processSweepRunning
+                     void $ liftIO $ forkIO $ processSweep opts lastMaxV sweepN m
+                     liftIO $ atomically $ putTMVar processSweepRunning ()
+                     
     doEstimateHypers opts sweepN
 
 checkOpts :: SamplerOpts -> IO ()
@@ -164,5 +168,7 @@ runSampler opts m uus = do
     putStrLn $ "Burning in for "++show (burnin opts)++" samples"
     let lagNs = maybe [0..] (\n->[0..n+1]) $ iterations opts           
     lastMaxV <- atomically $ newTVar 0
-    void $ S.runStateT (forM_ lagNs (samplerIter opts uus lastMaxV)) m
+    processSweepRunning <- atomically $ newEmptyTMVar
+    void $ S.runStateT (forM_ lagNs (samplerIter opts uus processSweepRunning lastMaxV)) m
+    atomically $ takeTMVar processSweepRunning
 
