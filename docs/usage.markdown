@@ -23,7 +23,7 @@ All models are implemented using the bayes-stack framework, which makes it very 
 
 ### Parallel inference in Bayes-Stack
 
-Bayes-stack aims at multi-core environments, parallelizing the inference across multiple threads. In bayes-stack each worker thread will repeatedly pick an update unit, fetch the current model state, computes a new setting for variables in the update unit. It then prepares a thunk for updating the model state with this new setting (called a `diff`). One global diff-worker will apply the diffs in batches of `update-block`. Notice that the model state may have advanced in the mean time. We can still apply the diff, as Gibbs samplers are robust towards being mildly out-of-date. However, we ensure consistency of updates, such constant counts across all statistics using the diff-worker.
+Bayes-stack aims at multi-core environments, parallelizing the inference across multiple threads. In bayes-stack each worker thread will repeatedly pick an update unit, fetch the current model state, computes a new setting for variables in the update unit. It then prepares a thunk for updating the model state with this new setting (called a `diff`). One global diff-worker will apply the diffs in batches of `diff-batch`. Notice that the model state may have advanced in the mean time. We can still apply the diff, as Gibbs samplers are robust towards being mildly out-of-date. However, we ensure consistency of updates, such constant counts across all statistics using the diff-worker.
 
 Bayes-stack is different to other parallel topic model frameworks in that *it does not* update disjoint sets of variables in isolation for several iterations. It further supports integrating out parameters with conjugative priors (collapsing). Bayes-stack is applicable any generative model (not just LDA), especially if strong interdependencies between variables and plates exist. Bayes-stack supports arbitrary nesting of plates and conditional draws (aka gates).
 
@@ -63,8 +63,10 @@ Nomenclature:
 *phis*
 : for all topics, the mixture of items. (e.g. topic 1 has item "soccer" with 0.1 and item "ball" with 0.05)
 
-To run an LDA topic model with 10 topics using 5 parallel threads call
-    bayes-stack-lda --nodes FILE -t10 --sweeps=ldasweeps --threads=5
+Each of the mixtures are represented by a multinomial distribution with a symmetric Dirichlet prior
+
+To run an LDA topic model with 10 topics, priors for theta and phi of 0.1, using 5 parallel threads call
+    bayes-stack-lda --nodes FILE -t10 --prior-theta=0.1 --prior-phi-0.1 --sweeps=ldasweeps --threads=5
 
 The nodes file is in the format of
 
