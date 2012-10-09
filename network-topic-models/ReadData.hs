@@ -1,6 +1,6 @@
 {-# LANGUAGE PatternGuards #-}
 
-module ReadData ( Term
+module ReadData ( Term, NodeName
                 , readEdges
                 , readNodeItems
                 , getLastSweep
@@ -26,25 +26,24 @@ import           System.FilePath ((</>))
 import           System.Directory
 import           Data.List                 
 
-readEdges :: FilePath -> IO (Set (Node, Node))
+type Term = T.Text
+type NodeName = T.Text
+
+readEdges :: FilePath -> IO (Set (NodeName, NodeName))
 readEdges fname =
     S.fromList . mapMaybe parseLine . T.lines <$> TIO.readFile fname
-    where parseLine :: T.Text -> Maybe (Node, Node)
+    where parseLine :: T.Text -> Maybe (NodeName, NodeName)
           parseLine l = case T.words l of
-             [a,b] -> case (decimal a, decimal b) of
-                          (Right (a',_), Right (b',_)) ->
-                              Just (Node a', Node b')
-                          otherwise -> Nothing
+             [a,b]     -> Just (a, b)
              otherwise -> Nothing
 
-type Term = T.Text
-readNodeItems :: Set Term -> FilePath -> IO (M.Map Node [Term])
+readNodeItems :: Set Term -> FilePath -> IO (M.Map NodeName [Term])
 readNodeItems stopWords fname =
     M.unionsWith (++) . map parseLine . T.lines <$> TIO.readFile fname
-    where parseLine :: T.Text -> M.Map Node [Term]
+    where parseLine :: T.Text -> M.Map NodeName [Term]
           parseLine l = case T.words l of
-             n:words | Right (n',_) <- decimal n ->
-                 M.singleton (Node n')
+             n:words ->
+                 M.singleton n
                  $ filter (\word->T.length word > 4)
                  $ map (T.filter isAlpha)
                  $ filter (`S.notMember` stopWords) words

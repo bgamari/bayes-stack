@@ -4,6 +4,7 @@ import           Prelude hiding (mapM)
 
 import           Options.Applicative    
 import           Data.Monoid ((<>))                 
+import           Control.Monad.Trans.Class                 
 
 import           Data.Vector (Vector)    
 import qualified Data.Vector.Generic as V    
@@ -104,9 +105,22 @@ hyperOpts = HyperParams
                   <> help "Beta parameter for prior on gamma (own)"
                    )
 
-termsToItems :: M.Map Node [Term] -> (M.Map Node [Item], M.Map Item Term)
-termsToItems = runUniqueKey' [Item i | i <- [0..]]
-            . mapM (mapM getUniqueKey)
+mapMKeys :: (Ord k, Ord k', Monad m, Applicative m)
+         => (a -> m a') -> (k -> m k') -> M.Map k a -> m (M.Map k' a')
+mapMKeys f g x = M.fromList <$> (mapM (\(k,v)->(,) <$> g k <*> f v) $ M.assocs x)
+
+termsToItems :: M.Map NodeName [Term] -> Set (NodeName, NodeName)
+             -> ( (M.Map Node [Item], Set (Node, Node))
+                , (M.Map Item Term, M.Map Node NodeName))
+termsToItems nodes arcs =
+    let ((d', nodeMap), itemMap) =
+            runUniqueKey' [Item i | i <- [0..]] $
+            runUniqueKeyT' [Node i | i <- [0..]] $ do
+                a <- mapMKeys (mapM (lift . getUniqueKey)) getUniqueKey nodes
+                b <- S.fromList <$> mapM (\(x,y)->(,) <$> getUniqueKey x <*> getUniqueKey y)
+                     (S.toList arcs)
+                return (a,b)
+    in (d', (itemMap, nodeMap))
 
 netData :: HyperParams -> M.Map Node [Item] -> Set Arc -> Int -> NetData
 netData hp nodeItems arcs nTopics = cleanNetData $ 
@@ -147,9 +161,10 @@ main = do
                      Nothing -> return S.empty
     printf "Read %d stopwords\n" (S.size stopWords)
 
-    arcs <- edgesToArcs <$> readEdges (arcsFile args)
-    (nodeItems, itemMap) <- termsToItems
+    ((nodeItems, a), (itemMap, nodeMap)) <- termsToItems
                             <$> readNodeItems stopWords (nodesFile args)
+                            <*> readEdges (arcsFile args)
+    let arcs = edgesToArcs a
 
     let sweepsDir = Sampler.sweepsDir $ samplerOpts args
     createDirectoryIfMissing False sweepsDir
@@ -158,7 +173,7 @@ main = do
     let termCounts = V.fromListN (M.size nodeItems)
                      $ map length $ M.elems nodeItems :: Vector Int
     printf "Read %d arcs, %d nodeItems\n" (S.size arcs) (M.size nodeItems)
-    printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
+    --printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
     
     withSystemRandom $ \mwc->do
     let nd = netData (hyperParams args) nodeItems arcs (nTopics args)
