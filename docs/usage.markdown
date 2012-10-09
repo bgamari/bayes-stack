@@ -19,20 +19,20 @@ Bayes-stack comes with implementations of a various topic models for social netw
 
 ### Gibbs sampling in Bayes-Stack
 
-All models are implemented using the bayes-stack framework, which makes it very easy to implement multi-threaded blocked collapsed Gibbs samplers for latent variable and parameter estimation. Gibbs sampling starts with a random initialization of unknown variables, which are iteratively updated in sweeps over all variables for a number of iterations. Every `lag` iterations, bayes-stack will dump the model likelihood to `sweeps/likelihood.log` - a diagnostic measure which should improve on average. Bayes-stack will dump a state of latent variables to the `sweeps` directory whenever a new "best" likelihood is achieved. As early iterations are dominated by the random initialization, the first `burnin` iterations won't lead to a dump. Bayes-stack provides support for updating sets of variables from their joint distribution (aka blocked Gibbs sampler) via the concept of an update unit.
+All models are implemented using the bayes-stack framework, which makes it very easy to implement multi-threaded blocked collapsed Gibbs samplers for latent variable and parameter estimation. Gibbs sampling starts with a random initialization of unknown variables, which are iteratively updated in sweeps over all variables for a number of iterations. Every `lag` iterations, bayes-stack will dump the model likelihood to `sweeps/likelihood.log` - a diagnostic measure which should increase on average. Bayes-stack will dump a state of latent variables to the `sweeps` directory whenever a new "best" likelihood is achieved. As early iterations are dominated by the random initialization, the first `burnin` iterations won't lead to a dump. Bayes-stack provides support for updating sets of variables from their joint distribution (aka blocked Gibbs sampler) via the concept of an update unit.
 
 ### Parallel inference in Bayes-Stack
 
-Bayes-stack aims at multi-core environments, parallelizing the inference across multiple threads. In bayes-stack each worker thread will repeatedly pick an update unit, fetch the current model state, computes a new setting for variables in the update unit. It then prepares a thunk for updating the model state with this new setting (called a `diff`). One global diff-worker will apply the diffs in batches of `diff-batch`. Notice that the model state may have advanced in the mean time. We can still apply the diff, as Gibbs samplers are robust towards being mildly out-of-date. However, we ensure consistency of updates, such constant counts across all statistics using the diff-worker.
+Bayes-stack aims at multi-core environments, parallelizing the inference across multiple threads. In bayes-stack each worker thread will repeatedly pick an update unit, fetch the current model state, and compute a new setting for variables in the update unit. It then prepares instructions for updating the model state with this new setting (called a `diff`). One global diff-worker will apply the diffs in batches of size `diff-batch`. Notice that the model state may have advanced in the mean time. Despite this, we can still apply the diff, as Gibbs samplers are robust towards being mildly out-of-date.
 
-Bayes-stack is different to other parallel topic model frameworks in that *it does not* update disjoint sets of variables in isolation for several iterations. It further supports integrating out parameters with conjugative priors (collapsing). Bayes-stack is applicable any generative model (not just LDA), especially if strong interdependencies between variables and plates exist. Bayes-stack supports arbitrary nesting of plates and conditional draws (aka gates).
+Bayes-stack is different to other parallel topic model frameworks in that *it does not* update disjoint sets of variables in isolation for several iterations. It further supports integrating out parameters with conjugative priors (collapsing). Bayes-stack is applicable any generative model (not only LDA), especially if strong interdependencies between variables and plates exist. Bayes-stack supports arbitrary nesting of plates and conditional draws (aka gates).
 
 
 [gates]:http://research.microsoft.com/apps/pubs/default.aspx?id=78857 "Gates"
 
 ### Hyper-parameter optimization
 
-Bayes-stack supports optimizing symmetric Dirichlet hyper-parameters (`alpha` in LDA) using Tom Minka's fixed point method. If enabled, an optimization phase is inserted every `hyper-lag` iterations (after `hyper-burnin` iterations). Diagnostic information about new settins of hyper-parameters as well as model likelihood before and after the change are written to `sweeps/hyperparams.log`. It is highly recommended to inspect diagnostic information before proceeding.
+Bayes-stack supports optimizing symmetric Dirichlet hyper-parameters (`alpha` in LDA) using Tom Minka's fixed point method. If enabled, an optimization phase is inserted every `hyper-lag` iterations (after `hyper-burnin` iterations). Diagnostic information about new settins of hyper-parameters as well as model likelihood before and after the change are written to `sweeps/hyperparams.log`. It is highly recommended to inspect this diagnostic information before proceeding.
 
 
 ### Model inference and analysis
@@ -51,31 +51,32 @@ Network Topic models
 
 ### Latent Dirichlet allocation
 
-Probabistic topic models and its seminal basic variant latent Dirichlet allocation [Blei2003] are an unsupervised method for clustering words into so-called topics, taking their document context into account. The original work was motivated from a perspective of documents, here we assume that each node as a set of words associated. We therefore use the term `node` instead of `document`. Striving towards applications on tags, songs, books, we also use the `item` instead of `word`. 
+Probabistic topic models and its seminal basic variant latent Dirichlet allocation [Blei2003] are unsupervised methods for clustering words into so-called topics, taking their document context into account. The original work was motivated from a perspective of documents; here we assume that each node as a set of words associated. We therefore use the term `node` instead of `document`. Striving towards applications on tags, songs, books, we also use the `item` instead of `word`. 
 
 The intuition of topic model is that two tokens are likely about the same `topic` if they represent the same word, and/or are in the same node. 
 
 Nomenclature:
 
 *thetas*
-: for all nodes, the mixture of topics (e.g. document 1 is one third about topic 1, two thirds about topic 5)
+: for all nodes, the mixture of topics (e.g. node 1 is one third about topic 1, two thirds about topic 5)
 
 *phis*
 : for all topics, the mixture of items. (e.g. topic 1 has item "soccer" with 0.1 and item "ball" with 0.05)
 
 Each of the mixtures are represented by a multinomial distribution with a symmetric Dirichlet prior
 
-To run an LDA topic model with 10 topics, priors for theta and phi of 0.1, using 5 parallel threads call
+To run an LDA topic model with 10 topics, priors for theta and phi of 0.1, using 5 parallel threads call,
+
     bayes-stack-lda --nodes FILE -t10 --prior-theta=0.1 --prior-phi=0.1 --sweeps=ldasweeps --threads=5
 
-The nodes file is in the format of
+The nodes file must be in the format of,
 
      `node id` \t all items (e.g. words) on one line \n
 
-If a stopwords file is given, those items are ignored from the input.
+Words (white-space separated) listed in the stopwords file (if given) are ignored from the nodes file.
 
 
-After the Gibbs sampler finished, inspect `likelihood.log` file (in the sweeps directory) to confirm that the model likelihood converged. If hyperparameter estimation is turned on, also inspect `hyperparams.log` to ensure that parameters are in a reasonable range.
+After the Gibbs sampler has finished, inspect `likelihood.log` file (in the sweeps directory) to confirm that the model likelihood converged. If hyperparameter estimation is turned on, also inspect `hyperparams.log` to ensure that parameters are in a reasonable range.
 
 To output the top 20 items for each topic call
 
@@ -96,7 +97,7 @@ The output format for `N` multinomial parameters over support `S1`, `S2`, ... is
 
 ### Shared Taste Model
 
-The shared taste model is a probabilistic network topic model to understand shared topics that underlie a friendship. The intuition is that if two friends are using the same items, this represents a shared taste. If the friends use different items that also have been mutually used in other friendships, it is also likely that they represent the shared taste. This is modeled by introducing topic mixtures of friendships (i.e. edges, not nodes!). Each node associates their items with one of their friends, then draws a topic from the shared topic mixture of that friendship to generate the item. In order to be robust against nodes with individual (that is, non-shared) interests, an item can also be associated with its own topic mixture.
+The shared taste model is a probabilistic network topic model to understand shared topics that underlie a friendship. The intuition is that if two friends are using the same items, this represents a shared taste. If the friends use different items that also have been mutually used in other friendships, it is also likely that they represent the shared taste. This is modeled by introducing topic mixtures of friendships (i.e. edges, not nodes!). Each node associates their items with one of their friends, then draws a topic from the shared topic mixture of that friendship to generate the item. In order to be robust against nodes with individual (that is, non-shared) interests, an item can also be associated with its node's own topic mixture.
 
 Nomenclature:
 
@@ -152,7 +153,7 @@ Notice that `influences` is different from `psis`. Any friend that shares a freq
 
 ### Citation influence model
 
-The citation influence model is designed to understand for which topics a document was cited and to determine a given research paper which its citations had strong influence on it. Notice that even seminal papers, may be cited by papers on which they only have a marginal influence. We treat each document as a node, and each citation as an arc from the citing to the cited paper.
+The citation influence model is designed to analyze for which topics a document was cited and the strength of its influence on citing papers. Notice that even seminal papers may be cited by papers on which they only have a marginal influence. We treat each document as a node, and each citation as an arc from the citing to the cited paper.
 
 Those local influences on a citing node are modeled by mixture over citations `psi`. Each cited node has a mixture over topics `lambda`. Each item in a citing node are associated with one of its citations, and a topic drawn from that cited documents's `lambda`. Further, each item in a cited node are drawn from its `lambda`. The consequence is that a cited node's topic mixture `lambda` is a shared topic mixture, estimated not only from the node's items, but also some items in citing nodes. This is a crucial distinction to LDA. `psi` and `lambda` influence each other: The more likely items in a citing document fit to a topic mixture, the higher its probability  under `psi`; The more items in citing documents are associated with the cited document, the more `lamba` will be representing it.
 
