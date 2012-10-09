@@ -55,10 +55,10 @@ readDumper "gammas" = Just $ \opts nd m showItem showNode ->
 readDumper "influences" = Just $ \opts nd m showItem showNode ->
     let formatProb = formatRealFloat Exponent (Just 3) . realToFrac
         formatInfluences u =
-            foldMap (\(n,p)->"  " <> showNode n <> "\t" <> formatProb p <> "\n")
+            foldMap (\(n,p)->"\t" <> showNode n <> "\t" <> formatProb p <> "\n")
             $ sortBy (flip (compare `on` snd))
             $ M.assocs $ influence nd m u
-    in foldMap (\u->"\n" <> showB u <> ":\n" <> formatInfluences u)
+    in foldMap (\u->"\n" <> showB u <> "\n" <> formatInfluences u)
        $ M.keys $ stGammas m
 
 opts = Opts
