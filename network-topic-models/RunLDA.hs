@@ -38,8 +38,15 @@ data RunOpts = RunOpts { nodesFile       :: FilePath
                        , stopwords       :: Maybe FilePath
                        , nTopics         :: Int
                        , samplerOpts     :: Sampler.SamplerOpts
+                       , hyperParams     :: HyperParams
                        }
 
+data HyperParams = HyperParams
+                   { alphaTheta       :: Double
+                   , alphaPhi         :: Double
+                   }
+                 deriving (Show, Eq)
+                   
 runOpts :: Parser RunOpts
 runOpts = RunOpts 
     <$> strOption  ( long "nodes"
@@ -61,15 +68,26 @@ runOpts = RunOpts
                   <> help "Number of topics"
                    )
     <*> Sampler.samplerOpts
+    <*> hyperOpts
     
+hyperOpts = HyperParams
+    <$> option     ( long "prior-theta"
+                  <> value 1
+                  <> help "Dirichlet parameter for prior on theta"
+                   )
+    <*> option     ( long "prior-phi"
+                  <> value 0.1
+                  <> help "Dirichlet parameter for prior on phi"
+                   )
+
 termsToItems :: M.Map Node [Term] -> (M.Map Node [Item], M.Map Item Term)
 termsToItems = runUniqueKey' [Item i | i <- [0..]]
             . mapM (mapM getUniqueKey)
 
-netData :: M.Map Node [Item] -> Int -> NetData
-netData nodeItems nTopics = 
-    NetData { dAlphaTheta       = 0.1
-            , dAlphaPhi         = 0.1
+netData :: HyperParams -> M.Map Node [Item] -> Int -> NetData
+netData hp nodeItems nTopics = 
+    NetData { dAlphaTheta       = alphaTheta hp
+            , dAlphaPhi         = alphaPhi hp
             , dItems            = S.unions $ map S.fromList $ M.elems nodeItems
             , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
             , dNodeItems        = M.fromList
@@ -114,7 +132,7 @@ main = do
     printf "Mean items per node:  %1.2f\n" (mean $ V.map realToFrac termCounts)
     
     withSystemRandom $ \mwc->do
-    let nd = netData nodeItems (nTopics args)
+    let nd = netData (hyperParams args) nodeItems (nTopics args)
     BS.writeFile ("sweeps" </> "data") $ runPut $ put nd
     mInit <- runRVar (randomInitialize nd) mwc
     let m = model nd mInit
