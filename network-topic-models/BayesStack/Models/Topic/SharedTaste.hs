@@ -139,13 +139,13 @@ instance NFData STSetting where
     rnf (OwnSetting t)      = rnf t `seq` ()
     rnf (SharedSetting t f) = rnf t `seq` rnf f `seq` ()
 
-data MState = MState { stGammas   :: Map Node (Multinom ItemSource)
-                     , stOmegas   :: Map Node (Multinom Topic)
-                     , stPsis     :: Map Node (Multinom Node)
-                     , stLambdas  :: Map Edge (Multinom Topic)
-                     , stPhis     :: Map Topic (Multinom Item)
+data MState = MState { stGammas   :: !(Map Node (Multinom ItemSource))
+                     , stOmegas   :: !(Map Node (Multinom Topic))
+                     , stPsis     :: !(Map Node (Multinom Node))
+                     , stLambdas  :: !(Map Edge (Multinom Topic))
+                     , stPhis     :: !(Map Topic (Multinom Item))
              
-                     , stVars     :: Map NodeItem STSetting
+                     , stVars     :: !(Map NodeItem STSetting)
                      }
             deriving (Show, Generic)
 instance Serialize MState
