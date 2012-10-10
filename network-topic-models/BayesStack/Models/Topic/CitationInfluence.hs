@@ -24,6 +24,9 @@ module BayesStack.Models.Topic.CitationInfluence
   , influence
   ) where
 
+import qualified Data.Vector as V
+import Statistics.Sample (mean)
+
 import           Prelude hiding (mapM_, sum)
 
 import           Data.Set (Set)
@@ -266,10 +269,15 @@ modelLikelihood model =
            ++ map likelihood (M.elems $ stOmegas model)
            ++ map likelihood (M.elems $ stPsis model)
 
--- | The probability of a collections of items under a given topic mixture.
+harMean :: V.Vector LogFloat -> LogFloat
+harMean = logToLogFloat . mean . V.map logFromLogFloat
+
+-- | The geometric mean of the probabilities of a collection of items under a
+-- given topic mixture.
 topicCompatibility :: MState -> [Item] -> Multinom Topic -> Probability
 topicCompatibility m items lambda = 
-    product $ do t <- toList $ dmDomain lambda
+    harMean $ V.fromList 
+            $ do t <- toList $ dmDomain lambda
                  x <- items
                  let phi = stPhis m M.! t
                  return $ prob lambda t * prob phi x
