@@ -67,14 +67,6 @@ opts = Opts
                     <> help "The sweep number to dump"
                      )
 
-readItemMap :: FilePath -> IO (M.Map Item Term)                 
-readItemMap sweepsDir =
-    (either error id . runGet get) <$> BS.readFile (sweepsDir </> "item-map")
-
-readNodeMap :: FilePath -> IO (M.Map Node NodeName)              
-readNodeMap sweepsDir =
-    (either error id . runGet get) <$> BS.readFile (sweepsDir </> "node-map")
-
 readSweep :: FilePath -> IO MState
 readSweep fname = (either error id . runGet get) <$> BS.readFile fname
 

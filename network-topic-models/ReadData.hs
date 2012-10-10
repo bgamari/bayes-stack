@@ -4,6 +4,7 @@ module ReadData ( Term, NodeName
                 , readEdges
                 , readNodeItems
                 , getLastSweep
+                , readItemMap, readNodeMap
                 ) where
 
 import           BayesStack.Models.Topic.Types
@@ -21,6 +22,9 @@ import           Data.Char (isAlpha)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
+import           Data.Serialize
+import qualified Data.ByteString as BS
+import           SerializeText ()
                  
 import           System.FilePath ((</>))
 import           System.Directory
@@ -53,3 +57,12 @@ getLastSweep :: FilePath -> IO FilePath
 getLastSweep sweepsDir =
     (sweepsDir </>) . last . sort . filter (".state" `isSuffixOf`)
     <$> getDirectoryContents sweepsDir
+    
+readItemMap :: FilePath -> IO (M.Map Item Term)                 
+readItemMap sweepsDir =
+    (either error id . runGet get) <$> BS.readFile (sweepsDir </> "item-map")
+
+readNodeMap :: FilePath -> IO (M.Map Node NodeName)              
+readNodeMap sweepsDir =
+    (either error id . runGet get) <$> BS.readFile (sweepsDir </> "node-map")
+
