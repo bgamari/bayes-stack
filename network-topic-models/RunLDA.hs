@@ -85,7 +85,7 @@ mapMKeys :: (Ord k, Ord k', Monad m, Applicative m)
 mapMKeys f g x = M.fromList <$> (mapM (\(k,v)->(,) <$> g k <*> f v) $ M.assocs x)
 
 termsToItems :: M.Map NodeName [Term]
-             -> ( M.Map Node [Item], (M.Map Item Term, M.Map Node NodeName))
+             -> (M.Map Node [Item], (M.Map Item Term, M.Map Node NodeName))
 termsToItems nodes =
     let ((d', nodeMap), itemMap) =
             runUniqueKey' [Item i | i <- [0..]] $
@@ -128,7 +128,7 @@ main = do
                      Nothing -> return S.empty
     printf "Read %d stopwords\n" (S.size stopWords)
 
-    (nodeItems, itemMap) <- termsToItems
+    (nodeItems, (itemMap, nodeMap)) <- termsToItems
                             <$> readNodeItems stopWords (nodesFile args)
 
     let sweepsDir = Sampler.sweepsDir $ samplerOpts args
