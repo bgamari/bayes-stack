@@ -243,17 +243,17 @@ instance NFData CitingSetting where
     rnf (SharedSetting t c) = rnf t `seq` rnf c `seq` ()
 
 data MState = MState { -- Citing model state
-                       stGammas   :: Map CitingNode (Multinom ItemSource)
-                     , stOmegas   :: Map CitingNode (Multinom Topic)
-                     , stPsis     :: Map CitingNode (Multinom CitedNode)
-                     , stPhis     :: Map Topic (Multinom Item)
+                       stGammas   :: !(Map CitingNode (Multinom ItemSource))
+                     , stOmegas   :: !(Map CitingNode (Multinom Topic))
+                     , stPsis     :: !(Map CitingNode (Multinom CitedNode))
+                     , stPhis     :: !(Map Topic (Multinom Item))
 
-                     , stCiting   :: Map CitingNodeItem CitingSetting
+                     , stCiting   :: !(Map CitingNodeItem CitingSetting)
 
                      -- Cited model state
-                     , stLambdas  :: Map CitedNode (Multinom Topic)
+                     , stLambdas  :: !(Map CitedNode (Multinom Topic))
 
-                     , stT'       :: Map CitedNodeItem Topic
+                     , stT'       :: !(Map CitedNodeItem Topic)
                      }
             deriving (Show, Generic)
 instance Serialize MState
