@@ -169,6 +169,7 @@ main = do
     let sweepsDir = Sampler.sweepsDir $ samplerOpts args
     createDirectoryIfMissing False sweepsDir
     BS.writeFile (sweepsDir </> "item-map") $ runPut $ put itemMap
+    BS.writeFile (sweepsDir </> "node-map") $ runPut $ put nodeMap
 
     let termCounts = V.fromListN (M.size nodeItems)
                      $ map length $ M.elems nodeItems :: Vector Int
