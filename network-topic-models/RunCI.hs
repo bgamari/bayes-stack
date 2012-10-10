@@ -172,8 +172,8 @@ main = do
 
     let termCounts = V.fromListN (M.size nodeItems)
                      $ map length $ M.elems nodeItems :: Vector Int
-    printf "Read %d arcs, %d nodeItems\n" (S.size arcs) (M.size nodeItems)
-    --printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
+    printf "Read %d arcs, %d nodes, %d node-items\n" (S.size arcs) (M.size nodeItems) (V.sum termCounts)
+    printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
     
     withSystemRandom $ \mwc->do
     let nd = netData (hyperParams args) nodeItems arcs (nTopics args)
