@@ -89,11 +89,11 @@ hyperOpts = HyperParams
                   <> help "Dirichlet parameter for prior on lambda"
                    )
     <*> option     ( long "prior-phi"
-                  <> value 0.1
+                  <> value 0.01
                   <> help "Dirichlet parameter for prior on phi"
                    )
     <*> option     ( long "prior-omega"
-                  <> value 0.1
+                  <> value 0.01
                   <> help "Dirichlet parameter for prior on omega"
                    )
     <*> option     ( long "prior-gamma-shared"
