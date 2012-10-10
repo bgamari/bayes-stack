@@ -4,7 +4,7 @@ import           Prelude hiding (mapM)
 
 import           Options.Applicative    
 import           Data.Monoid ((<>))                 
-import           Control.Monad (liftM)
+import           Control.Monad.Trans.Class                 
 
 import           Data.Vector (Vector)    
 import qualified Data.Vector.Generic as V    
@@ -80,9 +80,18 @@ hyperOpts = HyperParams
                   <> help "Dirichlet parameter for prior on phi"
                    )
 
-termsToItems :: M.Map Node [Term] -> (M.Map Node [Item], M.Map Item Term)
-termsToItems = runUniqueKey' [Item i | i <- [0..]]
-            . mapM (mapM getUniqueKey)
+mapMKeys :: (Ord k, Ord k', Monad m, Applicative m)
+         => (a -> m a') -> (k -> m k') -> M.Map k a -> m (M.Map k' a')
+mapMKeys f g x = M.fromList <$> (mapM (\(k,v)->(,) <$> g k <*> f v) $ M.assocs x)
+
+termsToItems :: M.Map NodeName [Term]
+             -> ( M.Map Node [Item], (M.Map Item Term, M.Map Node NodeName))
+termsToItems nodes =
+    let ((d', nodeMap), itemMap) =
+            runUniqueKey' [Item i | i <- [0..]] $
+            runUniqueKeyT' [Node i | i <- [0..]] $ do
+                mapMKeys (mapM (lift . getUniqueKey)) getUniqueKey nodes
+    in (d', (itemMap, nodeMap))
 
 netData :: HyperParams -> M.Map Node [Item] -> Int -> NetData
 netData hp nodeItems nTopics = 
