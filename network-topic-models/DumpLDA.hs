@@ -71,6 +71,10 @@ readItemMap :: FilePath -> IO (M.Map Item Term)
 readItemMap sweepsDir =
     (either error id . runGet get) <$> BS.readFile (sweepsDir </> "item-map")
 
+readNodeMap :: FilePath -> IO (M.Map Node NodeName)              
+readNodeMap sweepsDir =
+    (either error id . runGet get) <$> BS.readFile (sweepsDir </> "node-map")
+
 readSweep :: FilePath -> IO MState
 readSweep fname = (either error id . runGet get) <$> BS.readFile fname
 
@@ -86,11 +90,12 @@ main = do
 
     nd <- readNetData $ sweepDir args </> "data"
     itemMap <- readItemMap $ sweepDir args
+    nodeMap <- readNodeMap $ sweepDir args
     m <- case sweepNum args of
              Nothing -> readSweep =<< getLastSweep (sweepDir args)
              Just n  -> readSweep $ sweepDir args </> printf "%05d.state" n
     
     let showItem = showB . (itemMap M.!)
-        showNode = showB
+        showNode = showB . (nodeMap M.!)
     TL.putStr $ TB.toLazyText $ dumper args args nd m showItem showNode
 
