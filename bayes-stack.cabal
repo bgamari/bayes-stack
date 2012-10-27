@@ -6,10 +6,12 @@ Synopsis:            Framework for inferring generative probabilistic models
 Description:         bayes-stack is a framework for inference on generative
                      probabilistic models. The framework uses Gibbs sampling,
                      although is suitable for other iterative update methods.
+homepage:            https://github.com/bgamari/bayes-stack
 License:             BSD3
 License-file:        LICENSE
 Author:              Ben Gamari
 Maintainer:          bgamari.foss@gmail.com
+copyright:           Copyright (c) 2012 Ben Gamari
 Category:            Math
 
 Build-type:          Simple
