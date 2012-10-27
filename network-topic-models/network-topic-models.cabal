@@ -2,9 +2,12 @@
 -- further documentation, see http://haskell.org/cabal/users-guide/
 
 name:                network-topic-models
-version:             0.1.0.0
+version:             0.2.0.1
 synopsis:            A few network topic model implementations for bayes-stack
--- description:         
+description:         Implementations of a few network topic models build upon bayes-stack.
+                     The package includes Latent Dirichlet Allocation
+                     (LDA), the shared taste model, and the citation
+                     influence model.
 homepage:            https://github.com/bgamari/bayes-stack
 license:             BSD3
 license-file:        LICENSE
@@ -14,6 +17,10 @@ maintainer:          bgamari.foss@gmail.com
 category:            Math
 build-type:          Simple
 cabal-version:       >=1.8
+
+source-repository head
+  type:                 git
+  location:             https://github.com/bgamari/bayes-stack.git
 
 executable bayes-stack-lda
   main-is:             RunLDA.hs
