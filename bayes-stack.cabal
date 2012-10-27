@@ -1,7 +1,11 @@
 Name:                bayes-stack
 
-Version:             0.2
-Synopsis:            Framework for inferring generative probabilistic models with Gibbs sampling
+Version:             0.2.0.1
+Synopsis:            Framework for inferring generative probabilistic models
+                     with Gibbs sampling
+Description:         bayes-stack is a framework for inference on generative
+                     probabilistic models. The framework uses Gibbs sampling,
+                     although is suitable for other iterative update methods.
 License:             BSD3
 License-file:        LICENSE
 Author:              Ben Gamari
@@ -9,8 +13,11 @@ Maintainer:          bgamari.foss@gmail.com
 Category:            Math
 
 Build-type:          Simple
-Cabal-version:       >=1.2
+Cabal-version:       >=1.6
 
+source-repository head
+  type:                 git
+  location:             https://github.com/bgamari/bayes-stack.git
 
 Library
   Exposed-modules:     BayesStack.Core, BayesStack.Core.Types, BayesStack.Core.Gibbs,
@@ -20,5 +27,24 @@ Library
                        Data.Serialize.EnumMap,
                        Data.Serialize.LogFloat,
                        Data.Random.Sequence, Data.Sequence.Chunk
-  Build-depends:       base, stm, transformers, mtl, deepseq, random-source, random-fu, rvar, containers, enummapset, ghc-prim, vector, mwc-random, pretty, cereal, logfloat, digamma, gamma, statistics
+
+  Build-depends:       base >=4 && <5,
+                       stm,
+                       transformers,
+                       mtl,
+                       deepseq,
+                       random-source,
+                       random-fu,
+                       rvar,
+                       containers,
+                       enummapset,
+                       ghc-prim,
+                       vector,
+                       mwc-random,
+                       pretty,
+                       cereal,
+                       logfloat,
+                       digamma,
+                       gamma,
+                       statistics
   
