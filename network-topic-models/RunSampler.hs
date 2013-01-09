@@ -51,7 +51,7 @@ samplerOpts = SamplerOpts
                   <> short 'i'
                   <> metavar "N"
                   <> value Nothing
-                  <> reader (Just . auto)
+                  <> reader (pure . auto)
                   <> help "Number of sweeps to run for"
                    )
     <*> option     ( long "diff-batch"
