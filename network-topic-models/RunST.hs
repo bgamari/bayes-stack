@@ -27,7 +27,7 @@ import qualified Data.Text.IO as TIO
 
 import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath.Posix ((</>))
-import           Data.Serialize
+import           Data.Binary
 import qualified Data.ByteString as BS
 import           Text.Printf
        
@@ -165,8 +165,8 @@ main = do
 
     let sweepsDir = Sampler.sweepsDir $ samplerOpts args
     createDirectoryIfMissing False sweepsDir
-    BS.writeFile (sweepsDir </> "item-map") $ runPut $ put itemMap
-    BS.writeFile (sweepsDir </> "node-map") $ runPut $ put nodeMap
+    encodeFile (sweepsDir </> "item-map") itemMap
+    encodeFile (sweepsDir </> "node-map") nodeMap
 
     let termCounts = V.fromListN (M.size nodeItems)
                      $ map length $ M.elems nodeItems :: Vector Int
@@ -175,7 +175,7 @@ main = do
     
     withSystemRandom $ \mwc->do
     let nd = netData (hyperParams args) nodeItems edges 10
-    BS.writeFile (sweepsDir </> "data") $ runPut $ put nd
+    encodeFile (sweepsDir </> "data") nd
     mInit <- runRVar (randomInitialize nd) mwc
     let m = model nd mInit
     Sampler.runSampler (samplerOpts args) m (updateUnits nd)

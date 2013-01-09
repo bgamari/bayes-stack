@@ -13,7 +13,7 @@ import qualified Data.Text.Lazy.IO as TL
 import qualified Data.Text.Lazy.Builder as TB
 import           Data.Text.Lazy.Builder.Int
 import           Data.Text.Lazy.Builder.RealFloat
-import           Data.Serialize
+import           Data.Binary
 
 import           System.FilePath ((</>))                 
 import           Text.Printf                 
@@ -88,10 +88,10 @@ opts = Opts
                      )
 
 readSweep :: FilePath -> IO MState
-readSweep fname = (either error id . runGet get) <$> BS.readFile fname
+readSweep = decodeFile
 
 readNetData :: FilePath -> IO NetData
-readNetData fname = (either error id . runGet get) <$> BS.readFile fname
+readNetData = decodeFile
 
 main = do
     args <- execParser $ info (helper <*> opts) 

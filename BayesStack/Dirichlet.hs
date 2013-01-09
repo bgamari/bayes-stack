@@ -25,9 +25,9 @@ import Math.Gamma
 import Text.Printf
 import Text.PrettyPrint
 
-import Data.Serialize
-import Data.Serialize.EnumMap ()
-import Data.Serialize.LogFloat ()
+import Data.Binary
+import Data.Binary.EnumMap ()
+import Data.Binary.LogFloat ()
 import GHC.Generics (Generic)
 
 -- | Make error handling a bit easier
@@ -46,7 +46,7 @@ data Alpha a = SymAlpha { aDomain :: Seq a
                      , aNorm :: LogFloat
                      }
              deriving (Show, Eq, Generic)
-instance (Enum a, Serialize a) => Serialize (Alpha a)
+instance (Enum a, Binary a) => Binary (Alpha a)
 
 type DirMean a = EnumMap a Double
 type DirPrecision = Double

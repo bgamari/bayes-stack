@@ -22,7 +22,7 @@ import           Data.Char (isAlpha)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import           Data.Text.Read (decimal)
-import           Data.Serialize
+import           Data.Binary
 import qualified Data.ByteString as BS
 import           SerializeText ()
                  
@@ -60,9 +60,9 @@ getLastSweep sweepsDir =
     
 readItemMap :: FilePath -> IO (M.Map Item Term)                 
 readItemMap sweepsDir =
-    (either error id . runGet get) <$> BS.readFile (sweepsDir </> "item-map")
+    decodeFile $ sweepsDir </> "item-map"
 
 readNodeMap :: FilePath -> IO (M.Map Node NodeName)              
 readNodeMap sweepsDir =
-    (either error id . runGet get) <$> BS.readFile (sweepsDir </> "node-map")
+    decodeFile $ sweepsDir </> "node-map"
 

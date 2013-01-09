@@ -4,7 +4,7 @@ module BayesStack.Models.Topic.Types where
 
 import Control.DeepSeq
 import GHC.Generics
-import Data.Serialize
+import Data.Binary
 import Data.Function
 import Data.Maybe
 
@@ -17,11 +17,11 @@ newtype Topic = Topic Int deriving (Show, Eq, Ord, Enum, Generic, NFData)
 newtype NodeItem = NodeItem Int deriving (Show, Eq, Ord, Enum, Generic, NFData)
 newtype Edge = Edge (Node, Node) deriving (Show, Generic, NFData)
 
-instance Serialize Node
-instance Serialize Item
-instance Serialize Topic
-instance Serialize NodeItem
-instance Serialize Edge
+instance Binary Node
+instance Binary Item
+instance Binary Topic
+instance Binary NodeItem
+instance Binary Edge
 
 instance Eq Edge where
   (Edge (a,b)) == (Edge (c,d)) = (a == c && b == d) || (a == d && b == c)

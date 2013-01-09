@@ -41,7 +41,7 @@ import BayesStack.TupleEnum ()
 import BayesStack.Models.Topic.Types
 
 import GHC.Generics
-import Data.Serialize
+import Data.Binary
 
 data NetData = NetData { dAlphaTheta :: Double
                        , dAlphaPhi :: Double
@@ -51,7 +51,7 @@ data NetData = NetData { dAlphaTheta :: Double
                        , dNodeItems :: Map NodeItem (Node, Item)
                        }
                deriving (Show, Eq, Generic)
-instance Serialize NetData
+instance Binary NetData
 
 type ModelInit = Map NodeItem Topic
 
@@ -89,14 +89,14 @@ data MState = MState { stThetas :: !(Map Node (Multinom Topic))
                      , stT      :: !(Map NodeItem Topic)
                      }
             deriving (Show, Generic)
-instance Serialize MState
+instance Binary MState
 
 data LDAUpdateUnit = LDAUpdateUnit { uuNI :: NodeItem
                                    , uuN  :: Node
                                    , uuX  :: Item
                                    }
                    deriving (Show, Generic)
-instance Serialize LDAUpdateUnit
+instance Binary LDAUpdateUnit
 
 setUU :: LDAUpdateUnit -> Maybe Topic -> MState -> MState
 setUU uu@(LDAUpdateUnit {uuN=n, uuNI=ni, uuX=x}) setting ms =

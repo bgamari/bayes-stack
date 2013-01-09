@@ -12,7 +12,7 @@ import           Control.Monad (when, forM_, void)
 import qualified Control.Monad.Trans.State as S
 import           Control.Monad.IO.Class
 
-import           Data.Serialize
+import           Data.Binary
 import qualified Data.ByteString as BS
 import           Text.Printf
 
@@ -95,14 +95,11 @@ hyperEstOpts' = HyperEstOpts
                   <> help "Number of sweeps between hyperparameter estimations (must be multiple of --lag)"
                    )
 
-class Serialize ms => SamplerModel ms where
+class Binary ms => SamplerModel ms where
     modelLikelihood :: ms -> LogFloat
     estimateHypers :: ms -> ms
     summarizeHypers :: ms -> String
     
-serializeState :: Serialize ms => ms -> FilePath -> IO ()
-serializeState model fname = BS.writeFile fname $ runPut $ put model
-
 processSweep :: SamplerModel ms => SamplerOpts -> TVar LogFloat -> Int -> ms -> IO ()
 processSweep opts lastMaxV sweepN m = do             
     let l = modelLikelihood m
@@ -113,8 +110,9 @@ processSweep opts lastMaxV sweepN m = do
         newMax <- atomically $ do oldL <- readTVar lastMaxV
                                   if l > oldL then writeTVar lastMaxV l >> return True
                                               else return False
-        when (newMax && sweepN >= burnin opts)
-            $ serializeState m $ sweepsDir opts </> printf "%05d.state" sweepN
+        when (newMax && sweepN >= burnin opts) $
+            let fname = sweepsDir opts </> printf "%05d.state" sweepN
+            in encodeFile fname m
 
 doEstimateHypers :: SamplerModel ms => SamplerOpts -> Int -> S.StateT ms IO ()
 doEstimateHypers opts@(SamplerOpts {hyperEstOpts=HyperEstOpts True burnin lag}) iterN

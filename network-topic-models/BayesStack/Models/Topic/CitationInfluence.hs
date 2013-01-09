@@ -53,17 +53,17 @@ import           BayesStack.TupleEnum ()
 import           BayesStack.Models.Topic.Types
 
 import           GHC.Generics
-import           Data.Serialize (Serialize)
+import           Data.Binary (Binary)
 import           Control.DeepSeq
 
 data ItemSource = Shared | Own deriving (Show, Eq, Enum, Ord, Generic)
-instance Serialize ItemSource
+instance Binary ItemSource
 instance NFData ItemSource         
          
 newtype Citing a = Citing a deriving (Show, Eq, Enum, Ord, Generic, NFData)
 newtype Cited a = Cited a deriving (Show, Eq, Enum, Ord, Generic, NFData)
-instance Serialize a => Serialize (Citing a)
-instance Serialize a => Serialize (Cited a)
+instance Binary a => Binary (Citing a)
+instance Binary a => Binary (Cited a)
          
 type CitingNode = Citing Node
 type CitedNode = Cited Node
@@ -73,7 +73,7 @@ type CitedNodeItem = Cited NodeItem
 -- ^ A directed edge         
 newtype Arc = Arc (CitingNode, CitedNode)
             deriving (Show, Eq, Ord, Generic)
-instance Serialize Arc
+instance Binary Arc
 
 -- ^ The citing node of an arc
 citingNode :: Arc -> CitingNode
@@ -95,7 +95,7 @@ data NetData = NetData { dAlphaPsi           :: Double
                        , dNodeItems          :: Map NodeItem (Node, Item)
                        }
               deriving (Show, Eq, Generic)
-instance Serialize NetData
+instance Binary NetData
          
 dCitedNodeItems :: NetData -> Map CitedNodeItem (CitedNode, Item)
 dCitedNodeItems = M.mapKeys Cited . M.map (\(n,i)->(Cited n, i)) . dNodeItems
@@ -240,7 +240,7 @@ updateUnits d = map WrappedUU (citedUpdateUnits d)
 data CitingSetting = OwnSetting !Topic
                    | SharedSetting !Topic !CitedNode
                    deriving (Show, Eq, Generic)
-instance Serialize CitingSetting
+instance Binary CitingSetting
 instance NFData CitingSetting where
     rnf (OwnSetting t)      = rnf t `seq` ()
     rnf (SharedSetting t c) = rnf t `seq` rnf c `seq` ()
@@ -259,7 +259,7 @@ data MState = MState { -- Citing model state
                      , stT'       :: !(Map CitedNodeItem Topic)
                      }
             deriving (Show, Generic)
-instance Serialize MState
+instance Binary MState
 
 modelLikelihood :: MState -> Probability
 modelLikelihood model =
@@ -301,7 +301,7 @@ data CitedUpdateUnit = CitedUpdateUnit { uuNI' :: CitedNodeItem
                                        , uuX' :: Item
                                        }
                      deriving (Show, Generic)
-instance Serialize CitedUpdateUnit
+instance Binary CitedUpdateUnit
 
 instance UpdateUnit CitedUpdateUnit where
     type ModelState CitedUpdateUnit = MState
@@ -348,7 +348,7 @@ data CitingUpdateUnit = CitingUpdateUnit { uuNI    :: CitingNodeItem
                                          , uuCites :: Set CitedNode
                                          }
                       deriving (Show, Generic)
-instance Serialize CitingUpdateUnit
+instance Binary CitingUpdateUnit
 
 instance UpdateUnit CitingUpdateUnit where
     type ModelState CitingUpdateUnit = MState

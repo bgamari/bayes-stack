@@ -28,9 +28,9 @@ import Text.PrettyPrint
 import Text.Printf
 
 import GHC.Generics (Generic)
-import Data.Serialize
-import Data.Serialize.EnumMap ()
-import Data.Serialize.LogFloat ()
+import Data.Binary
+import Data.Binary.EnumMap ()
+import Data.Binary.LogFloat ()
 
 import BayesStack.Core
 import BayesStack.Dirichlet
@@ -81,7 +81,7 @@ data Multinom a = DirMulti { dmAlpha :: Alpha a
                            , dmDomain :: !(Seq a)
                            }
                 deriving (Show, Eq, Generic)
-instance (Enum a, Serialize a) => Serialize (Multinom a)
+instance (Enum a, Binary a) => Binary (Multinom a)
 
 -- | 'symMultinomFromPrecision d p' is a symmetric Dirichlet/multinomial over a
 -- domain 'd' with precision 'p'

@@ -43,11 +43,11 @@ import BayesStack.TupleEnum ()
 import BayesStack.Models.Topic.Types
 
 import GHC.Generics
-import Data.Serialize
+import Data.Binary
 
 data ItemSource = Shared | Own
                 deriving (Show, Eq, Generic, Enum, Ord)
-instance Serialize ItemSource
+instance Binary ItemSource
 instance NFData ItemSource         
 
 data NetData = NetData { dAlphaPsi           :: Double
@@ -62,7 +62,7 @@ data NetData = NetData { dAlphaPsi           :: Double
                        , dNodeItems          :: Map NodeItem (Node, Item)
                        }
              deriving (Show, Eq, Generic)
-instance Serialize NetData
+instance Binary NetData
          
 dNodes :: NetData -> Set Node
 dNodes = S.fromList . map fst . M.elems . dNodeItems
@@ -134,7 +134,7 @@ data STSetting = OwnSetting !Topic
                | SharedSetting !Topic !Edge
                deriving (Show, Eq, Generic)
 
-instance Serialize STSetting
+instance Binary STSetting
 instance NFData STSetting where
     rnf (OwnSetting t)      = rnf t `seq` ()
     rnf (SharedSetting t f) = rnf t `seq` rnf f `seq` ()
@@ -148,7 +148,7 @@ data MState = MState { stGammas   :: !(Map Node (Multinom ItemSource))
                      , stVars     :: !(Map NodeItem STSetting)
                      }
             deriving (Show, Generic)
-instance Serialize MState
+instance Binary MState
 
 data STUpdateUnit = STUpdateUnit { uuNI      :: NodeItem
                                  , uuN       :: Node
@@ -156,7 +156,7 @@ data STUpdateUnit = STUpdateUnit { uuNI      :: NodeItem
                                  , uuFriends :: [Node]
                                  }
                    deriving (Show, Generic)
-instance Serialize STUpdateUnit
+instance Binary STUpdateUnit
 
 setUU :: STUpdateUnit -> Maybe (Setting STUpdateUnit) -> MState -> MState
 setUU uu@(STUpdateUnit {uuNI=ni, uuN=n, uuX=x}) setting ms =

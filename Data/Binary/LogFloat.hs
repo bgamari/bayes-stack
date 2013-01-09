@@ -1,9 +1,9 @@
-module Data.Serialize.LogFloat where
+module Data.Binary.LogFloat where
 
-import Data.Serialize
+import Data.Binary
 import Data.Number.LogFloat
 
-instance Serialize LogFloat where
+instance Binary LogFloat where
   put = put . (logFromLogFloat :: LogFloat -> Double)
   get = (logToLogFloat :: Double -> LogFloat) `fmap` get
 
