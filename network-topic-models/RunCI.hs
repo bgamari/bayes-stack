@@ -66,7 +66,7 @@ runOpts = RunOpts
     <*> nullOption ( long "stopwords"
                   <> short 's'
                   <> metavar "FILE"
-                  <> reader (Just . Just)
+                  <> reader (pure . Just)
                   <> value Nothing
                   <> help "Stop words list"
                    )

@@ -67,7 +67,7 @@ opts = Opts
     <$> nullOption   ( long "top"
                     <> short 'n'
                     <> value Nothing
-                    <> reader (Just . auto)
+                    <> reader (pure . auto)
                     <> metavar "N"
                     <> help "Number of elements to output from each distribution"
                      )
@@ -83,7 +83,7 @@ opts = Opts
                      )
     <*> option       ( long "sweep-n"
                     <> short 'N'
-                    <> reader (Just . auto)
+                    <> reader (pure . auto)
                     <> value Nothing
                     <> metavar "N"
                     <> help "The sweep number to dump"
