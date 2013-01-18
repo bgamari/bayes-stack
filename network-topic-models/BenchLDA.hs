@@ -64,9 +64,10 @@ ldaBenchmark b = do
     let name = printf "%d topics, %d threads, %d blocks" (nTopics $ bNetParams b) (bThreads b) (bUpdateBlock b)
     return $ bench name $ do
         setNumCapabilities $ bThreads b
-        gibbsUpdate (bUpdateBlock b) (model net init) (updateUnits net)
+        gibbsUpdate (bUpdateBlock b) (model net init) (take 10000 $ cycle $ updateUnits net)
 
 main = do
     bs <- withSystemRandomIO $ runRVar (mapM ldaBenchmark benchmarks)
     defaultMainWith defaultConfig (return ())
         [ bgroup "LDA" bs ]
+
