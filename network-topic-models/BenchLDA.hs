@@ -61,7 +61,7 @@ ldaBenchmark :: LDABenchmark -> RVar Benchmark
 ldaBenchmark b = do
     net <- randomNetwork $ bNetParams b
     init <- randomInitialize net
-    let name = printf "%d topics, %d threads" (nTopics $ bNetParams b) (bThreads b)
+    let name = printf "%d topics, %d threads, %d blocks" (nTopics $ bNetParams b) (bThreads b) (bUpdateBlock b)
     return $ bench name $ do
         setNumCapabilities $ bThreads b
         gibbsUpdate (bUpdateBlock b) (model net init) (updateUnits net)
