@@ -48,5 +48,7 @@ Library
                        logfloat,
                        digamma,
                        gamma,
-                       statistics
+                       statistics,
+                       abstract-deque,
+                       lockfree-queue
   

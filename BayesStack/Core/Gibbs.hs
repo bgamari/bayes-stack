@@ -16,6 +16,13 @@ import Data.Random
 import Data.Random.Lift       
 import System.Random.MWC (withSystemRandom)
 import Control.Monad.State hiding (lift)
+import Data.Concurrent.Deque.Class
+import Data.Concurrent.Queue.MichaelScott.DequeInstance
+
+-- | 'DiffQueue ms' is a queue of model state diffs. It is a FIFO with
+-- thread-safe push on left and pop on right. The pop operation needn't be
+-- thread-safe as there will be only one diff worker.
+type DiffQueue ms = Deque Threadsafe Nonthreadsafe SingleEnd SingleEnd Grow Dup (ms -> ms)
 
 class UpdateUnit uu where
     type ModelState uu
@@ -28,16 +35,16 @@ data WrappedUpdateUnit ms = forall uu. (UpdateUnit uu, ModelState uu ~ ms,
                                         NFData (Setting uu), Eq (Setting uu))
                          => WrappedUU uu
      
-updateUnit :: WrappedUpdateUnit ms -> IORef ms -> TBQueue (ms -> ms) -> RVarT IO ()
+updateUnit :: WrappedUpdateUnit ms -> IORef ms -> DiffQueue ms -> RVarT IO ()
 updateUnit (WrappedUU unit) stateRef diffQueue = do
     modelState <- lift $ readIORef stateRef
     let s = fetchSetting unit modelState
     s' <- lift $ evolveSetting modelState unit
     (s,s') `deepseq` return ()
     when (s /= s') $
-        lift $ atomically $ writeTBQueue diffQueue (updateSetting unit s s')
+        lift $ pushL diffQueue (updateSetting unit s s')
     
-updateWorker :: TQueue (WrappedUpdateUnit ms) -> IORef ms -> TBQueue (ms -> ms) -> RVarT IO ()
+updateWorker :: TQueue (WrappedUpdateUnit ms) -> IORef ms -> DiffQueue ms -> RVarT IO ()
 updateWorker unitsQueue stateRef diffQueue = do
     unit <- lift $ atomically $ tryReadTQueue unitsQueue
     case unit of
@@ -49,10 +56,12 @@ updateWorker unitsQueue stateRef diffQueue = do
 atomicModifyIORef' = atomicModifyIORef
 #endif
 
-diffWorker :: IORef ms -> TBQueue (ms -> ms) -> Int -> IO ()
+diffWorker :: IORef ms -> DiffQueue ms -> Int -> IO ()
 diffWorker stateRef diffQueue updateBlock = forever $ do
     diff <- execStateT (replicateM_ updateBlock $ do
-                            diff <- lift $ atomically $ readTBQueue diffQueue
+                            let go = do a <- lift (tryPopR diffQueue)
+                                        maybe (lift yield >> go) return a
+                            diff <- go
                             modify (. diff)
                        ) id
     atomicModifyIORef' stateRef $ \a->(diff a, ())
@@ -66,7 +75,7 @@ gibbsUpdate updateBlock modelState units = do
     unitsQueue <- atomically $ do q <- newTQueue
                                   mapM_ (writeTQueue q) units
                                   return q
-    diffQueue <- atomically $ newTBQueue $ 2*updateBlock -- FIXME
+    diffQueue <- newQ -- $ 2*updateBlock
     stateRef <- newIORef modelState
     diffThread <- forkIO $ do labelMyThread "diff worker"
                               diffWorker stateRef diffQueue updateBlock
