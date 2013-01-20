@@ -46,25 +46,28 @@ withSystemRandomIO = withSystemRandom
 data LDABenchmark = LDABenchmark { bNetParams    :: NetParams
                                  , bThreads      :: Int
                                  , bUpdateBlock  :: Int
+                                 , bSweeps       :: Int
                                  }
                                  
 benchmarks = do
-    updateBlock <- [1, 10, 100, 1000]
-    threads <- [3, 4, 6, 8, 10, 14, 18, 22, 26, 34, 38, 42, 48]
-    topics <- [10, 50, 100, 200, 500]
-    return LDABenchmark { bNetParams = netParams {nTopics=topics}
+    updateBlock <- [10, 100, 1000]
+    topics <- [20, 100, 500]
+    nItemsPerNode <- [20, 200]
+    threads <- [1,2,3, 4, 5, 6, 7, 8, 10]
+    return LDABenchmark { bNetParams = netParams {nTopics=topics, nItemsPerNode=nItemsPerNode}
                         , bThreads = threads
                         , bUpdateBlock = updateBlock
+                        , bSweeps = if nItemsPerNode == 20 then 40000 else 40000
                         }
                         
 ldaBenchmark :: LDABenchmark -> RVar Benchmark
 ldaBenchmark b = do
     net <- randomNetwork $ bNetParams b
     init <- randomInitialize net
-    let name = printf "%d topics, %d threads, %d blocks" (nTopics $ bNetParams b) (bThreads b) (bUpdateBlock b)
+    let name = printf "%d topics, %d threads, %d block, %d items per node" (nTopics $ bNetParams b) (bThreads b) (bUpdateBlock b) (nItemsPerNode $ bNetParams b)
     return $ bench name $ do
         setNumCapabilities $ bThreads b
-        gibbsUpdate (bUpdateBlock b) (model net init) (take 10000 $ cycle $ updateUnits net)
+        gibbsUpdate (bUpdateBlock b) (model net init) (take (bSweeps b) $ cycle $ updateUnits net)
 
 main = do
     bs <- withSystemRandomIO $ runRVar (mapM ldaBenchmark benchmarks)
