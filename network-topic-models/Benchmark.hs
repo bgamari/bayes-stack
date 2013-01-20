@@ -66,8 +66,8 @@ ldaBenchmark b = do
     init <- randomInitialize net
     let name = printf "%d topics, %d threads, %d block, %d items per node" (nTopics $ bNetParams b) (bThreads b) (bUpdateBlock b) (nItemsPerNode $ bNetParams b)
     return $ bench name $ do
-        setNumCapabilities $ bThreads b
-        gibbsUpdate (bUpdateBlock b) (model net init) (take (bSweeps b) $ cycle $ updateUnits net)
+        --setNumCapabilities $ bThreads b
+        gibbsUpdate (bThreads b) (bUpdateBlock b) (model net init) (take (bSweeps b) $ cycle $ updateUnits net)
 
 main = do
     bs <- withSystemRandomIO $ runRVar (mapM ldaBenchmark benchmarks)
