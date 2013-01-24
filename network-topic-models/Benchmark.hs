@@ -22,7 +22,7 @@ data NetParams = NetParams { nNodes        :: Int
                            , nItemsPerNode :: Int
                            }
 
-netParams = NetParams { nNodes = 2000, nItems = 30000, nTopics = 100, nItemsPerNode = 20 }
+netParams = NetParams { nNodes = 10000, nItems = 80000, nTopics = 100, nItemsPerNode = 20 }
 
 randomNetwork :: NetParams -> RVar NetData
 randomNetwork net = do
@@ -51,9 +51,9 @@ data LDABenchmark = LDABenchmark { bNetParams    :: NetParams
                                  
 benchmarks = do
     updateBlock <- [10, 100, 1000]
-    topics <- [20, 100, 500]
-    nItemsPerNode <- [20, 200]
-    threads <- [1,2,3, 4, 5, 6, 7, 8, 10]
+    topics <- [20, 100, 500, 1000]
+    nItemsPerNode <- [200]
+    threads <- [4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26]
     return LDABenchmark { bNetParams = netParams {nTopics=topics, nItemsPerNode=nItemsPerNode}
                         , bThreads = threads
                         , bUpdateBlock = updateBlock
