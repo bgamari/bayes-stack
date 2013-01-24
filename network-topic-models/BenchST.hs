@@ -62,8 +62,8 @@ drawStBenchmark b = do
     init <- randomInitialize net
     let name = printf "%d topics, %d threads, %d block, %d items per node" (nTopics $ bNetParams b) (bThreads b) (bUpdateBlock b) (nItemsPerNode $ bNetParams b)
     return $ bench name $ do
-        gibbsUpdate (bUpdateBlock b) (model net init)
-        $ concat $ replicate (bSweeps b) (updateUnits net)
+        gibbsUpdate (bThreads b) (bUpdateBlock b) (model net init)
+            $ concat $ replicate (bSweeps b) (updateUnits net)
 
 stBenchmarkParams :: [STBenchmark]
 stBenchmarkParams = do
