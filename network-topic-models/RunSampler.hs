@@ -140,7 +140,7 @@ samplerIter opts uus processSweepRunning lastMaxV lagN = do
     shuffledUus <- liftIO $ withSystemRandomIO $ \mwc->runRVar (shuffle uus) mwc
     let uus' = concat $ replicate (lag opts) shuffledUus
     m <- S.get
-    S.put =<< liftIO (gibbsUpdate (updateBlock opts) m uus')
+    S.put =<< liftIO (gibbsUpdate (nCaps opts) (updateBlock opts) m uus')
     when (sweepN == burnin opts) $ liftIO $ putStrLn "Burn-in complete"
     S.get >>= \m->do liftIO $ atomically $ takeTMVar processSweepRunning
                      void $ liftIO $ forkIO $ do

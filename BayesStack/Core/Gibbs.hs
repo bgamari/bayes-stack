@@ -60,9 +60,8 @@ diffWorker stateRef diffQueue updateBlock = forever $ do
 labelMyThread :: String -> IO ()
 labelMyThread label = myThreadId >>= \id->labelThread id label
 
-gibbsUpdate :: Int -> ms -> [WrappedUpdateUnit ms] -> IO ms
-gibbsUpdate updateBlock modelState units = do
-    n <- getNumCapabilities
+gibbsUpdate :: Int -> Int -> ms -> [WrappedUpdateUnit ms] -> IO ms
+gibbsUpdate nUpdateWorkers updateBlock modelState units = do
     unitsQueue <- atomically $ do q <- newTQueue
                                   mapM_ (writeTQueue q) units
                                   return q
@@ -73,7 +72,7 @@ gibbsUpdate updateBlock modelState units = do
 
     runningWorkers <- atomically $ newTVar (0 :: Int)
     done <- atomically $ newEmptyTMVar :: IO (TMVar ())
-    replicateM_ n $ forkIO $ withSystemRandom $ \mwc->do 
+    replicateM_ nUpdateWorkers $ forkIO $ withSystemRandom $ \mwc->do 
         labelMyThread "update worker"
         atomically $ modifyTVar' runningWorkers (+1)
         runRVarT (updateWorker unitsQueue stateRef diffQueue) mwc
