@@ -20,9 +20,9 @@ data NetParams = NetParams { nNodes        :: Int
                            , nItemsPerNode :: Int
                            }
 
-netParams = NetParams { nNodes = 10000
-                      , nEdgesPerNode = 50
-                      , nItems = 80000
+netParams = NetParams { nNodes = 5000
+                      , nEdgesPerNode = 10
+                      , nItems = nItemsPerNode netParams * nNodes netParams `div` 10
                       , nTopics = 100
                       , nItemsPerNode = 20
                       }
@@ -31,7 +31,7 @@ randomNetwork :: NetParams -> RVar NetData
 randomNetwork net = do
     let nodes = [Node i | i <- [1..nNodes net]]
         items = [Item i | i <- [1..nItems net]]
-        edge a = do b <- randomElement (nodes \\ [a])
+        edge a = do b <- randomElement nodes --(nodes \\ [a])
                     return $ Edge (a,b) 
         nodeItem = do node <- randomElement nodes
                       item <- randomElement items
@@ -68,12 +68,12 @@ drawStBenchmark b = do
 stBenchmarkParams :: [STBenchmark]
 stBenchmarkParams = do
     updateBlock <- [10, 100, 1000]
-    topics <- [20, 100, 500, 1000]
-    threads <- [4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26]
+    topics <- [20, 100, 500]
+    threads <- [1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26]
     return STBenchmark { bNetParams = netParams {nTopics=topics}
                        , bThreads = threads
                        , bUpdateBlock = updateBlock
-                       , bSweeps = 1
+                       , bSweeps = 2
                        }
 
 stBenchmarks :: RVar Benchmark

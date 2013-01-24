@@ -17,8 +17,8 @@ data NetParams = NetParams { nNodes        :: Int
                            , nItemsPerNode :: Int
                            }
 
-netParams = NetParams { nNodes = 10000
-                      , nItems = 80000
+netParams = NetParams { nNodes = 5000
+                      , nItems = nItemsPerNode netParams * nNodes netParams `div` 10
                       , nTopics = 100
                       , nItemsPerNode = 20
                       }
@@ -59,11 +59,11 @@ ldaBenchmarkParams = do
     updateBlock <- [10, 100, 1000]
     topics <- [20, 100, 500, 1000]
     nItemsPerNode <- [200]
-    threads <- [4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26]
+    threads <- [1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26]
     return LDABenchmark { bNetParams = netParams {nTopics=topics, nItemsPerNode=nItemsPerNode}
                         , bThreads = threads
                         , bUpdateBlock = updateBlock
-                        , bSweeps = 1
+                        , bSweeps = 2
                         }
 
 ldaBenchmarks :: RVar Benchmark
