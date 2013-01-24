@@ -3,6 +3,7 @@ module BenchLDA where
 import           Control.Monad.Trans.State
 import           Control.Monad (replicateM, forM)
 import           Text.Printf
+import           Control.Concurrent (setNumCapabilities)
 
 import           Criterion
 import           Data.Random
@@ -51,6 +52,7 @@ drawLdaBenchmark b = do
     init <- randomInitialize net
     let name = printf "%d topics, %d threads, %d block, %d items per node" (nTopics $ bNetParams b) (bThreads b) (bUpdateBlock b) (nItemsPerNode $ bNetParams b)
     return $ bench name $ do
+        setNumCapabilities (bThreads b)
         gibbsUpdate (bThreads b) (bUpdateBlock b) (model net init)
             $ concat $ replicate (bSweeps b) (updateUnits net)
 
