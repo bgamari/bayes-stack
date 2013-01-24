@@ -75,13 +75,14 @@ dItemsOfNode nd u = map snd $ filter (\(n,_)->u==n) $ M.elems $ dNodeItems nd
 
 type ModelInit = Map NodeItem (Setting STUpdateUnit)
 
-randomInit :: NetData -> NodeItem -> RVar ModelInit
-randomInit d ni = do
+randomInit :: NetData -> Map Node (Set Node) -> NodeItem -> RVar ModelInit
+randomInit d friends ni = do
     let topics = S.toList $ dTopics d
     t <- randomElement topics
     s <- randomElement [Shared, Own]
     let (u,_) = dNodeItems d M.! ni
-    f <- randomElement $ getFriends (S.toList $ dEdges d) u
+    f <- randomElement $ S.toList
+         $ maybe (error "SharedTaste.randomInit: No friends") id $ M.lookup u friends
     return $ M.singleton ni $
         case s of Shared -> SharedSetting t (Edge (u,f))
                   Own    -> OwnSetting t
@@ -89,7 +90,10 @@ randomInit d ni = do
 randomInitialize' :: NetData -> ModelInit -> RVar ModelInit
 randomInitialize' d init = 
   let unset = M.keysSet (dNodeItems d) `S.difference` M.keysSet init
-  in liftM mconcat $ forM (S.toList unset) $ randomInit d
+      friends = M.unionsWith S.union $ map (\(Edge (a,b))-> M.singleton a (S.singleton b)
+                                                         <> M.singleton b (S.singleton a)
+                                           ) $ S.toList $ dEdges d
+  in liftM mconcat $ forM (S.toList unset) $ randomInit d friends
 
 
 randomInitialize :: NetData -> RVar ModelInit
