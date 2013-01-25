@@ -2,6 +2,7 @@ module BenchLDA where
 
 import           Control.Monad.Trans.State
 import           Control.Monad (replicateM, forM)
+import           Control.Applicative ((<$>))
 import           Text.Printf
 import           Control.Concurrent (setNumCapabilities)
 
@@ -17,11 +18,12 @@ data NetParams = NetParams { nNodes        :: Int
                            , nTopics       :: Int
                            , nItemsPerNode :: Int
                            }
+               deriving (Show, Eq, Ord)
 
-netParams = NetParams { nNodes = 5000
+netParams = NetParams { nNodes = 50000
                       , nItems = nItemsPerNode netParams * nNodes netParams `div` 10
                       , nTopics = 100
-                      , nItemsPerNode = 20
+                      , nItemsPerNode = 200
                       }
 
 randomNetwork :: NetParams -> RVar NetData
@@ -40,34 +42,29 @@ randomNetwork net = do
                      , dNodeItems  = setupNodeItems edges
                      }
 
-data LDABenchmark = LDABenchmark { bNetParams    :: NetParams
-                                 , bThreads      :: Int
-                                 , bUpdateBlock  :: Int
-                                 , bSweeps       :: Int
-                                 }
-
-drawLdaBenchmark :: LDABenchmark -> RVar Benchmark
-drawLdaBenchmark b = do
-    net <- randomNetwork $ bNetParams b
-    init <- randomInitialize net
-    let name = printf "%d topics, %d threads, %d block, %d items per node" (nTopics $ bNetParams b) (bThreads b) (bUpdateBlock b) (nItemsPerNode $ bNetParams b)
-    return $ bench name $ do
-        setNumCapabilities (bThreads b)
-        gibbsUpdate (bThreads b) (bUpdateBlock b) (model net init)
-            $ concat $ replicate (bSweeps b) (updateUnits net)
-
-ldaBenchmarkParams :: [LDABenchmark]
-ldaBenchmarkParams = do
+benchmarksForNetwork :: NetParams -> NetData -> ModelInit -> [Benchmark]
+benchmarksForNetwork np net init = do
+    let sweeps = 100
     updateBlock <- [10, 100, 1000]
-    topics <- [20, 100, 500, 1000]
-    nItemsPerNode <- [200]
     threads <- [1, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26]
-    return LDABenchmark { bNetParams = netParams {nTopics=topics, nItemsPerNode=nItemsPerNode}
-                        , bThreads = threads
-                        , bUpdateBlock = updateBlock
-                        , bSweeps = 2
-                        }
+    let name = printf "%d topics, %d threads, %d block, %d items per node" (nTopics np) threads updateBlock (nItemsPerNode np)
+    return $ bench name $ do
+        setNumCapabilities threads
+        gibbsUpdate threads updateBlock (model net init)
+            $ concat $ replicate sweeps (updateUnits net)
+
+benchmarksForNetParams :: NetParams -> RVar [Benchmark]
+benchmarksForNetParams np = do
+    net <- randomNetwork np
+    init <- randomInitialize net
+    return $ benchmarksForNetwork np net init
+
+ldaBenchmarkParams :: RVar [[Benchmark]]
+ldaBenchmarkParams =
+    mapM benchmarksForNetParams
+    $ do topics <- [100, 500, 1000]
+         return netParams {nTopics=topics}
 
 ldaBenchmarks :: RVar Benchmark
-ldaBenchmarks = bgroup "LDA" `fmap` mapM drawLdaBenchmark ldaBenchmarkParams
+ldaBenchmarks = bgroup "LDA" . concat <$> ldaBenchmarkParams 
 
