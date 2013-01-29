@@ -43,12 +43,12 @@ import BayesStack.Models.Topic.Types
 import GHC.Generics
 import Data.Binary
 
-data NetData = NetData { dAlphaTheta :: Double
-                       , dAlphaPhi :: Double
-                       , dNodes :: Set Node
-                       , dItems :: Set Item
-                       , dTopics :: Set Topic
-                       , dNodeItems :: Map NodeItem (Node, Item)
+data NetData = NetData { dAlphaTheta :: !Double
+                       , dAlphaPhi :: !Double
+                       , dNodes :: !(Set Node)
+                       , dItems :: !(Set Item)
+                       , dTopics :: !(Set Topic)
+                       , dNodeItems :: !(Map NodeItem (Node, Item))
                        }
                deriving (Show, Eq, Generic)
 instance Binary NetData
