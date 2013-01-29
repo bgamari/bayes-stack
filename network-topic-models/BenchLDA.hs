@@ -34,13 +34,13 @@ randomNetwork net = do
                       item <- randomElement items
                       return (node, item)
     edges <- replicateM (nItemsPerNode net) nodeItem
-    return $ NetData { dAlphaTheta = 0.1
-                     , dAlphaPhi   = 0.1
-                     , dNodes      = S.fromList nodes
-                     , dItems      = S.fromList items
-                     , dTopics     = S.fromList [Topic i | i <- [1..nTopics net]]
-                     , dNodeItems  = setupNodeItems edges
-                     }
+    return $! NetData { dAlphaTheta = 0.1
+                      , dAlphaPhi   = 0.1
+                      , dNodes      = S.fromList nodes
+                      , dItems      = S.fromList items
+                      , dTopics     = S.fromList [Topic i | i <- [1..nTopics net]]
+                      , dNodeItems  = setupNodeItems edges
+                      }
 
 benchmarksForNetwork :: NetParams -> NetData -> ModelInit -> [Benchmark]
 benchmarksForNetwork np net init = do
