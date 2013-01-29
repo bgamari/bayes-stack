@@ -16,6 +16,7 @@ import Data.Random
 import Data.Random.Lift       
 import System.Random.MWC (withSystemRandom)
 import Control.Monad.State hiding (lift)
+import Debug.Trace (traceEventIO)
 
 class UpdateUnit uu where
     type ModelState uu
@@ -51,11 +52,13 @@ atomicModifyIORef' = atomicModifyIORef
 
 diffWorker :: IORef ms -> TBQueue (ms -> ms) -> Int -> IO ()
 diffWorker stateRef diffQueue updateBlock = forever $ do
-    diff <- execStateT (replicateM_ updateBlock $ do
-                            diff <- lift $ atomically $ readTBQueue diffQueue
-                            modify (. diff)
-                       ) id
-    atomicModifyIORef' stateRef $ \a->(diff a, ())
+    s <- readIORef stateRef
+    s' <- execStateT (replicateM_ updateBlock $ do
+                          diff <- lift $ atomically $ readTBQueue diffQueue
+                          modify diff
+                     ) s
+    atomicWriteIORef stateRef $! s'
+    traceEventIO "diffWorker: State updated"
 
 labelMyThread :: String -> IO ()
 labelMyThread label = myThreadId >>= \id->labelThread id label
