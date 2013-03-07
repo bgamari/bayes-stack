@@ -84,8 +84,8 @@ model d init =
                      }
     in execState (mapM (\uu->modify $ setUU uu (Just $ M.findWithDefault (Topic 0) (uuNI uu) init)) uus) s
 
-data MState = MState { stThetas :: !(Map Node (Multinom Topic))
-                     , stPhis   :: !(Map Topic (Multinom Item))
+data MState = MState { stThetas :: !(Map Node (Multinom Int Topic))
+                     , stPhis   :: !(Map Topic (Multinom Int Item))
                      , stT      :: !(Map NodeItem Topic)
                      }
             deriving (Show, Generic)

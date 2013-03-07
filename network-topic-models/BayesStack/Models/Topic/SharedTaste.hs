@@ -143,11 +143,11 @@ instance NFData STSetting where
     rnf (OwnSetting t)      = rnf t `seq` ()
     rnf (SharedSetting t f) = rnf t `seq` rnf f `seq` ()
 
-data MState = MState { stGammas   :: !(Map Node (Multinom ItemSource))
-                     , stOmegas   :: !(Map Node (Multinom Topic))
-                     , stPsis     :: !(Map Node (Multinom Node))
-                     , stLambdas  :: !(Map Edge (Multinom Topic))
-                     , stPhis     :: !(Map Topic (Multinom Item))
+data MState = MState { stGammas   :: !(Map Node (Multinom Int ItemSource))
+                     , stOmegas   :: !(Map Node (Multinom Int Topic))
+                     , stPsis     :: !(Map Node (Multinom Int Node))
+                     , stLambdas  :: !(Map Edge (Multinom Int Topic))
+                     , stPhis     :: !(Map Topic (Multinom Int Item))
 
                      , stVars     :: !(Map NodeItem STSetting)
                      }
@@ -229,7 +229,7 @@ modelLikelihood model =
            ++ map likelihood (M.elems $ stPsis model)
 
 -- | The probability of a collections of items under a given topic mixture.
-topicCompatibility :: MState -> [Item] -> Multinom Topic -> Probability
+topicCompatibility :: MState -> [Item] -> Multinom Int Topic -> Probability
 topicCompatibility m items lambda =
     product $ do t <- toList $ dmDomain lambda
                  x <- items
@@ -237,7 +237,7 @@ topicCompatibility m items lambda =
                  return $ prob lambda t * prob phi x
 
 topicCompatibilities :: (Functor f, Foldable f)
-                     => MState -> [Item] -> f (Multinom Topic) -> f Probability
+                     => MState -> [Item] -> f (Multinom Int Topic) -> f Probability
 topicCompatibilities m items topics =
     let scores = fmap (topicCompatibility m items) topics
     in fmap (/sum scores) scores

@@ -246,15 +246,15 @@ instance NFData CitingSetting where
     rnf (SharedSetting t c) = rnf t `seq` rnf c `seq` ()
 
 data MState = MState { -- Citing model state
-                       stGammas   :: !(Map CitingNode (Multinom ItemSource))
-                     , stOmegas   :: !(Map CitingNode (Multinom Topic))
-                     , stPsis     :: !(Map CitingNode (Multinom CitedNode))
-                     , stPhis     :: !(Map Topic (Multinom Item))
+                       stGammas   :: !(Map CitingNode (Multinom Int ItemSource))
+                     , stOmegas   :: !(Map CitingNode (Multinom Int Topic))
+                     , stPsis     :: !(Map CitingNode (Multinom Int CitedNode))
+                     , stPhis     :: !(Map Topic (Multinom Int Item))
 
                      , stCiting   :: !(Map CitingNodeItem CitingSetting)
 
                      -- Cited model state
-                     , stLambdas  :: !(Map CitedNode (Multinom Topic))
+                     , stLambdas  :: !(Map CitedNode (Multinom Int Topic))
 
                      , stT'       :: !(Map CitedNodeItem Topic)
                      }
@@ -274,7 +274,7 @@ harMean = logToLogFloat . mean . V.map logFromLogFloat
 
 -- | The geometric mean of the probabilities of a collection of items under a
 -- given topic mixture.
-topicCompatibility :: MState -> [Item] -> Multinom Topic -> Probability
+topicCompatibility :: MState -> [Item] -> Multinom Int Topic -> Probability
 topicCompatibility m items lambda =
     harMean $ V.fromList
             $ do t <- toList $ dmDomain lambda
@@ -283,7 +283,7 @@ topicCompatibility m items lambda =
                  return $ prob lambda t * prob phi x
 
 topicCompatibilities :: (Functor f, Foldable f)
-                     => MState -> [Item] -> f (Multinom Topic) -> f Probability
+                     => MState -> [Item] -> f (Multinom Int Topic) -> f Probability
 topicCompatibilities m items topics =
     let scores = fmap (topicCompatibility m items) topics
     in fmap (/sum scores) scores
