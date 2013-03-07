@@ -5,6 +5,7 @@ module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                              -- | Do not do record updates with these
                            , dmTotal, dmAlpha, dmDomain
                            , setMultinom, SetUnset (..)
+                           , addMultinom, subMultinom
                            , decMultinom, incMultinom
                            , prettyMultinom
                            , updatePrior
@@ -45,7 +46,7 @@ checkNaN loc x | isNaN x = error $ "BayesStack.DirMulti."++loc++": Not a number"
 checkNaN loc x | isInfinite x = error $ "BayesStack.DirMulti."++loc++": Infinity"
 checkNaN _ x = x
 
-maybeInc, maybeDec :: Maybe Int -> Maybe Int
+maybeInc, maybeDec :: (Num a, Eq a) => Maybe a -> Maybe a
 maybeInc Nothing = Just 1
 maybeInc (Just n) = Just (n+1)
 maybeDec Nothing = error "Can't decrement zero count"
@@ -54,15 +55,21 @@ maybeDec (Just n) = Just (n-1)
 
 {-# INLINEABLE decMultinom #-}
 {-# INLINEABLE incMultinom #-}
-decMultinom, incMultinom :: (Ord a, Enum a) => a -> Multinom a -> Multinom a
-decMultinom k dm = dm { dmCounts = EM.alter maybeDec k $ dmCounts dm
-                      , dmTotal = dmTotal dm - 1 }
-incMultinom k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
-                      , dmTotal = dmTotal dm + 1 }
+decMultinom, incMultinom :: (Num w, Eq w, Ord a, Enum a)
+                         => a -> Multinom w a -> Multinom w a
+decMultinom k = subMultinom 1 k
+incMultinom k = addMultinom 1 k
+
+subMultinom, addMultinom :: (Num w, Eq w, Ord a, Enum a)
+                         => w -> a -> Multinom w a -> Multinom w a
+subMultinom w k dm = dm { dmCounts = EM.alter maybeDec k $ dmCounts dm
+                        , dmTotal = dmTotal dm - w }
+addMultinom w k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
+                        , dmTotal = dmTotal dm + w }
 
 data SetUnset = Set | Unset
 
-setMultinom :: (Enum a, Ord a) => SetUnset -> a -> Multinom a -> Multinom a
+setMultinom :: (Num w, Eq w, Enum a, Ord a) => SetUnset -> a -> Multinom w a -> Multinom w a
 setMultinom Set   s = incMultinom s
 setMultinom Unset s = decMultinom s
 
@@ -70,35 +77,35 @@ setMultinom Unset s = decMultinom s
 -- Optionally, this can include a collapsed Dirichlet prior.
 -- 'Multinom alpha count total' is a multinomial with Dirichlet prior
 -- with symmetric parameter 'alpha', ...
-data Multinom a = DirMulti { dmAlpha :: Alpha a
-                           , dmCounts :: EnumMap a Int
-                           , dmTotal :: !Int
-                           , dmDomain :: Seq a
-                           }
-                | Multinom { dmProbs :: !(EnumMap a Double)
-                           , dmCounts :: !(EnumMap a Int)
-                           , dmTotal :: !Int
-                           , dmDomain :: !(Seq a)
-                           }
-                deriving (Show, Eq, Generic)
-instance (Enum a, Binary a) => Binary (Multinom a)
+data Multinom w a = DirMulti { dmAlpha :: Alpha a
+                             , dmCounts :: EnumMap a w
+                             , dmTotal :: !w
+                             , dmDomain :: Seq a
+                             }
+                  | Multinom { dmProbs :: !(EnumMap a Double)
+                             , dmCounts :: !(EnumMap a w)
+                             , dmTotal :: !w
+                             , dmDomain :: !(Seq a)
+                             }
+                  deriving (Show, Eq, Generic)
+instance (Enum a, Binary a, Binary w) => Binary (Multinom w a)
 
 -- | 'symMultinomFromPrecision d p' is a symmetric Dirichlet/multinomial over a
 -- domain 'd' with precision 'p'
-symDirMultiFromPrecision :: Enum a => [a] -> DirPrecision -> Multinom a
+symDirMultiFromPrecision :: (Num w, Enum a) => [a] -> DirPrecision -> Multinom w a
 symDirMultiFromPrecision domain prec = symDirMulti (0.5*prec) domain
 
 -- | 'dirMultiFromMeanPrecision m p' is an asymmetric Dirichlet/multinomial
 -- over a domain 'd' with mean 'm' and precision 'p'
-dirMultiFromPrecision :: Enum a => DirMean a -> DirPrecision -> Multinom a
+dirMultiFromPrecision :: (Num w, Enum a) => DirMean a -> DirPrecision -> Multinom w a
 dirMultiFromPrecision m p = dirMultiFromAlpha $ meanPrecisionToAlpha m p
 
 -- | Create a symmetric Dirichlet/multinomial
-symDirMulti :: Enum a => Double -> [a] -> Multinom a
+symDirMulti :: (Num w, Enum a) => Double -> [a] -> Multinom w a
 symDirMulti alpha domain = dirMultiFromAlpha $ symAlpha domain alpha
 
 -- | A multinomial without a prior
-multinom :: Enum a => [(a,Double)] -> Multinom a
+multinom :: (Num w, Enum a) => [(a,Double)] -> Multinom w a
 multinom probs = Multinom { dmProbs = EM.fromList probs
                           , dmCounts = EM.empty
                           , dmTotal = 0
@@ -106,25 +113,29 @@ multinom probs = Multinom { dmProbs = EM.fromList probs
                           }
 
 -- | Create an asymmetric Dirichlet/multinomial from items and alphas
-dirMulti :: Enum a => [(a,Double)] -> Multinom a
+dirMulti :: (Num w, Enum a) => [(a,Double)] -> Multinom w a
 dirMulti domain = dirMultiFromAlpha $ asymAlpha $ EM.fromList domain
 
 -- | Create a Dirichlet/multinomial with a given prior
-dirMultiFromAlpha :: Enum a => Alpha a -> Multinom a
+dirMultiFromAlpha :: (Enum a, Num w) => Alpha a -> Multinom w a
 dirMultiFromAlpha alpha = DirMulti { dmAlpha = alpha
                                    , dmCounts = EM.empty
                                    , dmTotal = 0
                                    , dmDomain = alphaDomain alpha
                                    }
 
-dmGetCounts :: Enum a => Multinom a -> a -> Int
+dmGetCounts :: (Enum a, Num w) => Multinom w a -> a -> w
 dmGetCounts dm k =
   EM.findWithDefault 0 k (dmCounts dm)
 
-instance HasLikelihood Multinom where
-  type LContext Multinom a = (Ord a, Enum a)
+instance HasLikelihood (Multinom w) where
+  type LContext (Multinom w) a = (Real w, Ord a, Enum a)
   likelihood dm@(Multinom {}) =
-      product $ map (\(k,n)->(realToFrac $ dmProbs dm EM.! k)^n) $ EM.assocs $ dmCounts dm
+      product $ map (\(k,n)->(realToFrac $ dmProbs dm EM.! k)^^n)
+      $ EM.assocs $ dmCounts dm
+    where (^^) :: Real w => LogFloat -> w -> LogFloat
+          x ^^ y = logToLogFloat $ realToFrac y * logFromLogFloat' x
+          logFromLogFloat' = logFromLogFloat :: LogFloat -> Double
   likelihood dm =
       let alpha = dmAlpha dm
           f k = logToLogFloat $ checkNaN "likelihood(factor)"
@@ -144,25 +155,25 @@ instance HasLikelihood Multinom where
          / logToLogFloat (checkNaN "prob" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha)
   {-# INLINEABLE prob #-}
 
-instance FullConditionable Multinom where
-  type FCContext Multinom a = (Ord a, Enum a)
+instance FullConditionable (Multinom w) where
+  type FCContext (Multinom w) a = (Real w, Ord a, Enum a)
   sampleProb (Multinom {dmProbs=prob}) k = prob EM.! k
   sampleProb dm@(DirMulti {dmAlpha=a}) k =
     let alpha = a `alphaOf` k
-            n = realToFrac $ dmGetCounts dm k
-            total = realToFrac $ dmTotal dm
-        in (n + alpha) / (total + sumAlpha a)
+        n = realToFrac $ dmGetCounts dm k
+        total = realToFrac $ dmTotal dm
+    in (n + alpha) / (total + sumAlpha a)
   {-# INLINEABLE sampleProb #-}
 
 {-# INLINEABLE probabilities #-}
-probabilities :: (Ord a, Enum a) => Multinom a -> Seq (Double, a)
+probabilities :: (Real w, Ord a, Enum a) => Multinom w a -> Seq (Double, a)
 probabilities dm = fmap (\a->(sampleProb dm a, a)) $ dmDomain dm -- FIXME
 
 -- | Probabilities sorted decreasingly
-decProbabilities :: (Ord a, Enum a) => Multinom a -> Seq (Double, a)
+decProbabilities :: (Real w, Ord a, Enum a, Num w) => Multinom w a -> Seq (Double, a)
 decProbabilities = SQ.sortBy (flip (compare `on` fst)) . probabilities
 
-prettyMultinom :: (Ord a, Enum a) => Int -> (a -> String) -> Multinom a -> Doc
+prettyMultinom :: (Real w, Ord a, Enum a) => Int -> (a -> String) -> Multinom w a -> Doc
 prettyMultinom _ _ (Multinom {})         = error "TODO: prettyMultinom"
 prettyMultinom n showA dm@(DirMulti {})  =
   text "DirMulti" <+> parens (text "alpha=" <> prettyAlpha showA (dmAlpha dm))
@@ -171,14 +182,15 @@ prettyMultinom n showA dm@(DirMulti {})  =
             $ take n $ Data.Foldable.toList $ decProbabilities dm)
 
 -- | Update the prior of a Dirichlet/multinomial
-updatePrior :: (Alpha a -> Alpha a) -> Multinom a -> Multinom a
+updatePrior :: (Alpha a -> Alpha a) -> Multinom w a -> Multinom w a
 updatePrior _ (Multinom {}) = error "TODO: updatePrior"
 updatePrior f dm = dm {dmAlpha=f $ dmAlpha dm}
 
 -- | Relative tolerance in precision for prior estimation
 estimationTol = 1e-8
 
-reestimatePriors :: (Foldable f, Functor f, Enum a) => f (Multinom a) -> f (Multinom a)
+reestimatePriors :: (Foldable f, Functor f, Real w, Enum a)
+                 => f (Multinom w a) -> f (Multinom w a)
 reestimatePriors dms =
   let usableDms = filter (\dm->dmTotal dm > 5) $ toList dms
       alpha = case () of
@@ -186,7 +198,8 @@ reestimatePriors dms =
                 otherwise -> const $ estimatePrior estimationTol usableDms
   in fmap (updatePrior alpha) dms
 
-reestimateSymPriors :: (Foldable f, Functor f, Enum a) => f (Multinom a) -> f (Multinom a)
+reestimateSymPriors :: (Foldable f, Functor f, Real w, Enum a)
+                    => f (Multinom w a) -> f (Multinom w a)
 reestimateSymPriors dms =
   let usableDms = filter (\dm->dmTotal dm > 5) $ toList dms
       alpha = case () of
@@ -195,7 +208,7 @@ reestimateSymPriors dms =
   in fmap (updatePrior alpha) dms
 
 -- | Estimate the prior alpha from a set of Dirichlet/multinomials
-estimatePrior' :: (Enum a) => [Multinom a] -> Alpha a -> Alpha a
+estimatePrior' :: (Real w, Enum a) => [Multinom w a] -> Alpha a -> Alpha a
 estimatePrior' dms alpha =
   let domain = toList $ dmDomain $ head dms
       f k = let num = sum $ map (\i->digamma (realToFrac (dmGetCounts i k) + alphaOf alpha k)
@@ -213,7 +226,7 @@ estimatePrior' dms alpha =
                  otherwise  -> alphaOf alpha k * num / denom
   in asymAlpha $ foldMap (\k->EM.singleton k (f k)) domain
 
-estimatePrior :: (Enum a) => Double -> [Multinom a] -> Alpha a
+estimatePrior :: (Real w, Enum a) => Double -> [Multinom w a] -> Alpha a
 estimatePrior tol dms = iter $ dmAlpha $ head dms
   where iter alpha = let alpha' = estimatePrior' dms alpha
                          (_, prec)  = alphaToMeanPrecision alpha
