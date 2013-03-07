@@ -15,20 +15,20 @@ import           Data.Text.Lazy.Builder.Int
 import           Data.Text.Lazy.Builder.RealFloat
 import           Data.Binary
 
-import           System.FilePath ((</>))                 
+import           System.FilePath ((</>))
 import           Text.Printf
 
 import           BayesStack.Models.Topic.CitationInfluence
 import           SerializeText
 import           ReadData
-import           FormatMultinom                 
-                 
+import           FormatMultinom
+
 data Opts = Opts { nElems   :: Maybe Int
                  , dumper   :: Dumper
                  , sweepDir :: FilePath
                  , sweepNum :: Maybe Int
                  }
-     
+
 type Dumper = Opts -> NetData -> MState
               -> (Item -> TB.Builder) -> (Node -> TB.Builder)
               -> TB.Builder
@@ -51,7 +51,7 @@ readDumper "omegas" = Just $ \opts nd m showItem showNode ->
 
 readDumper "gammas" = Just $ \opts nd m showItem showNode ->
     formatMultinoms showB showB (nElems opts) (stGammas m)
-    
+
 readDumper "influences" = Just $ \opts nd m showItem showNode ->
     let formatProb = formatRealFloat Exponent (Just 3) . realToFrac
         formatInfluences u =
@@ -96,8 +96,8 @@ readNetData :: FilePath -> IO NetData
 readNetData = decodeFile
 
 main = do
-    args <- execParser $ info (helper <*> opts) 
-         ( fullDesc 
+    args <- execParser $ info (helper <*> opts)
+         ( fullDesc
         <> progDesc "Dump distributions from an citation influence model sweep"
         <> header "dump-ci - Dump distributions from an citation influence model sweep"
          )

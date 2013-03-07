@@ -3,7 +3,7 @@
 module FormatMultinom ( formatMultinom
                       , formatMultinoms
                       ) where
-                      
+
 import           Data.Foldable
 import           Data.Monoid
 
@@ -18,14 +18,13 @@ import           BayesStack.DirMulti
 formatMultinom :: (Ord a, Enum a)
                => (a -> TB.Builder) -> Maybe Int -> Multinom a -> TB.Builder
 formatMultinom show n = foldMap formatElem . takeTop . toList . decProbabilities
-    where formatElem (p,x) = 
+    where formatElem (p,x) =
                "\t" <> show x <> "\t" <> formatRealFloat Exponent (Just 3) p <> "\n"
           takeTop = maybe id take n
 
 formatMultinoms :: (Ord k, Ord a, Enum a)
                 => (k -> TB.Builder) -> (a -> TB.Builder) -> Maybe Int
                 -> M.Map k (Multinom a) -> TB.Builder
-formatMultinoms showKey showElem n = foldMap go . M.assocs 
+formatMultinoms showKey showElem n = foldMap go . M.assocs
     where go (k,v) = showKey k <> "\n"
                    <> formatMultinom showElem n v <> "\n"
-

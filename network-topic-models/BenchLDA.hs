@@ -66,5 +66,4 @@ ldaBenchmarkParams =
          return netParams {nTopics=topics}
 
 ldaBenchmarks :: RVar Benchmark
-ldaBenchmarks = bgroup "LDA" . concat <$> ldaBenchmarkParams 
-
+ldaBenchmarks = bgroup "LDA" . concat <$> ldaBenchmarkParams

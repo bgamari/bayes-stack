@@ -1,21 +1,21 @@
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 
-import           Prelude hiding (mapM)    
+import           Prelude hiding (mapM)
 
-import           Options.Applicative    
-import           Data.Monoid ((<>))                 
-import           Control.Monad.Trans.Class                 
+import           Options.Applicative
+import           Data.Monoid ((<>))
+import           Control.Monad.Trans.Class
 
-import           Data.Vector (Vector)    
-import qualified Data.Vector.Generic as V    
-import           Statistics.Sample (mean)       
+import           Data.Vector (Vector)
+import qualified Data.Vector.Generic as V
+import           Statistics.Sample (mean)
 
-import           Data.Traversable (mapM)                 
+import           Data.Traversable (mapM)
 import qualified Data.Set as S
 import           Data.Set (Set)
 import qualified Data.Map.Strict as M
 
-import           ReadData       
+import           ReadData
 import           SerializeText
 import qualified RunSampler as Sampler
 import           BayesStack.DirMulti
@@ -24,7 +24,7 @@ import           BayesStack.UniqueKey
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-       
+
 import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath.Posix ((</>))
 import           Data.Binary
@@ -32,8 +32,8 @@ import qualified Data.ByteString as BS
 import           Text.Printf
 
 import           Data.Random
-import           System.Random.MWC                 
-                 
+import           System.Random.MWC
+
 data RunOpts = RunOpts { nodesFile       :: FilePath
                        , stopwords       :: Maybe FilePath
                        , nTopics         :: Int
@@ -46,9 +46,9 @@ data HyperParams = HyperParams
                    , alphaPhi         :: Double
                    }
                  deriving (Show, Eq)
-                   
+
 runOpts :: Parser RunOpts
-runOpts = RunOpts 
+runOpts = RunOpts
     <$> strOption  ( long "nodes"
                   <> short 'n'
                   <> metavar "FILE"
@@ -69,7 +69,7 @@ runOpts = RunOpts
                    )
     <*> Sampler.samplerOpts
     <*> hyperOpts
-    
+
 hyperOpts = HyperParams
     <$> option     ( long "prior-theta"
                   <> value 1
@@ -94,7 +94,7 @@ termsToItems nodes =
     in (d', (itemMap, nodeMap))
 
 netData :: HyperParams -> M.Map Node [Item] -> Int -> NetData
-netData hp nodeItems nTopics = 
+netData hp nodeItems nTopics =
     NetData { dAlphaTheta       = alphaTheta hp
             , dAlphaPhi         = alphaPhi hp
             , dItems            = S.unions $ map S.fromList $ M.elems nodeItems
@@ -106,7 +106,7 @@ netData hp nodeItems nTopics =
                                        return (n, item)
             , dNodes            = M.keysSet nodeItems
             }
-            
+
 opts :: ParserInfo RunOpts
 opts = info runOpts (  fullDesc
                     <> progDesc "Learn LDA model"
@@ -116,7 +116,7 @@ opts = info runOpts (  fullDesc
 instance Sampler.SamplerModel MState where
     estimateHypers = reestimate
     modelLikelihood = modelLikelihood
-    summarizeHypers ms = 
+    summarizeHypers ms =
         "  phi  : "++show (dmAlpha $ snd $ M.findMin $ stPhis ms)++"\n"++
         "  theta: "++show (dmAlpha $ snd $ M.findMin $ stThetas ms)++"\n"
 
@@ -140,7 +140,7 @@ main = do
                      $ map length $ M.elems nodeItems :: Vector Int
     printf "Read %d nodes\n" (M.size nodeItems)
     printf "Mean items per node:  %1.2f\n" (mean $ V.map realToFrac termCounts)
-    
+
     withSystemRandom $ \mwc->do
     let nd = netData (hyperParams args) nodeItems (nTopics args)
     encodeFile (sweepsDir </> "data") nd
@@ -148,4 +148,3 @@ main = do
     let m = model nd mInit
     Sampler.runSampler (samplerOpts args) m (updateUnits nd)
     return ()
-

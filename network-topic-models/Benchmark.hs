@@ -15,4 +15,3 @@ withSystemRandomIO = withSystemRandom
 main = do
     bs <- withSystemRandomIO $ runRVar benchmarks
     defaultMainWith defaultConfig (return ()) bs
-

@@ -1,19 +1,19 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts,
              ExistentialQuantification, GADTs, CPP #-}
-              
+
 module BayesStack.Core.Gibbs ( UpdateUnit(..)
                              , WrappedUpdateUnit(..)
                              , gibbsUpdate
                              ) where
-                             
+
 import Control.Monad (replicateM_, when, forever)
 import Control.Concurrent
 import Control.Concurrent.STM
 import GHC.Conc.Sync (labelThread)
-import Data.IORef       
+import Data.IORef
 import Control.DeepSeq
 import Data.Random
-import Data.Random.Lift       
+import Data.Random.Lift
 import System.Random.MWC (withSystemRandom)
 import Control.Monad.State hiding (lift)
 import Debug.Trace (traceEventIO)
@@ -28,7 +28,7 @@ class UpdateUnit uu where
 data WrappedUpdateUnit ms = forall uu. (UpdateUnit uu, ModelState uu ~ ms,
                                         NFData (Setting uu), Eq (Setting uu))
                          => WrappedUU uu
-     
+
 updateUnit :: WrappedUpdateUnit ms -> IORef ms -> TBQueue (ms -> ms) -> RVarT IO ()
 updateUnit (WrappedUU unit) stateRef diffQueue = do
     modelState <- lift $ readIORef stateRef
@@ -37,7 +37,7 @@ updateUnit (WrappedUU unit) stateRef diffQueue = do
     (s,s') `deepseq` return ()
     when (s /= s') $
         lift $ atomically $ writeTBQueue diffQueue (updateSetting unit s s')
-    
+
 updateWorker :: TQueue (WrappedUpdateUnit ms) -> IORef ms -> TBQueue (ms -> ms) -> RVarT IO ()
 updateWorker unitsQueue stateRef diffQueue = do
     unit <- lift $ atomically $ tryReadTQueue unitsQueue
@@ -45,7 +45,7 @@ updateWorker unitsQueue stateRef diffQueue = do
         Just unit' -> do updateUnit unit' stateRef diffQueue
                          updateWorker unitsQueue stateRef diffQueue
         Nothing -> return ()
-   
+
 #if __GLASGOW_HASKELL__ < 706
 atomicModifyIORef' = atomicModifyIORef
 #endif
@@ -75,7 +75,7 @@ gibbsUpdate nUpdateWorkers updateBlock modelState units = do
 
     runningWorkers <- atomically $ newTVar (0 :: Int)
     done <- atomically $ newEmptyTMVar :: IO (TMVar ())
-    replicateM_ nUpdateWorkers $ forkIO $ withSystemRandom $ \mwc->do 
+    replicateM_ nUpdateWorkers $ forkIO $ withSystemRandom $ \mwc->do
         labelMyThread "update worker"
         atomically $ modifyTVar' runningWorkers (+1)
         runRVarT (updateWorker unitsQueue stateRef diffQueue) mwc
@@ -86,4 +86,3 @@ gibbsUpdate nUpdateWorkers updateBlock modelState units = do
 
     atomically $ takeTMVar done
     readIORef stateRef
-

@@ -1,5 +1,5 @@
 import qualified Data.Map as M
-       
+
 main = do
     let m :: M.Map Int Int
         m = M.fromList [ (1,1), (2,2) ]
@@ -8,4 +8,3 @@ main = do
 
     print $ M.lookup 1 m
     print $ M.lookup 2 m
-    

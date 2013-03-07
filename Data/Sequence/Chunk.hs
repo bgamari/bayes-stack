@@ -8,4 +8,3 @@ chunk n xs = let m = ceiling $ realToFrac (SQ.length xs) / realToFrac n
                  f xs | SQ.null xs = SQ.empty
                  f xs = SQ.take m xs <| (f $ SQ.drop m xs)
              in f xs
-

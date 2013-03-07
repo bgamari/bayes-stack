@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, CPP #-}
-    
+
 module BayesStack.UniqueKey ( getUniqueKey
                             , getValueMap, getKeyMap
                             , mapTraversable
@@ -8,15 +8,15 @@ module BayesStack.UniqueKey ( getUniqueKey
                             , runUniqueKey', runUniqueKeyT'
                             ) where
 
-import Prelude hiding (mapM)       
-import Control.Applicative (Applicative, (<$>))       
+import Prelude hiding (mapM)
+import Control.Applicative (Applicative, (<$>))
 import Data.Traversable (Traversable, mapM)
 import Data.Tuple
 import Data.Functor.Identity
 
 import Control.Monad.Trans
 import Control.Monad.State.Strict hiding (mapM)
-       
+
 #if __GLASGOW_HASKELL__ >= 706
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -31,7 +31,7 @@ type UniqueKey val key = UniqueKeyT val key Identity
 newtype UniqueKeyT val key m a = UniqueKeyT (StateT ([key], Map val key) m a)
                               deriving (Monad, Applicative, Functor, MonadTrans)
 
--- | Get map of unique keys to values              
+-- | Get map of unique keys to values
 getKeyMap :: (Monad m, Applicative m, Ord key, Ord val) => UniqueKeyT val key m (Map key val)
 getKeyMap = M.fromList . map swap . M.toList <$> getValueMap
 
@@ -45,7 +45,7 @@ popUniqueKey = do
     case keys of
         key:rest -> UniqueKeyT (put $! (rest, a)) >> return key
         []      -> error "Ran out of unique keys"
-    
+
 -- | Find the unique key for value 'val' or 'Nothing' if the value is unknown
 findUniqueKey :: (Monad m, Applicative m, Ord key, Ord val) => val -> UniqueKeyT val key m (Maybe key)
 findUniqueKey value = M.lookup value <$> getValueMap
@@ -81,4 +81,3 @@ runUniqueKey' keys action =
 
 mapTraversable :: (Traversable t, Ord key, Ord val) => [key] -> t val -> (t key, Map key val)
 mapTraversable keys xs = runUniqueKey' keys $ mapM getUniqueKey xs
-

@@ -20,7 +20,7 @@ import qualified Data.EnumMap as EM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
-import qualified Data.Foldable 
+import qualified Data.Foldable
 import Data.Foldable (toList, Foldable, foldMap)
 import Data.Function (on)
 
@@ -51,7 +51,7 @@ maybeInc (Just n) = Just (n+1)
 maybeDec Nothing = error "Can't decrement zero count"
 maybeDec (Just 1) = Nothing
 maybeDec (Just n) = Just (n-1)
-                  
+
 {-# INLINEABLE decMultinom #-}
 {-# INLINEABLE incMultinom #-}
 decMultinom, incMultinom :: (Ord a, Enum a) => a -> Multinom a -> Multinom a
@@ -61,8 +61,8 @@ incMultinom k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
                       , dmTotal = dmTotal dm + 1 }
 
 data SetUnset = Set | Unset
-         
-setMultinom :: (Enum a, Ord a) => SetUnset -> a -> Multinom a -> Multinom a         
+
+setMultinom :: (Enum a, Ord a) => SetUnset -> a -> Multinom a -> Multinom a
 setMultinom Set   s = incMultinom s
 setMultinom Unset s = decMultinom s
 
@@ -131,9 +131,9 @@ instance HasLikelihood Multinom where
                 $ lnGamma (realToFrac (dmGetCounts dm k) + alpha `alphaOf` k)
       in 1 / alphaNormalizer alpha
          * product (map f $ toList $ dmDomain dm)
-         / logToLogFloat (checkNaN "likelihood" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha) 
+         / logToLogFloat (checkNaN "likelihood" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha)
   {-# INLINEABLE likelihood #-}
-  
+
   prob dm@(Multinom {}) k = realToFrac $ dmProbs dm EM.! k
   prob dm k =
       let alpha = dmAlpha dm
@@ -141,14 +141,14 @@ instance HasLikelihood Multinom where
                 $ lnGamma (realToFrac (dmGetCounts dm k) + alpha `alphaOf` k)
       in 1 / alphaNormalizer alpha
          * f k
-         / logToLogFloat (checkNaN "prob" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha) 
+         / logToLogFloat (checkNaN "prob" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha)
   {-# INLINEABLE prob #-}
 
 instance FullConditionable Multinom where
   type FCContext Multinom a = (Ord a, Enum a)
   sampleProb (Multinom {dmProbs=prob}) k = prob EM.! k
   sampleProb dm@(DirMulti {dmAlpha=a}) k =
-  	let alpha = a `alphaOf` k
+    let alpha = a `alphaOf` k
             n = realToFrac $ dmGetCounts dm k
             total = realToFrac $ dmTotal dm
         in (n + alpha) / (total + sumAlpha a)
@@ -158,7 +158,7 @@ instance FullConditionable Multinom where
 probabilities :: (Ord a, Enum a) => Multinom a -> Seq (Double, a)
 probabilities dm = fmap (\a->(sampleProb dm a, a)) $ dmDomain dm -- FIXME
 
--- | Probabilities sorted decreasingly              
+-- | Probabilities sorted decreasingly
 decProbabilities :: (Ord a, Enum a) => Multinom a -> Seq (Double, a)
 decProbabilities = SQ.sortBy (flip (compare `on` fst)) . probabilities
 
@@ -200,7 +200,7 @@ estimatePrior' dms alpha =
   let domain = toList $ dmDomain $ head dms
       f k = let num = sum $ map (\i->digamma (realToFrac (dmGetCounts i k) + alphaOf alpha k)
                                       - digamma (alphaOf alpha k)
-                                ) 
+                                )
                       $ filter (\i->dmGetCounts i k > 0) dms
                 total i = realToFrac $ sum $ map (\k->dmGetCounts i k) domain
                 sumAlpha = sum $ map (alphaOf alpha) domain
@@ -221,4 +221,3 @@ estimatePrior tol dms = iter $ dmAlpha $ head dms
                      in if abs ((prec' - prec) / prec) > tol
                            then iter alpha'
                            else alpha'
-

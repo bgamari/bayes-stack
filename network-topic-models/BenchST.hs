@@ -33,7 +33,7 @@ randomNetwork net = do
     let nodes = [Node i | i <- [1..nNodes net]]
         items = [Item i | i <- [1..nItems net]]
         edge a = do b <- randomElement nodes --(nodes \\ [a])
-                    return $ Edge (a,b) 
+                    return $ Edge (a,b)
         nodeItem = do node <- randomElement nodes
                       item <- randomElement items
                       return (node, item)
@@ -80,4 +80,3 @@ stBenchmarkParams = do
 
 stBenchmarks :: RVar Benchmark
 stBenchmarks = bgroup "ST" `fmap` mapM drawStBenchmark stBenchmarkParams
-

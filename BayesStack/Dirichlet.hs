@@ -57,7 +57,7 @@ symAlpha domain alpha = SymAlpha { aDomain = SQ.fromList domain
                                  , aAlpha = alpha
                                  , aNorm = alphaNorm $ symAlpha domain alpha
                                  }
- 
+
 -- | Construct an asymmetric Alpha
 asymAlpha :: Enum a => EnumMap a Double -> Alpha a
 asymAlpha alphas | EM.null alphas = error "Dirichlet over null domain is undefined"
@@ -118,7 +118,7 @@ alphaToMeanPrecision (Alpha {aAlphas=alphas, aSumAlphas=prec}) =
 meanPrecisionToAlpha :: Enum a => DirMean a -> DirPrecision -> Alpha a
 meanPrecisionToAlpha mean prec = asymAlpha $ fmap (*prec) mean
 
--- | Symmetrize a Dirichlet prior (such that mean=0) 
+-- | Symmetrize a Dirichlet prior (such that mean=0)
 symmetrizeAlpha :: Enum a => Alpha a -> Alpha a
 symmetrizeAlpha alpha@(SymAlpha {}) = alpha
 symmetrizeAlpha alpha@(Alpha {}) =
@@ -141,4 +141,3 @@ prettyAlpha showA (Alpha {aAlphas=alphas}) =
   <+> fsep (punctuate comma
            $ map (\(a,alpha)->text (showA a) <> parens (text $ printf "%1.2e" alpha))
            $ take 100 $ EM.toList $ alphas)
-

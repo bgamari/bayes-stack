@@ -8,4 +8,3 @@ randomElementT xs | SQ.null xs = error "randomElementT: empty seq!"
 randomElementT xs = do
   n <- uniformT 0 (SQ.length xs - 1)
   return (xs `index` n)
-

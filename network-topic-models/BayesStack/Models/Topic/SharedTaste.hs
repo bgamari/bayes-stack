@@ -48,7 +48,7 @@ import Data.Binary
 data ItemSource = Shared | Own
                 deriving (Show, Eq, Generic, Enum, Ord)
 instance Binary ItemSource
-instance NFData ItemSource         
+instance NFData ItemSource
 
 data NetData = NetData { dAlphaPsi           :: Double
                        , dAlphaLambda        :: Double
@@ -63,13 +63,13 @@ data NetData = NetData { dAlphaPsi           :: Double
                        }
              deriving (Show, Eq, Generic)
 instance Binary NetData
-         
+
 dNodes :: NetData -> Set Node
 dNodes = S.fromList . map fst . M.elems . dNodeItems
-       
+
 dAdjNodes :: NetData -> Node -> Set Node
 dAdjNodes nd n = S.fromList $ getFriends (S.toList $ dEdges nd) n
-          
+
 dItemsOfNode :: NetData -> Node -> [Item]
 dItemsOfNode nd u = map snd $ filter (\(n,_)->u==n) $ M.elems $ dNodeItems nd
 
@@ -88,7 +88,7 @@ randomInit d friends ni = do
                   Own    -> OwnSetting t
 
 randomInitialize' :: NetData -> ModelInit -> RVar ModelInit
-randomInitialize' d init = 
+randomInitialize' d init =
   let unset = M.keysSet (dNodeItems d) `S.difference` M.keysSet init
       friends = M.unionsWith S.union $ map (\(Edge (a,b))-> M.singleton a (S.singleton b)
                                                          <> M.singleton b (S.singleton a)
@@ -98,7 +98,7 @@ randomInitialize' d init =
 
 randomInitialize :: NetData -> RVar ModelInit
 randomInitialize = (flip randomInitialize') M.empty
-                
+
 updateUnits' :: NetData -> [STUpdateUnit]
 updateUnits' d =
     map (\(ni,(n,x)) ->
@@ -111,8 +111,8 @@ updateUnits' d =
     $ M.assocs $ dNodeItems d
 
 updateUnits :: NetData -> [WrappedUpdateUnit MState]
-updateUnits = map WrappedUU . updateUnits'            
-              
+updateUnits = map WrappedUU . updateUnits'
+
 model :: NetData -> ModelInit -> MState
 model d init =
     let uus = updateUnits' d
@@ -148,7 +148,7 @@ data MState = MState { stGammas   :: !(Map Node (Multinom ItemSource))
                      , stPsis     :: !(Map Node (Multinom Node))
                      , stLambdas  :: !(Map Edge (Multinom Topic))
                      , stPhis     :: !(Map Topic (Multinom Item))
-             
+
                      , stVars     :: !(Map NodeItem STSetting)
                      }
             deriving (Show, Generic)
@@ -188,13 +188,13 @@ instance UpdateUnit STUpdateUnit where
     fetchSetting uu ms = stVars ms M.! uuNI uu
     evolveSetting ms uu = categorical $ stFullCond (setUU uu Nothing ms) uu
     updateSetting uu _ s' = setUU uu (Just s') . setUU uu Nothing
-        
+
 uuProb :: MState -> STUpdateUnit -> Setting STUpdateUnit -> Double
 uuProb st (STUpdateUnit {uuN=n, uuX=x}) setting =
     let gamma = stGammas st M.! n
         omega = stOmegas st M.! n
         psi = stPsis st M.! n
-    in case setting of 
+    in case setting of
         SharedSetting t fship -> let phi = stPhis st M.! t
                                      lambda = stLambdas st M.! fship
                                      f = maybe (error "Friend isn't friends with node") id
@@ -210,7 +210,7 @@ uuProb st (STUpdateUnit {uuN=n, uuX=x}) setting =
 
 stFullCond :: MState -> STUpdateUnit -> [(Double, Setting STUpdateUnit)]
 stFullCond ms uu = map (\s->(uuProb ms uu s, s)) $ stDomain ms uu
-            
+
 stDomain :: MState -> STUpdateUnit -> [Setting STUpdateUnit]
 stDomain ms uu = do
     s <- [Own, Shared]
@@ -230,7 +230,7 @@ modelLikelihood model =
 
 -- | The probability of a collections of items under a given topic mixture.
 topicCompatibility :: MState -> [Item] -> Multinom Topic -> Probability
-topicCompatibility m items lambda = 
+topicCompatibility m items lambda =
     product $ do t <- toList $ dmDomain lambda
                  x <- items
                  let phi = stPhis m M.! t
@@ -238,7 +238,7 @@ topicCompatibility m items lambda =
 
 topicCompatibilities :: (Functor f, Foldable f)
                      => MState -> [Item] -> f (Multinom Topic) -> f Probability
-topicCompatibilities m items topics = 
+topicCompatibilities m items topics =
     let scores = fmap (topicCompatibility m items) topics
     in fmap (/sum scores) scores
 
@@ -248,4 +248,3 @@ influence d m u =
     let lambdas = foldMap (\f->M.singleton f $ stLambdas m M.! Edge (u,f))
                   $ dAdjNodes d u
     in topicCompatibilities m (dItemsOfNode d u) lambdas
-

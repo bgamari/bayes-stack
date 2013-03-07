@@ -1,6 +1,6 @@
 module SerializeText () where
 
-import           Control.Applicative       
+import           Control.Applicative
 import           Data.Binary
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE

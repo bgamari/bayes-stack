@@ -12,7 +12,7 @@ import           BayesStack.Models.Topic.CitationInfluence
 
 import qualified Data.Set as S
 import           Data.Set (Set)
-                 
+
 import qualified Data.Map as M
 
 import           Data.Maybe (mapMaybe)
@@ -25,10 +25,10 @@ import           Data.Text.Read (decimal)
 import           Data.Binary
 import qualified Data.ByteString as BS
 import           SerializeText ()
-                 
+
 import           System.FilePath ((</>))
 import           System.Directory
-import           Data.List                 
+import           Data.List
 
 type Term = T.Text
 type NodeName = T.Text
@@ -57,12 +57,11 @@ getLastSweep :: FilePath -> IO FilePath
 getLastSweep sweepsDir =
     (sweepsDir </>) . last . sort . filter (".state" `isSuffixOf`)
     <$> getDirectoryContents sweepsDir
-    
-readItemMap :: FilePath -> IO (M.Map Item Term)                 
+
+readItemMap :: FilePath -> IO (M.Map Item Term)
 readItemMap sweepsDir =
     decodeFile $ sweepsDir </> "item-map"
 
-readNodeMap :: FilePath -> IO (M.Map Node NodeName)              
+readNodeMap :: FilePath -> IO (M.Map Node NodeName)
 readNodeMap sweepsDir =
     decodeFile $ sweepsDir </> "node-map"
-

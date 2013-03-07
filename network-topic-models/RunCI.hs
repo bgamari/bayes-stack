@@ -1,21 +1,21 @@
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 
-import           Prelude hiding (mapM)    
+import           Prelude hiding (mapM)
 
-import           Options.Applicative    
-import           Data.Monoid ((<>))                 
-import           Control.Monad.Trans.Class                 
+import           Options.Applicative
+import           Data.Monoid ((<>))
+import           Control.Monad.Trans.Class
 
-import           Data.Vector (Vector)    
-import qualified Data.Vector.Generic as V    
-import           Statistics.Sample (mean)       
+import           Data.Vector (Vector)
+import qualified Data.Vector.Generic as V
+import           Statistics.Sample (mean)
 
-import           Data.Traversable (mapM)                 
+import           Data.Traversable (mapM)
 import qualified Data.Set as S
 import           Data.Set (Set)
 import qualified Data.Map as M
 
-import           ReadData       
+import           ReadData
 import           SerializeText
 import qualified RunSampler as Sampler
 import           BayesStack.DirMulti
@@ -24,7 +24,7 @@ import           BayesStack.UniqueKey
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-       
+
 import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath.Posix ((</>))
 import           Data.Binary
@@ -32,8 +32,8 @@ import qualified Data.ByteString as BS
 import           Text.Printf
 
 import           Data.Random
-import           System.Random.MWC                 
-                 
+import           System.Random.MWC
+
 data RunOpts = RunOpts { arcsFile        :: FilePath
                        , nodesFile       :: FilePath
                        , stopwords       :: Maybe FilePath
@@ -41,7 +41,7 @@ data RunOpts = RunOpts { arcsFile        :: FilePath
                        , samplerOpts     :: Sampler.SamplerOpts
                        , hyperParams     :: HyperParams
                        }
-     
+
 data HyperParams = HyperParams
                    { alphaPsi         :: Double
                    , alphaLambda      :: Double
@@ -51,8 +51,8 @@ data HyperParams = HyperParams
                    , alphaGammaOwn    :: Double
                    }
                  deriving (Show, Eq)
-                   
-runOpts = RunOpts 
+
+runOpts = RunOpts
     <$> strOption  ( long "arcs"
                   <> short 'a'
                   <> metavar "FILE"
@@ -78,7 +78,7 @@ runOpts = RunOpts
                    )
     <*> Sampler.samplerOpts
     <*> hyperOpts
-    
+
 hyperOpts = HyperParams
     <$> option     ( long "prior-psi"
                   <> value 1
@@ -123,7 +123,7 @@ termsToItems nodes arcs =
     in (d', (itemMap, nodeMap))
 
 netData :: HyperParams -> M.Map Node [Item] -> Set Arc -> Int -> NetData
-netData hp nodeItems arcs nTopics = cleanNetData $ 
+netData hp nodeItems arcs nTopics = cleanNetData $
     NetData { dAlphaPsi         = alphaPsi hp
             , dAlphaLambda      = alphaLambda hp
             , dAlphaPhi         = alphaPhi hp
@@ -139,7 +139,7 @@ netData hp nodeItems arcs nTopics = cleanNetData $
                                        item <- items
                                        return (n, item)
             }
-            
+
 opts = info runOpts
            (  fullDesc
            <> progDesc "Learn citation influence model"
@@ -175,7 +175,7 @@ main = do
                      $ map length $ M.elems nodeItems :: Vector Int
     printf "Read %d arcs, %d nodes, %d node-items\n" (S.size arcs) (M.size nodeItems) (V.sum termCounts)
     printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
-    
+
     withSystemRandom $ \mwc->do
     let nd = netData (hyperParams args) nodeItems arcs (nTopics args)
     encodeFile (sweepsDir </> "data") nd
@@ -183,4 +183,3 @@ main = do
     let m = model nd mInit
     Sampler.runSampler (samplerOpts args) m (updateUnits nd)
     return ()
-

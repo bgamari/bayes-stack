@@ -52,7 +52,7 @@ vocabulary = EM.fromList $ zip (map Item [1..])
 
 revVocabulary :: M.Map String Item
 revVocabulary = M.fromList $ map swap $ EM.assocs vocabulary
-               
+
 -- | Input data to the model
 stdata = STData { -- Content-enriched network
                   stNodes            = S.fromList $ map Node [1..5]
@@ -89,7 +89,7 @@ stdata = STData { -- Content-enriched network
                                                     ]
                                            )
                                          ]
-                
+
                 -- Hyper-parameters and such
                 , stAlphaGammaShared = alphaGammaShared
                 , stAlphaGammaOwn    = 1 - alphaGammaShared
@@ -107,8 +107,8 @@ main = do
       maybeInc Nothing  = Just 1
       wordCounts = foldl' (\a (n,x)->EM.alter maybeInc x a) EM.empty
                    $ EM.elems $ stNodeItems $ msData state
-      totalCounts = EM.size $ stNodeItems $ msData state 
-      
+      totalCounts = EM.size $ stNodeItems $ msData state
+
   liftIO $ putStr "\nTopics:\n"
   forM_ topics $ \t -> do
     let phi = msPhis state EM.! t
@@ -118,8 +118,8 @@ main = do
                  $ map (\(x,p)->text (vocabulary EM.! x) <> parens (text $ printf "%1.2e" p))
                  $ take 10 $ sortBy (flip (compare `on` snd))
                  $ zip (S.toList $ stItems $ msData state) probs
-                 ) 
-                 
+                 )
+
   liftIO $ putStr "\nFriendship weights:\n"
   forM_ (stFriendships stdata) $ \(Friendship (a,b)) -> do
     let psi = msPsis state EM.! a
@@ -136,7 +136,7 @@ main = do
                     $ map (\t->printf "%s(%e)\t" (show t) (sampleProb lambda t))
                     $ S.toList topics
     liftIO $ putStr "\n"
-    
+
   liftIO $ putStr "\nOwn topic mixtures:\n"
   forM_ (stNodes stdata) $ \n -> do
     let omega = msOmegas state EM.! n
@@ -150,18 +150,17 @@ run :: ModelMonad STModelState
 run = do
   initial <- liftRVar $ randomInitialize stdata
   (ius, model) <- model stdata initial
-  
+
   state <- getModelState model
   liftIO $ putStrLn $ printf "Model log likelihood after initialization: %e"
                       (logFromLogFloat $ modelLikelihood state :: Double)
-                      
+
   liftIO $ putStrLn $ printf "Created %d update units" (SQ.length ius)
   liftIO $ putStrLn "Starting inference..."
   forM_ [1..nIter::Int] $ \sweepN -> do
     concurrentFullGibbsUpdate 10 ius
-    
+
   state <- getModelState model
   liftIO $ putStrLn $ printf "Model log likelihood after %d iterations: %e"
                       nIter (logFromLogFloat $ modelLikelihood state :: Double)
   return state
-  

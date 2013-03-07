@@ -4,4 +4,3 @@ module BayesStack.Core( module BayesStack.Core.Types
 
 import BayesStack.Core.Types
 import BayesStack.Core.Gibbs
-

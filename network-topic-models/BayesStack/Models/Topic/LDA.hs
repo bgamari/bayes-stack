@@ -56,7 +56,7 @@ instance Binary NetData
 type ModelInit = Map NodeItem Topic
 
 randomInitialize' :: NetData -> ModelInit -> RVar ModelInit
-randomInitialize' d init = 
+randomInitialize' d init =
   let unset = M.keysSet (dNodeItems d) `S.difference` M.keysSet init
       topics = S.toList $ dTopics d
       randomInit :: NodeItem -> RVar ModelInit
@@ -65,14 +65,14 @@ randomInitialize' d init =
 
 randomInitialize :: NetData -> RVar ModelInit
 randomInitialize = (flip randomInitialize') M.empty
-                
+
 updateUnits :: NetData -> [WrappedUpdateUnit MState]
-updateUnits = map WrappedUU . updateUnits'            
+updateUnits = map WrappedUU . updateUnits'
 
 updateUnits' :: NetData -> [LDAUpdateUnit]
 updateUnits' =
-    map (\(ni,(n,x))->LDAUpdateUnit {uuNI=ni, uuN=n, uuX=x}) . M.assocs . dNodeItems 
-              
+    map (\(ni,(n,x))->LDAUpdateUnit {uuNI=ni, uuN=n, uuX=x}) . M.assocs . dNodeItems
+
 model :: NetData -> ModelInit -> MState
 model d init =
     let uus = updateUnits' d
@@ -114,7 +114,7 @@ instance UpdateUnit LDAUpdateUnit where
     fetchSetting (LDAUpdateUnit {uuNI=ni}) ms = stT ms M.! ni
     evolveSetting ms uu = evolveFromCPT (uuDomain ms uu) (uuProb (setUU uu Nothing ms) uu)
     updateSetting uu _ s' = setUU uu (Just s') . setUU uu Nothing
-        
+
 uuProb :: MState -> LDAUpdateUnit -> Topic -> Double
 uuProb state (LDAUpdateUnit {uuN=n, uuX=x}) t =
     let theta = stThetas state M.! n

@@ -58,26 +58,26 @@ import           Control.DeepSeq
 
 data ItemSource = Shared | Own deriving (Show, Eq, Enum, Ord, Generic)
 instance Binary ItemSource
-instance NFData ItemSource         
-         
+instance NFData ItemSource
+
 newtype Citing a = Citing a deriving (Show, Eq, Enum, Ord, Generic, NFData)
 newtype Cited a = Cited a deriving (Show, Eq, Enum, Ord, Generic, NFData)
 instance Binary a => Binary (Citing a)
 instance Binary a => Binary (Cited a)
-         
+
 type CitingNode = Citing Node
 type CitedNode = Cited Node
 type CitingNodeItem = Citing NodeItem
 type CitedNodeItem = Cited NodeItem
 
--- ^ A directed edge         
+-- ^ A directed edge
 newtype Arc = Arc (CitingNode, CitedNode)
             deriving (Show, Eq, Ord, Generic)
 instance Binary Arc
 
 -- ^ The citing node of an arc
 citingNode :: Arc -> CitingNode
-citingNode (Arc (a,_)) = a           
+citingNode (Arc (a,_)) = a
 
 -- ^ The cited node of an arc
 citedNode :: Arc -> CitedNode
@@ -96,7 +96,7 @@ data NetData = NetData { dAlphaPsi           :: Double
                        }
               deriving (Show, Eq, Generic)
 instance Binary NetData
-         
+
 dCitedNodeItems :: NetData -> Map CitedNodeItem (CitedNode, Item)
 dCitedNodeItems = M.mapKeys Cited . M.map (\(n,i)->(Cited n, i)) . dNodeItems
 
@@ -108,7 +108,7 @@ dCitingNodes = S.fromList . map (Citing . fst) . M.elems . dNodeItems
 
 dCitedNodes :: NetData -> Set CitedNode
 dCitedNodes = S.fromList . map (Cited . fst) . M.elems . dNodeItems
-         
+
 getCitingNodes :: NetData -> CitedNode -> Set CitingNode
 getCitingNodes d n = S.map citingNode $ S.filter (\(Arc (_,cited))->cited==n) $ dArcs d
 
@@ -118,7 +118,7 @@ getCitedNodes d n = S.map citedNode $ S.filter (\(Arc (citing,_))->citing==n) $ 
 itemsOfCitingNode :: NetData -> CitingNode -> [Item]
 itemsOfCitingNode d u =
     map snd $ M.elems $ M.filter (\(n,_)->n==u) $ dCitingNodeItems d
-              
+
 connectedNodes :: Set Arc -> Set Node
 connectedNodes arcs =
     S.map ((\(Cited n)->n) . citedNode) arcs `S.union` S.map ((\(Citing n)->n) . citingNode) arcs
@@ -173,7 +173,7 @@ randomInitializeCiting d init = execStateT doInit init
     where doInit :: StateT CitingModelInit RVar ()
           doInit = let unset = M.keysSet (dCitingNodeItems d) `S.difference` M.keysSet init
                    in mapM_ (randomInitCitingUU d) (S.toList unset)
-   
+
 randomInitCitingUU :: NetData -> CitingNodeItem -> StateT CitingModelInit RVar ()
 randomInitCitingUU d ni =
     let (n,_) = dCitingNodeItems d M.! ni
@@ -193,7 +193,7 @@ randomInitCitingUU d ni =
 randomInitialize :: NetData -> RVar ModelInit
 randomInitialize d =
     ModelInit <$> randomInitializeCited d M.empty <*> randomInitializeCiting d M.empty
-                
+
 model :: NetData -> ModelInit -> MState
 model d (ModelInit citedInit citingInit) =
     let s = MState { -- Citing model
@@ -275,16 +275,16 @@ harMean = logToLogFloat . mean . V.map logFromLogFloat
 -- | The geometric mean of the probabilities of a collection of items under a
 -- given topic mixture.
 topicCompatibility :: MState -> [Item] -> Multinom Topic -> Probability
-topicCompatibility m items lambda = 
-    harMean $ V.fromList 
+topicCompatibility m items lambda =
+    harMean $ V.fromList
             $ do t <- toList $ dmDomain lambda
                  x <- items
                  let phi = stPhis m M.! t
                  return $ prob lambda t * prob phi x
-                 
+
 topicCompatibilities :: (Functor f, Foldable f)
                      => MState -> [Item] -> f (Multinom Topic) -> f Probability
-topicCompatibilities m items topics = 
+topicCompatibilities m items topics =
     let scores = fmap (topicCompatibility m items) topics
     in fmap (/sum scores) scores
 
@@ -324,7 +324,7 @@ citedUpdateUnits d =
                                          , uuX'       = x'
                                          }
         ) $ M.assocs $ dCitedNodeItems d
-              
+
 setCitedUU :: CitedUpdateUnit -> Maybe Topic -> MState -> MState
 setCitedUU uu@(CitedUpdateUnit {uuN'=n', uuNI'=ni', uuX'=x'}) setting ms =
     let t' = maybe (fetchSetting uu ms) id setting
@@ -365,13 +365,13 @@ citingUpdateUnits d =
                                        , uuCites   = getCitedNodes d n
                                        }
         ) $ M.assocs $ dCitingNodeItems d
-        
+
 citingProb :: MState -> CitingUpdateUnit -> Setting CitingUpdateUnit -> Double
 citingProb st (CitingUpdateUnit {uuN=n, uuX=x}) setting =
     let gamma = stGammas st M.! n
         omega = stOmegas st M.! n
         psi = stPsis st M.! n
-    in case setting of 
+    in case setting of
         SharedSetting t c -> let phi = stPhis st M.! t
                                  lambda = stLambdas st M.! c
                              in sampleProb gamma Shared
@@ -385,7 +385,7 @@ citingProb st (CitingUpdateUnit {uuN=n, uuX=x}) setting =
 
 citingFullCond :: MState -> CitingUpdateUnit -> [(Double, Setting CitingUpdateUnit)]
 citingFullCond ms uu = map (\s->(citingProb ms uu s, s)) $ citingDomain ms uu
-            
+
 citingDomain :: MState -> CitingUpdateUnit -> [Setting CitingUpdateUnit]
 citingDomain ms uu = do
     s <- [Own, Shared]
@@ -409,4 +409,3 @@ setCitingUU uu@(CitingUpdateUnit {uuNI=ni, uuN=n, uuX=x}) setting ms =
                                     , stGammas = M.adjust (setMultinom set Own) n $ stGammas ms
                                     }
     in ms' { stCiting = M.alter (const setting) ni $ stCiting ms' }
-

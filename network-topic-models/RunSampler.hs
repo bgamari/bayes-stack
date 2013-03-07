@@ -2,9 +2,9 @@ module RunSampler ( SamplerModel (..)
                   , SamplerOpts (..), samplerOpts
                   , runSampler
                   ) where
-                  
-import           Options.Applicative    
-import           Data.Monoid ((<>))                 
+
+import           Options.Applicative
+import           Data.Monoid ((<>))
 import           System.FilePath.Posix ((</>))
 import           System.Directory (createDirectoryIfMissing)
 
@@ -17,11 +17,11 @@ import qualified Data.ByteString as BS
 import           Text.Printf
 
 import           Control.Concurrent
-import           Control.Concurrent.STM       
+import           Control.Concurrent.STM
 
-import           System.Random.MWC                 
+import           System.Random.MWC
 import           Data.Random
-                 
+
 import           Data.Number.LogFloat (LogFloat, logFromLogFloat)
 import           BayesStack.Core
 
@@ -99,9 +99,9 @@ class Binary ms => SamplerModel ms where
     modelLikelihood :: ms -> LogFloat
     estimateHypers :: ms -> ms
     summarizeHypers :: ms -> String
-    
+
 processSweep :: SamplerModel ms => SamplerOpts -> TVar LogFloat -> Int -> ms -> IO ()
-processSweep opts lastMaxV sweepN m = do             
+processSweep opts lastMaxV sweepN m = do
     let l = modelLikelihood m
     putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
     appendFile (sweepsDir opts </> "likelihood.log")
@@ -146,7 +146,7 @@ samplerIter opts uus processSweepRunning lastMaxV lagN = do
                      void $ liftIO $ forkIO $ do
                          processSweep opts lastMaxV sweepN m
                          liftIO $ atomically $ putTMVar processSweepRunning ()
-                     
+
     doEstimateHypers opts sweepN
 
 checkOpts :: SamplerOpts -> IO ()
@@ -166,9 +166,8 @@ runSampler opts m uus = do
     createDirectoryIfMissing False (sweepsDir opts)
     putStrLn "Starting sampler..."
     putStrLn $ "Burning in for "++show (burnin opts)++" samples"
-    let lagNs = maybe [0..] (\n->[0..n `div` lag opts]) $ iterations opts           
+    let lagNs = maybe [0..] (\n->[0..n `div` lag opts]) $ iterations opts
     lastMaxV <- atomically $ newTVar 0
     processSweepRunning <- atomically $ newTMVar ()
     void $ S.runStateT (forM_ lagNs (samplerIter opts uus processSweepRunning lastMaxV)) m
     atomically $ takeTMVar processSweepRunning
-

@@ -48,4 +48,3 @@ getFriends fs u = mapMaybe (otherFriend u) fs
 
 setupNodeItems :: [(Node,Item)] -> Map NodeItem (Node, Item)
 setupNodeItems nodeItems = M.fromList $ zipWith (\idx (n,i)->(NodeItem idx, (n,i))) [0..] nodeItems
-
