@@ -44,7 +44,7 @@ Library
                        vector,
                        mwc-random,
                        pretty,
-                       binary,
+                       binary >= 0.7 && < 0.8,
                        logfloat,
                        digamma,
                        gamma,
