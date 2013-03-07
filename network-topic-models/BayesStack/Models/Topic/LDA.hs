@@ -112,7 +112,7 @@ instance UpdateUnit LDAUpdateUnit where
     type ModelState LDAUpdateUnit = MState
     type Setting LDAUpdateUnit = Topic
     fetchSetting (LDAUpdateUnit {uuNI=ni}) ms = stT ms M.! ni
-    evolveSetting ms uu = evolveFromCPT (uuDomain ms uu) (uuProb (setUU uu Nothing ms) uu)
+    evolveSetting ms uu = categorical $ ldaFullCond (setUU uu Nothing ms) uu
     updateSetting uu _ s' = setUU uu (Just s') . setUU uu Nothing
 
 uuProb :: MState -> LDAUpdateUnit -> Topic -> Double
@@ -120,6 +120,11 @@ uuProb state (LDAUpdateUnit {uuN=n, uuX=x}) t =
     let theta = stThetas state M.! n
         phi = stPhis state M.! t
     in realToFrac $ sampleProb theta t * sampleProb phi x
+
+ldaFullCond :: MState -> LDAUpdateUnit -> [(Double, Topic)]
+ldaFullCond ms uu = do
+    t <- uuDomain ms uu
+    return (uuProb ms uu t, t)
 
 uuDomain :: MState -> LDAUpdateUnit -> [Topic]
 uuDomain ms uu = M.keys $ stPhis ms
