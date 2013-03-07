@@ -81,7 +81,7 @@ data HyperEstOpts = HyperEstOpts { hyperEst       :: Bool
 
 hyperEstOpts' = HyperEstOpts
     <$> switch     ( long "hyper"
-                  <> short 'h'
+                  <> short 'H'
                   <> help "Enable hyperparameter estimation"
                    )
     <*> option     ( long "hyper-burnin"
