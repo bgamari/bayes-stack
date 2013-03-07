@@ -77,11 +77,11 @@ model :: NetData -> ModelInit -> MState
 model d init =
     let uus = updateUnits' d
         s = MState { stThetas = foldMap (\n->M.singleton n (symDirMulti (dAlphaTheta d) (toList $ dTopics d)))
-                                  $ dNodes d
-                     , stPhis = foldMap (\t->M.singleton t (symDirMulti (dAlphaPhi d) (toList $ dItems d)))
-                                $ dTopics d
-                     , stT = M.empty
-                     }
+                                $ dNodes d
+                   , stPhis = foldMap (\t->M.singleton t (symDirMulti (dAlphaPhi d) (toList $ dItems d)))
+                              $ dTopics d
+                   , stT = M.empty
+                   }
     in execState (mapM (\uu->modify $ setUU uu (Just $ M.findWithDefault (Topic 0) (uuNI uu) init)) uus) s
 
 data MState = MState { stThetas :: !(Map Node (Multinom Int Topic))
