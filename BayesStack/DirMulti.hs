@@ -77,10 +77,10 @@ setMultinom Unset s = decMultinom s
 -- Optionally, this can include a collapsed Dirichlet prior.
 -- 'Multinom alpha count total' is a multinomial with Dirichlet prior
 -- with symmetric parameter 'alpha', ...
-data Multinom w a = DirMulti { dmAlpha :: Alpha a
-                             , dmCounts :: EnumMap a w
+data Multinom w a = DirMulti { dmAlpha :: !(Alpha a)
+                             , dmCounts :: !(EnumMap a w)
                              , dmTotal :: !w
-                             , dmDomain :: Seq a
+                             , dmDomain :: !(Seq a)
                              }
                   | Multinom { dmProbs :: !(EnumMap a Double)
                              , dmCounts :: !(EnumMap a w)
