@@ -45,7 +45,7 @@ import GHC.Generics
 import Data.Binary as B
 import Data.Fixed
 
-type ItemWeight = Milli
+type ItemWeight = Micro
 
 data NetData = NetData { dAlphaTheta :: !Double
                        , dAlphaPhi :: !Double
@@ -106,10 +106,10 @@ data LDAUpdateUnit = LDAUpdateUnit { uuNI :: NodeItem
                    deriving (Show, Generic)
 instance Binary LDAUpdateUnit
 
-instance Binary (Fixed E3) where
+instance Binary (Fixed E6) where
     get = do a <- B.get :: Get Int
-             return $ fromIntegral a / 1000
-    put = (B.put :: Int -> Put) . round . (*1000)
+             return $ fromIntegral a / 1000000
+    put = (B.put :: Int -> Put) . round . (*1000000)
 
 setUU :: LDAUpdateUnit -> Maybe Topic -> MState -> MState
 setUU uu@(LDAUpdateUnit {uuN=n, uuNI=ni, uuX=x, uuW=w}) setting ms =
