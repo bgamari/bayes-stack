@@ -15,17 +15,15 @@ import qualified Data.Set as S
 import           Data.Set (Set)
 import qualified Data.Map.Strict as M
 
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import           ReadData hiding (readNodeItems)
+import           ReadRelevanceData (readNodeItems)
 import           SerializeText
 import qualified RunSampler as Sampler
 import           BayesStack.DirMulti
 import           BayesStack.Models.Topic.LDARelevance
 import           BayesStack.UniqueKey
-
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
-import           Data.Text.Read (double)
-import           Data.Char (isAlpha)
 
 import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath.Posix ((</>))
@@ -131,6 +129,7 @@ main = do
     printf "Read %d stopwords\n" (S.size stopWords)
 
     (nodeItems, (itemMap, nodeMap)) <- termsToItems
+                            . either error id
                             <$> readNodeItems stopWords (nodesFile args)
 
     let sweepsDir = Sampler.sweepsDir $ samplerOpts args
@@ -150,22 +149,3 @@ main = do
     let m = model nd mInit
     Sampler.runSampler (samplerOpts args) m (updateUnits nd)
     return ()
-
-readNodeItems :: Set Term -> FilePath -> IO (M.Map NodeName [(Term, ItemWeight)])
-readNodeItems stopWords fname =
-    M.unionsWith (++) . map parseLine . T.lines <$> TIO.readFile fname
-    where parseLine :: T.Text -> M.Map NodeName [(Term, ItemWeight)]
-          parseLine l = case T.words l of
-             n:words ->
-                 M.singleton n
-                 $ filter (\(word,w)->T.length word > 4)
-                 $ map (\(word,w)->(T.filter isAlpha word, w))
-                 $ filter (\(word,w)->word `S.notMember` stopWords)
-                 $ map (\(word,w)->(word, either (error "Can't parse weight") (realToFrac . fst) $ double w))
-                 $ twoTogether words
-             otherwise -> M.empty
-
-          twoTogether :: [a] -> [(a,a)]
-          twoTogether (a:b:rest) = (a,b):twoTogether rest
-          twoTogether []         = []
-          twoTogether otherwise  = error "Parse error: No weight given"
