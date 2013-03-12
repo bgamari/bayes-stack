@@ -15,11 +15,10 @@ readNodeItems :: Set Term -> FilePath
 readNodeItems stopWords fname =
     fmap (M.unionsWith (++)) . parseOnly (many1 line) <$> TIO.readFile fname
     where line = do doc <- takeTill isHorizontalSpace
-                    words <- many1 $ do
+                    words <- flip manyTill endOfLine $ do
                         skipSpace
                         word <- takeTill isHorizontalSpace
                         skipSpace
                         weight <- double
                         return (word, realToFrac weight)
-                    endOfLine
                     return $ M.singleton doc words
