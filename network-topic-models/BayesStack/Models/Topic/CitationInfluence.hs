@@ -23,6 +23,7 @@ module BayesStack.Models.Topic.CitationInfluence
     -- * Diagnostics
   , modelLikelihood
   , influence
+  , arcTopicMixture
   ) where
 
 import qualified Data.Vector as V
@@ -269,6 +270,14 @@ modelLikelihood model =
            ++ map likelihood (M.elems $ stLambdas model)
            ++ map likelihood (M.elems $ stOmegas model)
            ++ map likelihood (M.elems $ stPsis model)
+
+-- | Mixture of the topics of an edge
+arcTopicMixture :: NetData -> MState -> Arc -> Topic -> Probability
+arcTopicMixture nd m (Arc (d,c)) t =
+    sum $ do x <- itemsOfCitingNode nd d
+             let phi = stPhis m M.! t
+                 lambda = stLambdas m M.! c
+             return $ prob lambda t * prob phi x
 
 -- | Geometric mean
 geomMean :: V.Vector LogFloat -> LogFloat
