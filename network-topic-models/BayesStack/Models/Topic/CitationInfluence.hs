@@ -12,6 +12,7 @@ module BayesStack.Models.Topic.CitationInfluence
   , Citing(..), Cited(..)
   , Item(..), Topic(..), NodeItem(..), Node(..)
   , Arc(..), citedNode, citingNode
+  , dCitedNodes, dCitingNodes, getCitingNodes, getCitedNodes
   , setupNodeItems
     -- * Initialization
   , verifyNetData, cleanNetData
