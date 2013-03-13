@@ -31,6 +31,7 @@ import           FormatMultinom
 data Opts = Opts { inputFiles   :: [FilePath]
                  , sweepNum     :: Int
                  , documents    :: [NodeName]
+                 , topN         :: Maybe Int
                  }
 
 opts = Opts
@@ -44,10 +45,17 @@ opts = Opts
                     <> metavar "N"
                     <> help "The number of sweeps to aggregate"
                      )
-    <*> option    ( long "document"
+    <*> option       ( long "document"
                     <> short 'd'
                     <> reader (fmap ((:[]) . Text.pack) . str)
                     <> help "The documents to dump"
+                     )
+    <*> option       ( long "top"
+                    <> short 'n'
+                    <> value Nothing
+                    <> reader (pure . auto)
+                    <> metavar "N"
+                    <> help "How many items to list for each"
                      )
 
 readSweep :: FilePath -> IO MState
@@ -100,8 +108,9 @@ main = do
     sweeps <- T.forM (concat files) $ readPhi (documents args)
     let sweeps' = M.unionsWith (M.unionWith (+)) sweeps
                 :: Map NodeName (Map Term Double)
+        takeTopN = maybe id take $ topN args
     F.forM_ (M.assocs sweeps') $ \(n,items)->do
         print n
-        F.forM_ (sortBy (flip compare `on` snd) $ M.assocs items) $ \(x,p)->do
+        F.forM_ (takeTopN $ sortBy (flip compare `on` snd) $ M.assocs items) $ \(x,p)->do
             printf "\t%s\t%1.2e\n" (show x) p
         putStrLn ""
