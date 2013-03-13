@@ -40,6 +40,7 @@ data RunOpts = RunOpts { arcsFile        :: FilePath
                        , nTopics         :: Int
                        , samplerOpts     :: Sampler.SamplerOpts
                        , hyperParams     :: HyperParams
+                       , noClean         :: Bool
                        }
 
 data HyperParams = HyperParams
@@ -78,6 +79,10 @@ runOpts = RunOpts
                    )
     <*> Sampler.samplerOpts
     <*> hyperOpts
+    <*> flag False True ( long "no-clean"
+                       <> short 'c'
+                       <> help "Don't attempt to sanitize input data. Among other things, nodes without friends will not be discarded"
+                        )
 
 hyperOpts = HyperParams
     <$> option     ( long "prior-psi"
@@ -123,7 +128,7 @@ termsToItems nodes arcs =
     in (d', (itemMap, nodeMap))
 
 netData :: HyperParams -> M.Map Node [Item] -> Set Arc -> Int -> NetData
-netData hp nodeItems arcs nTopics = cleanNetData $
+netData hp nodeItems arcs nTopics =
     NetData { dAlphaPsi         = alphaPsi hp
             , dAlphaLambda      = alphaLambda hp
             , dAlphaPhi         = alphaPhi hp
@@ -177,7 +182,8 @@ main = do
     printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
 
     withSystemRandom $ \mwc->do
-    let nd = netData (hyperParams args) nodeItems arcs (nTopics args)
+    let nd = (if noClean args then id else cleanNetData)
+             $ netData (hyperParams args) nodeItems arcs (nTopics args)
     encodeFile (sweepsDir </> "data") nd
     mInit <- runRVar (randomInitialize nd) mwc
     let m = model nd mInit
