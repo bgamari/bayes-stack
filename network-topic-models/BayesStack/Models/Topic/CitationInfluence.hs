@@ -270,19 +270,21 @@ modelLikelihood model =
            ++ map likelihood (M.elems $ stOmegas model)
            ++ map likelihood (M.elems $ stPsis model)
 
-harMean :: V.Vector LogFloat -> LogFloat
-harMean = logToLogFloat . mean . V.map logFromLogFloat
+-- | Geometric mean
+geomMean :: V.Vector LogFloat -> LogFloat
+geomMean = logToLogFloat . mean . V.map logFromLogFloat
 
 -- | The geometric mean of the probabilities of a collection of items under a
 -- given topic mixture.
 topicCompatibility :: MState -> [Item] -> Multinom Int Topic -> Probability
 topicCompatibility m items lambda =
-    harMean $ V.fromList
+    geomMean $ V.fromList
             $ do t <- toList $ dmDomain lambda
                  x <- items
                  let phi = stPhis m M.! t
                  return $ prob lambda t * prob phi x
 
+-- | Normalized compatibilities with a set of items
 topicCompatibilities :: (Functor f, Foldable f)
                      => MState -> [Item] -> f (Multinom Int Topic) -> f Probability
 topicCompatibilities m items topics =
