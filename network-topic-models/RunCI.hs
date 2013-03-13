@@ -187,6 +187,7 @@ main = do
              $ netData (hyperParams args) nodeItems arcs (nTopics args)
     let nCitingNodes = map (realToFrac . S.size . getCitingNodes nd)
                       $ S.toList $ dCitedNodes nd
+    printf "After cleaning: %d arcs, %d node-items\n" (S.size $ dArcs nd) (M.size $ dNodeItems nd)
     printf "Mean citings per node: %f, maximum node degree: %f\n" (mean $ VU.fromList nCitingNodes) (maximum nCitingNodes)
     encodeFile (sweepsDir </> "data") nd
     mInit <- runRVar (randomInitialize nd) mwc
