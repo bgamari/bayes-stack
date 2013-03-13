@@ -7,6 +7,7 @@ import           Data.Function (on)
 import           Options.Applicative
 
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.ByteString as BS
 
 import qualified Data.Text.Lazy.IO as TL
@@ -36,9 +37,14 @@ type Dumper = Opts -> NetData -> MState
 showB :: Show a => a -> TB.Builder
 showB = TB.fromString . show
 
+showTopic :: Topic -> TB.Builder
+showTopic (Topic n) = "Topic "<>decimal n
+
+formatProb = formatRealFloat Exponent (Just 3) . realToFrac
+
 readDumper :: String -> Maybe Dumper
 readDumper "phis"   = Just $ \opts nd m showItem showNode ->
-    formatMultinoms (\(Topic n)->"Topic "<>decimal n) showItem (nElems opts) (stPhis m)
+    formatMultinoms showTopic showItem (nElems opts) (stPhis m)
 
 readDumper "psis"   = Just $ \opts nd m showItem showNode ->
     formatMultinoms (\(Citing n)->showNode n) showB (nElems opts) (stPsis m)
@@ -53,13 +59,20 @@ readDumper "gammas" = Just $ \opts nd m showItem showNode ->
     formatMultinoms showB showB (nElems opts) (stGammas m)
 
 readDumper "influences" = Just $ \opts nd m showItem showNode ->
-    let formatProb = formatRealFloat Exponent (Just 3) . realToFrac
-        formatInfluences u =
+    let formatInfluences u =
             foldMap (\(n,p)->"\t" <> showB n <> "\t" <> formatProb p <> "\n")
             $ sortBy (flip (compare `on` snd))
             $ M.assocs $ influence nd m u
     in foldMap (\u->"\n" <> showB u <> "\n" <> formatInfluences u)
        $ M.keys $ stGammas m
+
+readDumper "edge-mixtures" = Just $ \opts nd m showItem showNode ->
+    let showArc (Arc (Citing d, Cited c)) = showNode d <> " -> " <> showNode c
+        formatMixture a =
+            foldMap (\t->showTopic t <> "\t" <> formatProb (arcTopicMixture nd m a t))
+            $ S.toList $ dTopics nd
+    in foldMap (\a->"\n" <> showArc a <> "\n" <> formatMixture a)
+       $ S.toList $ dArcs nd
 
 readDumper _        = Nothing
 
@@ -73,7 +86,7 @@ opts = Opts
                      )
     <*> argument readDumper
                      ( metavar "STR"
-                    <> help "One of: phis, psis, lambdas, omegas, gammas, influences"
+                    <> help "One of: phis, psis, lambdas, omegas, gammas, influences, edge-mixtures"
                      )
     <*> strOption    ( long "sweeps"
                     <> short 's'
