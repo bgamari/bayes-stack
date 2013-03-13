@@ -7,6 +7,7 @@ import           Data.Monoid ((<>))
 import           Control.Monad.Trans.Class
 
 import           Data.Vector (Vector)
+import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Generic as V
 import           Statistics.Sample (mean)
 
@@ -184,6 +185,9 @@ main = do
     withSystemRandom $ \mwc->do
     let nd = (if noClean args then id else cleanNetData)
              $ netData (hyperParams args) nodeItems arcs (nTopics args)
+    let nCitingNodes = map (realToFrac . S.size . getCitingNodes nd)
+                      $ S.toList $ dCitedNodes nd
+    printf "Mean citings per node: %f, maximum node degree: %f\n" (mean $ VU.fromList nCitingNodes) (maximum nCitingNodes)
     encodeFile (sweepsDir </> "data") nd
     mInit <- runRVar (randomInitialize nd) mwc
     let m = model nd mInit
