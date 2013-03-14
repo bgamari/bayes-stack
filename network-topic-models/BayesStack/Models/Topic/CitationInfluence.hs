@@ -99,17 +99,26 @@ data NetData = NetData { dAlphaPsi           :: Double
               deriving (Show, Eq, Generic)
 instance Binary NetData
 
+-- FIXME: This really should be memoized
 dCitedNodeItems :: NetData -> Map CitedNodeItem (CitedNode, Item)
-dCitedNodeItems = M.mapKeys Cited . M.map (\(n,i)->(Cited n, i)) . dNodeItems
+dCitedNodeItems nd =
+    M.mapKeys Cited
+    $ M.map (\(n,i)->(Cited n, i))
+    $ M.filter (\(n,i)->Cited n `S.member` dCitedNodes nd)
+    $ dNodeItems nd
 
 dCitingNodeItems :: NetData -> Map CitingNodeItem (CitingNode, Item)
-dCitingNodeItems = M.mapKeys Citing . M.map (\(n,i)->(Citing n, i)) . dNodeItems
+dCitingNodeItems nd =
+    M.mapKeys Citing
+    $ M.map (\(n,i)->(Citing n, i))
+    $ M.filter (\(n,i)->Citing n `S.member` dCitingNodes nd)
+    $ dNodeItems nd
 
 dCitingNodes :: NetData -> Set CitingNode
-dCitingNodes = S.fromList . map (Citing . fst) . M.elems . dNodeItems
+dCitingNodes = S.map citingNode . dArcs
 
 dCitedNodes :: NetData -> Set CitedNode
-dCitedNodes = S.fromList . map (Cited . fst) . M.elems . dNodeItems
+dCitedNodes = S.map citedNode . dArcs
 
 getCitingNodes :: NetData -> CitedNode -> Set CitingNode
 getCitingNodes d n = S.map citingNode $ S.filter (\(Arc (_,cited))->cited==n) $ dArcs d
