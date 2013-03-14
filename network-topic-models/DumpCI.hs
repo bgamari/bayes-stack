@@ -50,20 +50,20 @@ readDumper "psis"   = Just $ \opts nd m showItem showNode ->
     formatMultinoms (\(Citing n)->showNode n) showB (nElems opts) (stPsis m)
 
 readDumper "lambdas"= Just $ \opts nd m showItem showNode ->
-    formatMultinoms showB showB (nElems opts) (stLambdas m)
+    formatMultinoms (\(Cited n)->showNode n) showB (nElems opts) (stLambdas m)
 
 readDumper "omegas" = Just $ \opts nd m showItem showNode ->
-    formatMultinoms showB showB (nElems opts) (stOmegas m)
+    formatMultinoms (\(Citing n)->showNode n) showB (nElems opts) (stOmegas m)
 
 readDumper "gammas" = Just $ \opts nd m showItem showNode ->
-    formatMultinoms showB showB (nElems opts) (stGammas m)
+    formatMultinoms (\(Citing n)->showNode n) showB (nElems opts) (stGammas m)
 
 readDumper "influences" = Just $ \opts nd m showItem showNode ->
     let formatInfluences u =
-            foldMap (\(n,p)->"\t" <> showB n <> "\t" <> formatProb p <> "\n")
+            foldMap (\(Cited n,p)->"\t" <> showNode n <> "\t" <> formatProb p <> "\n")
             $ sortBy (flip (compare `on` snd))
             $ M.assocs $ influence nd m u
-    in foldMap (\u->"\n" <> showB u <> "\n" <> formatInfluences u)
+    in foldMap (\u@(Citing u')->"\n" <> showNode u' <> "\n" <> formatInfluences u)
        $ M.keys $ stGammas m
 
 readDumper "edge-mixtures" = Just $ \opts nd m showItem showNode ->
