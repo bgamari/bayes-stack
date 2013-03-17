@@ -31,12 +31,11 @@ import Text.Printf
 import GHC.Generics (Generic)
 import Data.Binary
 import Data.Binary.EnumMap ()
-import Data.Binary.LogFloat ()
 
 import BayesStack.Core
 import BayesStack.Dirichlet
 
-import Data.Number.LogFloat hiding (realToFrac, isNaN, isInfinite)
+import Numeric.Log hiding (sum)
 import Numeric.Digamma
 import Math.Gamma hiding (p)
 
@@ -133,26 +132,25 @@ instance HasLikelihood (Multinom w) where
   likelihood dm@(Multinom {}) =
       product $ map (\(k,n)->(realToFrac $ dmProbs dm EM.! k)^^n)
       $ EM.assocs $ dmCounts dm
-    where (^^) :: Real w => LogFloat -> w -> LogFloat
-          x ^^ y = logToLogFloat $ realToFrac y * logFromLogFloat' x
-          logFromLogFloat' = logFromLogFloat :: LogFloat -> Double
+    where (^^) :: Real w => Log Double -> w -> Log Double
+          x ^^ y = Log $ realToFrac y * runLog x
   likelihood dm =
       let alpha = dmAlpha dm
-          f k = logToLogFloat $ checkNaN "likelihood(factor)"
+          f k = Log $ checkNaN "likelihood(factor)"
                 $ lnGamma (realToFrac (dmGetCounts dm k) + alpha `alphaOf` k)
       in 1 / alphaNormalizer alpha
          * product (map f $ toList $ dmDomain dm)
-         / logToLogFloat (checkNaN "likelihood" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha)
+         / Log (checkNaN "likelihood" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha)
   {-# INLINEABLE likelihood #-}
 
   prob dm@(Multinom {}) k = realToFrac $ dmProbs dm EM.! k
   prob dm k =
       let alpha = dmAlpha dm
-          f k = logToLogFloat $ checkNaN "prob(factor)"
+          f k = Log $ checkNaN "prob(factor)"
                 $ lnGamma (realToFrac (dmGetCounts dm k) + alpha `alphaOf` k)
       in 1 / alphaNormalizer alpha
          * f k
-         / logToLogFloat (checkNaN "prob" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha)
+         / Log (checkNaN "prob" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha)
   {-# INLINEABLE prob #-}
 
 instance FullConditionable (Multinom w) where

@@ -19,7 +19,7 @@ import qualified Data.EnumMap as EM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
-import Data.Number.LogFloat hiding (realToFrac, isNaN, isInfinite)
+import Numeric.Log
 import Math.Gamma
 
 import Text.Printf
@@ -27,7 +27,6 @@ import Text.PrettyPrint
 
 import Data.Binary
 import Data.Binary.EnumMap ()
-import Data.Binary.LogFloat ()
 import GHC.Generics (Generic)
 
 -- | Make error handling a bit easier
@@ -39,11 +38,11 @@ checkNaN _ x = x
 -- | A Dirichlet prior
 data Alpha a = SymAlpha { aDomain :: Seq a
                         , aAlpha :: !Double
-                        , aNorm :: LogFloat
+                        , aNorm :: !(Log Double)
                         }
              | Alpha { aAlphas :: EnumMap a Double
                      , aSumAlphas :: !Double
-                     , aNorm :: LogFloat
+                     , aNorm :: !(Log Double)
                      }
              deriving (Show, Eq, Generic)
 instance (Enum a, Binary a) => Binary (Alpha a)
@@ -62,7 +61,7 @@ symAlpha domain alpha = SymAlpha { aDomain = SQ.fromList domain
 asymAlpha :: Enum a => EnumMap a Double -> Alpha a
 asymAlpha alphas | EM.null alphas = error "Dirichlet over null domain is undefined"
 asymAlpha alphas = Alpha { aAlphas = alphas
-                         , aSumAlphas = sum $ EM.elems alphas
+                         , aSumAlphas = Prelude.sum $ EM.elems alphas
                          , aNorm = alphaNorm $ asymAlpha alphas
                          }
 
@@ -74,21 +73,21 @@ setSymAlpha alpha a = let b = (symmetrizeAlpha a) { aAlpha = alpha
 
 -- | Compute the normalizer of the likelihood involving alphas,
 -- (product_k gamma(alpha_k)) / gamma(sum_k alpha_k)
-alphaNorm :: Enum a => Alpha a -> LogFloat
+alphaNorm :: Enum a => Alpha a -> Log Double
 alphaNorm alpha = normNum / normDenom
   where dim = realToFrac $ SQ.length $ aDomain alpha
         normNum = case alpha of
-                      Alpha {} -> product $ map (\a->logToLogFloat $ checkNaN ("alphaNorm.normNum(asym) alpha="++show a) $ lnGamma a)
+                      Alpha {} -> product $ map (\a->Log $ checkNaN ("alphaNorm.normNum(asym) alpha="++show a) $ lnGamma a)
                                   $ EM.elems $ aAlphas alpha
-                      SymAlpha {} -> logToLogFloat $ checkNaN "alphaNorm.normNum(sym)" $ dim * lnGamma (aAlpha alpha)
-        normDenom = logToLogFloat $ checkNaN "alphaNorm.normDenom" $ lnGamma $ sumAlpha alpha
+                      SymAlpha {} -> Log $ checkNaN "alphaNorm.normNum(sym)" $ dim * lnGamma (aAlpha alpha)
+        normDenom = Log $ checkNaN "alphaNorm.normDenom" $ lnGamma $ sumAlpha alpha
 
 -- | 'alphaDomain a' is the domain of prior 'a'
 alphaDomain :: Enum a => Alpha a -> Seq a
 alphaDomain (SymAlpha {aDomain=d}) = d
 alphaDomain (Alpha {aAlphas=a}) = SQ.fromList $ EM.keys a
 
-alphaNormalizer :: Enum a => Alpha a -> LogFloat
+alphaNormalizer :: Enum a => Alpha a -> Log Double
 alphaNormalizer = aNorm
 
 -- | 'alphaOf alpha k' is the value of element 'k' in prior 'alpha'

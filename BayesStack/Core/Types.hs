@@ -6,9 +6,9 @@ module BayesStack.Core.Types ( Probability
                              ) where
 
 import GHC.Prim (Constraint)
-import Data.Number.LogFloat
+import Numeric.Log
 
-type Probability = LogFloat
+type Probability = Log Double
 
 class HasLikelihood p where
   type LContext p a :: Constraint

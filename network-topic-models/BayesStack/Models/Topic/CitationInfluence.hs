@@ -46,7 +46,7 @@ import           Control.Monad.Trans.Writer.Strict
 import           Data.Random
 import           Data.Random.Lift (lift)
 import           Data.Random.Distribution.Categorical (categorical)
-import           Data.Number.LogFloat hiding (realToFrac)
+import           Numeric.Log hiding (sum)
 
 import           BayesStack.Core.Types
 import           BayesStack.Core.Gibbs
@@ -289,8 +289,8 @@ arcTopicMixture nd m (Arc (d,c)) t =
              return $ prob lambda t * prob phi x
 
 -- | Geometric mean
-geomMean :: V.Vector LogFloat -> LogFloat
-geomMean = logToLogFloat . mean . V.map logFromLogFloat
+geomMean :: V.Vector (Log Double) -> Log Double
+geomMean = Log . mean . V.map runLog
 
 -- | The geometric mean of the probabilities of a collection of items under a
 -- given topic mixture.

@@ -27,7 +27,6 @@ Library
                        BayesStack.UniqueKey,
                        BayesStack.TupleEnum,
                        Data.Binary.EnumMap,
-                       Data.Binary.LogFloat,
                        Data.Random.Sequence, Data.Sequence.Chunk
 
   Build-depends:       base >=4 && <5,
@@ -45,8 +44,7 @@ Library
                        mwc-random,
                        pretty,
                        binary >= 0.7 && < 0.8,
-                       logfloat,
+                       log-domain,
                        digamma,
                        gamma,
                        statistics
-  

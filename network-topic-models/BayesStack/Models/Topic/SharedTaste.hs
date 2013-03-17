@@ -34,7 +34,7 @@ import Control.Monad (liftM)
 import Control.Monad.Trans.State
 import Data.Random
 import Data.Random.Distribution.Categorical (categorical)
-import Data.Number.LogFloat hiding (realToFrac)
+import Numeric.Log hiding (sum)
 
 import BayesStack.Core.Types
 import BayesStack.Core.Gibbs

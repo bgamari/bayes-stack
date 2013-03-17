@@ -22,7 +22,7 @@ import           Control.Concurrent.STM
 import           System.Random.MWC
 import           Data.Random
 
-import           Data.Number.LogFloat (LogFloat, logFromLogFloat)
+import           Numeric.Log
 import           BayesStack.Core
 
 data SamplerOpts = SamplerOpts { burnin          :: Int
@@ -96,16 +96,16 @@ hyperEstOpts' = HyperEstOpts
                    )
 
 class Binary ms => SamplerModel ms where
-    modelLikelihood :: ms -> LogFloat
+    modelLikelihood :: ms -> Log Double
     estimateHypers :: ms -> ms
     summarizeHypers :: ms -> String
 
-processSweep :: SamplerModel ms => SamplerOpts -> TVar LogFloat -> Int -> ms -> IO ()
+processSweep :: SamplerModel ms => SamplerOpts -> TVar (Log Double) -> Int -> ms -> IO ()
 processSweep opts lastMaxV sweepN m = do
     let l = modelLikelihood m
-    putStr $ printf "Sweep %d: %f\n" sweepN (logFromLogFloat l :: Double)
+    putStr $ printf "Sweep %d: %f\n" sweepN (runLog l)
     appendFile (sweepsDir opts </> "likelihood.log")
-        $ printf "%d\t%f\n" sweepN (logFromLogFloat l :: Double)
+        $ printf "%d\t%f\n" sweepN (runLog l)
     when (sweepN >= burnin opts) $ do
         newMax <- atomically $ do oldL <- readTVar lastMaxV
                                   if l > oldL then writeTVar lastMaxV l >> return True
@@ -125,15 +125,15 @@ doEstimateHypers opts@(SamplerOpts {hyperEstOpts=HyperEstOpts True burnin lag}) 
             $ appendFile (sweepsDir opts </> "hyperparams.log")
             $ printf "%5d\t%f\t%f\t%s\n"
                   iterN
-                  (logFromLogFloat $ modelLikelihood m :: Double)
-                  (logFromLogFloat $ modelLikelihood m' :: Double)
+                  (runLog $ modelLikelihood m)
+                  (runLog $ modelLikelihood m')
                   (summarizeHypers m')
 doEstimateHypers _ _  = return ()
 
 withSystemRandomIO = withSystemRandom :: (GenIO -> IO a) -> IO a
 
 samplerIter :: SamplerModel ms => SamplerOpts -> [WrappedUpdateUnit ms]
-            -> TMVar () -> TVar LogFloat
+            -> TMVar () -> TVar (Log Double)
             -> Int -> S.StateT ms IO ()
 samplerIter opts uus processSweepRunning lastMaxV lagN = do
     let sweepN = lagN * lag opts
