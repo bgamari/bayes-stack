@@ -185,10 +185,13 @@ main = do
     withSystemRandom $ \mwc->do
     let nd = (if noClean args then id else cleanNetData)
              $ netData (hyperParams args) nodeItems arcs (nTopics args)
-    let nCitingNodes = map (realToFrac . S.size . getCitingNodes nd)
+    let nCitingNodes = VU.fromList $ map (realToFrac . S.size . getCitingNodes nd)
                       $ S.toList $ dCitedNodes nd
+        nCitedNodes = VU.fromList $ map (realToFrac . S.size . getCitedNodes nd)
+                      $ S.toList $ dCitingNodes nd
     printf "After cleaning: %d arcs, %d node-items\n" (S.size $ dArcs nd) (M.size $ dNodeItems nd)
-    printf "Mean citings per node: %f, maximum node degree: %f\n" (mean $ VU.fromList nCitingNodes) (maximum nCitingNodes)
+    printf "In degree: mean=%f, maximum=%f\n" (mean nCitingNodes) (V.maximum nCitingNodes)
+    printf "Out degree: mean=%f, maximum=%f\n" (mean nCitedNodes) (V.maximum nCitedNodes)
     encodeFile (sweepsDir </> "data") nd
     mInit <- runRVar (randomInitialize nd) mwc
     let m = model nd mInit
