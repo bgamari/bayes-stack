@@ -69,7 +69,10 @@ readDumper "influences" = Just $ \opts nd m showItem showNode ->
 readDumper "edge-mixtures" = Just $ \opts nd m showItem showNode ->
     let showArc (Arc (Citing d, Cited c)) = showNode d <> " -> " <> showNode c
         formatMixture a =
-            foldMap (\t->"\t" <> showTopic t <> "\t" <> formatProb (arcTopicMixture nd m a t) <> "\n")
+            foldMap (\(t,p)->"\t" <> showTopic t <> "\t" <> formatProb p <> "\n")
+            $ maybe id take (nElems opts)
+            $ sortBy (flip compare `on` snd)
+            $ map (\t->(t, arcTopicMixture nd m a t))
             $ S.toList $ dTopics nd
     in foldMap (\a->"\n" <> showArc a <> "\n" <> formatMixture a)
        $ S.toList $ dArcs nd
