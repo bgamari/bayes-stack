@@ -40,8 +40,6 @@ showB = TB.fromString . show
 showTopic :: Topic -> TB.Builder
 showTopic (Topic n) = "Topic "<>decimal n
 
-showArc (Arc (Citing d, Cited c)) = showNode d <> " -> " <> showNode c
-
 formatProb = formatRealFloat Exponent (Just 3) . realToFrac
 
 readDumper :: String -> Maybe Dumper
@@ -69,7 +67,8 @@ readDumper "influences" = Just $ \opts nd m showItem showNode ->
        $ M.keys $ stGammas m
 
 readDumper "edge-mixtures" = Just $ \opts nd m showItem showNode ->
-    let formatMixture a =
+    let showArc (Arc (Citing d, Cited c)) = showNode d <> " -> " <> showNode c
+        formatMixture a =
             foldMap (\t->"\t" <> showTopic t <> "\t" <> formatProb (arcTopicMixture nd m a t) <> "\n")
             $ S.toList $ dTopics nd
     in foldMap (\a->"\n" <> showArc a <> "\n" <> formatMixture a)
