@@ -146,8 +146,9 @@ instance HasLikelihood (Multinom w) where
   prob dm@(Multinom {}) k = realToFrac $ dmProbs dm EM.! k
   prob dm k =
       let alpha = dmAlpha dm
+          n = realToFrac $ dmGetCounts dm k
           f k = Log $ checkNaN "prob(factor)"
-                $ lnGamma (realToFrac (dmGetCounts dm k) + alpha `alphaOf` k)
+                $ lnGamma (n + alpha `alphaOf` k)
       in 1 / alphaNormalizer alpha
          * f k
          / Log (checkNaN "prob" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha)
