@@ -234,7 +234,7 @@ topicCompatibility m items lambda =
     product $ do t <- toList $ dmDomain lambda
                  x <- items
                  let phi = stPhis m M.! t
-                 return $ prob lambda t * prob phi x
+                 return $ sampleProb lambda t * sampleProb phi x
 
 topicCompatibilities :: (Functor f, Foldable f)
                      => MState -> [Item] -> f (Multinom Int Topic) -> f Probability
