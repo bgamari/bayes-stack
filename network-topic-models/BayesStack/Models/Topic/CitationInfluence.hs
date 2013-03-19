@@ -277,11 +277,10 @@ modelLikelihood model =
 -- | Mixture of the topics of an edge
 arcTopicMixture :: NetData -> MState -> Arc -> Topic -> Probability
 arcTopicMixture nd m (Arc (d,c)) t =
-    geomMean $ V.fromList
-             $ do x <- itemsOfCitingNode nd d
-                  let phi = stPhis m M.! t
-                      lambda = stLambdas m M.! c
-                  return $ realToFrac $ sampleProb lambda t * sampleProb phi x
+    let itemObs = zip (itemsOfCitingNode nd d) (repeat 1)
+        phi = stPhis m M.! t
+        lambda = stLambdas m M.! c
+    in realToFrac (sampleProb lambda t) * obsProb phi itemObs
 
 -- | Geometric mean
 geomMean :: V.Vector (Log Double) -> Log Double
