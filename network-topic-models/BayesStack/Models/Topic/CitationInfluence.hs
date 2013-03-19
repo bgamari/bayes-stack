@@ -137,20 +137,14 @@ cleanNetData d =
          , dNodeItems = M.filter (\(n,i)->n `S.member` keptNodes) $ dNodeItems d
          }
 
-verifyNetData :: NetData -> [String]
-verifyNetData d = execWriter $ do
+verifyNetData :: (Node -> String) -> NetData -> [String]
+verifyNetData showNode d = execWriter $ do
     let nodesWithItems = S.fromList $ map fst $ M.elems $ dNodeItems d
     forM_ (dArcs d) $ \(Arc (Citing citing, Cited cited))->do
         when (cited `S.notMember` nodesWithItems)
-            $ tell [show cited++" has arc yet has no items"]
+            $ tell [showNode cited++" has arc yet has no items"]
         when (citing `S.notMember` nodesWithItems)
-            $ tell [show citing++" has arc yet has no items"]
-    forM_ (dCitingNodes d) $ \n->
-        when (S.null $ getCitedNodes d n)
-            $ tell [show n++" is in dCitingNodeItems yet has no arcs"]
-    forM_ (dCitedNodes d) $ \n->
-        when (S.null $ getCitingNodes d n)
-            $ tell [show n++" is in cited NodeItems yet has no arcs"]
+            $ tell [showNode citing++" has arc yet has no items"]
 
 type CitedModelInit = Map CitedNodeItem (Setting CitedUpdateUnit)
 type CitingModelInit = Map CitingNodeItem (Setting CitingUpdateUnit)
