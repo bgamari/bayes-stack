@@ -143,17 +143,6 @@ instance HasLikelihood (Multinom w) where
          / Log (checkNaN "likelihood" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha)
   {-# INLINEABLE likelihood #-}
 
-  prob dm@(Multinom {}) k = realToFrac $ dmProbs dm EM.! k
-  prob dm k =
-      let alpha = dmAlpha dm
-          n = realToFrac $ dmGetCounts dm k
-          f k = Log $ checkNaN "prob(factor)"
-                $ lnGamma (n + alpha `alphaOf` k)
-      in 1 / alphaNormalizer alpha
-         * f k
-         / Log (checkNaN "prob" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha)
-  {-# INLINEABLE prob #-}
-
 instance FullConditionable (Multinom w) where
   type FCContext (Multinom w) a = (Real w, Ord a, Enum a)
   sampleProb (Multinom {dmProbs=prob}) k = prob EM.! k

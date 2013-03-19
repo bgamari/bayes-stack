@@ -14,7 +14,6 @@ class HasLikelihood p where
   type LContext p a :: Constraint
   type LContext p a = ()
   likelihood :: LContext p a => p a -> Probability
-  prob :: LContext p a => p a -> a -> Probability
 
 -- | A distribution for which a full conditional factor can be produced
 class FullConditionable p where
