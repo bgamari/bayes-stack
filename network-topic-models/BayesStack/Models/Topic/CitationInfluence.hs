@@ -186,18 +186,18 @@ randomInitializeCiting d init = execStateT doInit init
                    in mapM_ (randomInitCitingUU d) (S.toList unset)
 
 randomInitCitingUU :: NetData -> CitingNodeItem -> StateT CitingModelInit RVar ()
-randomInitCitingUU d ni =
-    let (n,_) = dCitingNodeItems d M.! ni
-    in case getCitedNodes d n of
+randomInitCitingUU d cni@(Citing ni) =
+    let (n,_) = dNodeItems d M.! ni
+    in case getCitedNodes d (Citing n) of
            a | S.null a -> do
                t <- lift $ randomElement $ toList $ dTopics d
-               modify' $ M.insert ni $ OwnSetting t
+               modify' $ M.insert cni $ OwnSetting t
 
            citedNodes -> do
                s <- lift $ randomElement [Shared, Own]
                c <- lift $ randomElement $ toList citedNodes
                t <- lift $ randomElement $ toList $ dTopics d
-               modify' $ M.insert ni $
+               modify' $ M.insert cni $
                    case s of Shared -> SharedSetting t c
                              Own    -> OwnSetting t
 
