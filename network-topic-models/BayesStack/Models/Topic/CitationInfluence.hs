@@ -283,10 +283,11 @@ modelLikelihood model =
 -- | Mixture of the topics of an edge
 arcTopicMixture :: NetData -> MState -> Arc -> Topic -> Probability
 arcTopicMixture nd m (Arc (d,c)) t =
-    sum $ do x <- itemsOfCitingNode nd d
-             let phi = stPhis m M.! t
-                 lambda = stLambdas m M.! c
-             return $ prob lambda t * prob phi x
+    geomMean $ V.fromList
+             $ do x <- itemsOfCitingNode nd d
+                  let phi = stPhis m M.! t
+                      lambda = stLambdas m M.! c
+                  return $ realToFrac $ sampleProb lambda t * sampleProb phi x
 
 -- | Geometric mean
 geomMean :: V.Vector (Log Double) -> Log Double
@@ -300,7 +301,7 @@ topicCompatibility m items lambda =
             $ do t <- toList $ dmDomain lambda
                  x <- items
                  let phi = stPhis m M.! t
-                 return $ prob lambda t * prob phi x
+                 return $ realToFrac $ sampleProb lambda t * sampleProb phi x
 
 -- | Normalized compatibilities with a set of items
 topicCompatibilities :: (Functor f, Foldable f)
