@@ -193,9 +193,8 @@ main = do
         nCitedNodes  = VU.fromList $ M.elems $ M.unionsWith (+)
                        $ map (\a->M.singleton (citedNode a) 1)
                        $ S.toList $ dArcs nd
-    printf "After cleaning: %d cited nodes, %d citing nodes"
+    printf "After cleaning: %d cited nodes, %d citing nodes, %d arcs, %d node-items\n"
            (S.size $ S.map citedNode $ dArcs nd) (S.size $ S.map citingNode $ dArcs nd)
-    printf "                %d arcs, %d node-items\n"
            (S.size $ dArcs nd) (M.size $ dNodeItems nd)
     printf "In degree:  mean=%3.1f, maximum=%3.1f\n"
            (mean nCitedNodes) (V.maximum nCitedNodes)
