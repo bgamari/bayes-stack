@@ -167,7 +167,8 @@ data ModelInit = ModelInit CitedModelInit CitingModelInit
 
 randomInitializeCited :: NetData -> CitedModelInit -> RVar CitedModelInit
 randomInitializeCited d init = execStateT doInit init
-    where doInit = let unset = M.keysSet (dCitedNodeItems d) `S.difference` M.keysSet init
+    where doInit = let unset = citedNodeItems `S.difference` M.keysSet init
+                       citedNodeItems = S.map Cited (M.keysSet (dNodeItems d))
                    in mapM_ (randomInitCitedUU d) (S.toList unset)
 
 modify' :: Monad m => (a -> a) -> StateT a m ()
