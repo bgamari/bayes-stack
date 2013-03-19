@@ -232,9 +232,9 @@ modelLikelihood model =
 topicCompatibility :: MState -> [Item] -> Multinom Int Topic -> Probability
 topicCompatibility m items lambda =
     product $ do t <- toList $ dmDomain lambda
-                 x <- items
                  let phi = stPhis m M.! t
-                 return $ sampleProb lambda t * sampleProb phi x
+                     itemObs = zip items (repeat 1)
+                 return $ realToFrac $ sampleProb lambda t * obsProb phi itemObs
 
 topicCompatibilities :: (Functor f, Foldable f)
                      => MState -> [Item] -> f (Multinom Int Topic) -> f Probability
