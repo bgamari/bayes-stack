@@ -139,7 +139,7 @@ obsProb (DirMulti {dmAlpha=alpha}) obs =
     in case Foldable.foldl' go (Acc 0 1) obs of
          Acc w p -> p / alphaNormalizer alpha
                     / Log (lnGamma $ realToFrac w + sumAlpha alpha)
-{-# INLINEABLE obsProb #-}
+{-# INLINE obsProb #-}
 
 dmGetCounts :: (Enum a, Num w) => Multinom w a -> a -> w
 dmGetCounts dm k =
