@@ -38,11 +38,11 @@ checkNaN _ x = x
 -- | A Dirichlet prior
 data Alpha a = SymAlpha { aDomain :: Seq a
                         , aAlpha :: !Double
-                        , aNorm :: !(Log Double)
+                        , aNorm :: Log Double
                         }
              | Alpha { aAlphas :: EnumMap a Double
                      , aSumAlphas :: !Double
-                     , aNorm :: !(Log Double)
+                     , aNorm :: Log Double
                      }
              deriving (Show, Eq, Generic)
 instance (Enum a, Binary a) => Binary (Alpha a)
