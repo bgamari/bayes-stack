@@ -190,8 +190,8 @@ main = do
         nCitedNodes = VU.fromList $ map (realToFrac . S.size . getCitedNodes nd)
                       $ S.toList $ dCitingNodes nd
     printf "After cleaning: %d arcs, %d node-items\n" (S.size $ dArcs nd) (M.size $ dNodeItems nd)
-    printf "In degree: mean=%f, maximum=%f\n" (mean nCitingNodes) (V.maximum nCitingNodes)
-    printf "Out degree: mean=%f, maximum=%f\n" (mean nCitedNodes) (V.maximum nCitedNodes)
+    printf "In degree:  mean=%3.1f, maximum=%3.1f\n" (mean nCitedNodes) (V.maximum nCitedNodes)
+    printf "Out degree: mean=%3.1f, maximum=%3.1f\n" (mean nCitingNodes) (V.maximum nCitingNodes)
     encodeFile (sweepsDir </> "data") nd
     mInit <- runRVar (randomInitialize nd) mwc
     let m = model nd mInit
