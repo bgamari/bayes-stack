@@ -48,8 +48,6 @@ readNodeItems stopWords fname =
           parseLine l = case T.words l of
              n:words ->
                  M.singleton n
-                 $ filter (\word->T.length word > 4)
-                 $ map (T.filter isAlpha)
                  $ filter (`S.notMember` stopWords) words
              otherwise -> M.empty
 
