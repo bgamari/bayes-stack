@@ -292,9 +292,9 @@ topicCompatibility :: MState -> [Item] -> Multinom Int Topic -> Probability
 topicCompatibility m items lambda =
     geomMean $ V.fromList
             $ do t <- toList $ dmDomain lambda
-                 x <- items
                  let phi = stPhis m M.! t
-                 return $ realToFrac $ sampleProb lambda t * sampleProb phi x
+                     itemObs = zip items (repeat 1)
+                 return $ realToFrac (sampleProb lambda t) * obsProb phi itemObs
 
 -- | Normalized compatibilities with a set of items
 topicCompatibilities :: (Functor f, Foldable f)
