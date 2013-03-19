@@ -185,6 +185,7 @@ main = do
     withSystemRandom $ \mwc->do
     let nd = (if noClean args then id else cleanNetData)
              $ netData (hyperParams args) nodeItems arcs (nTopics args)
+    mapM_ putStrLn $ verifyNetData (\n->maybe (show n) show $ M.lookup n nodeMap) nd
 
     let nCitingNodes = VU.fromList $ M.elems $ M.unionsWith (+)
                        $ map (\a->M.singleton (citingNode a) 1)
