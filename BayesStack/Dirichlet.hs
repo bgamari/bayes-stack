@@ -86,24 +86,29 @@ alphaNorm alpha = normNum / normDenom
 alphaDomain :: Enum a => Alpha a -> Seq a
 alphaDomain (SymAlpha {aDomain=d}) = d
 alphaDomain (Alpha {aAlphas=a}) = SQ.fromList $ EM.keys a
+{-# INLINE alphaDomain #-}
 
 alphaNormalizer :: Enum a => Alpha a -> Log Double
 alphaNormalizer = aNorm
+{-# INLINE alphaNormalizer #-}
 
 -- | 'alphaOf alpha k' is the value of element 'k' in prior 'alpha'
 alphaOf :: Enum a => Alpha a -> a -> Double
 alphaOf (SymAlpha {aAlpha=alpha}) = const alpha
 alphaOf (Alpha {aAlphas=alphas}) = (alphas EM.!)
+{-# INLINE alphaOf #-}
 
 -- | 'sumAlpha alpha' is the sum of all alphas
 sumAlpha :: Enum a => Alpha a -> Double
 sumAlpha (SymAlpha {aDomain=domain, aAlpha=alpha}) = realToFrac (SQ.length domain) * alpha
 sumAlpha (Alpha {aSumAlphas=sum}) = sum
+{-# INLINE sumAlpha #-}
 
 -- | Set a particular alpha element
 setAlphaOf :: Enum a => a -> Double -> Alpha a -> Alpha a
 setAlphaOf k a alpha@(SymAlpha {}) = setAlphaOf k a $ asymmetrizeAlpha alpha
 setAlphaOf k a (Alpha {aAlphas=alphas}) = asymAlpha $ EM.insert k a alphas
+{-# INLINE setAlphaOf #-}
 
 -- | 'alphaToMeanPrecision a' is the mean/precision representation of the prior 'a'
 alphaToMeanPrecision :: Enum a => Alpha a -> (DirMean a, DirPrecision)
@@ -112,10 +117,12 @@ alphaToMeanPrecision (SymAlpha {aDomain=dom, aAlpha=alpha}) =
   in (EM.fromList $ map (\a->(a, alpha/prec)) $ toList dom, prec)
 alphaToMeanPrecision (Alpha {aAlphas=alphas, aSumAlphas=prec}) =
   (fmap (/prec) alphas, prec)
+{-# INLINE alphaToMeanPrecision #-}
 
 -- | 'meanPrecisionToAlpha m p' is a prior with mean 'm' and precision 'p'
 meanPrecisionToAlpha :: Enum a => DirMean a -> DirPrecision -> Alpha a
 meanPrecisionToAlpha mean prec = asymAlpha $ fmap (*prec) mean
+{-# INLINE meanPrecisionToAlpha #-}
 
 -- | Symmetrize a Dirichlet prior (such that mean=0)
 symmetrizeAlpha :: Enum a => Alpha a -> Alpha a
