@@ -146,18 +146,7 @@ dmGetCounts dm k =
 
 instance HasLikelihood (Multinom w) where
   type LContext (Multinom w) a = (Real w, Ord a, Enum a)
-  likelihood dm@(Multinom {}) =
-      product $ map (\(k,n)->(realToFrac $ dmProbs dm EM.! k)^^n)
-      $ EM.assocs $ dmCounts dm
-    where (^^) :: Real w => Log Double -> w -> Log Double
-          x ^^ y = Log $ realToFrac y * runLog x
-  likelihood dm =
-      let alpha = dmAlpha dm
-          f k = Log $ checkNaN "likelihood(factor)"
-                $ lnGamma (realToFrac (dmGetCounts dm k) + alpha `alphaOf` k)
-      in 1 / alphaNormalizer alpha
-         * product (map f $ toList $ dmDomain dm)
-         / Log (checkNaN "likelihood" $ lnGamma $ realToFrac (dmTotal dm) + sumAlpha alpha)
+  likelihood dm = obsProb dm $ EM.assocs $ dmCounts dm
   {-# INLINEABLE likelihood #-}
 
 instance FullConditionable (Multinom w) where
