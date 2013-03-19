@@ -180,15 +180,19 @@ main = do
     let termCounts = V.fromListN (M.size nodeItems)
                      $ map length $ M.elems nodeItems :: Vector Int
     printf "Read %d arcs, %d nodes, %d node-items\n" (S.size arcs) (M.size nodeItems) (V.sum termCounts)
-    printf "Mean terms per document:  %1.2f\n" (mean $ V.map realToFrac termCounts)
+    printf "Mean items per node:  %1.2f\n" (mean $ V.map realToFrac termCounts)
 
     withSystemRandom $ \mwc->do
     let nd = (if noClean args then id else cleanNetData)
              $ netData (hyperParams args) nodeItems arcs (nTopics args)
-    let nCitingNodes = VU.fromList $ map (realToFrac . S.size . getCitingNodes nd)
-                      $ S.toList $ dCitedNodes nd
-        nCitedNodes = VU.fromList $ map (realToFrac . S.size . getCitedNodes nd)
-                      $ S.toList $ dCitingNodes nd
+
+    let nCitingNodes = VU.fromList $ M.elems $ M.unionsWith (+)
+                       $ map (\a->M.singleton (citingNode a) 1)
+                       $ S.toList $ dArcs nd
+
+        nCitedNodes  = VU.fromList $ M.elems $ M.unionsWith (+)
+                       $ map (\a->M.singleton (citedNode a) 1)
+                       $ S.toList $ dArcs nd
     printf "After cleaning: %d arcs, %d node-items\n" (S.size $ dArcs nd) (M.size $ dNodeItems nd)
     printf "In degree:  mean=%3.1f, maximum=%3.1f\n" (mean nCitedNodes) (V.maximum nCitedNodes)
     printf "Out degree: mean=%3.1f, maximum=%3.1f\n" (mean nCitingNodes) (V.maximum nCitingNodes)
