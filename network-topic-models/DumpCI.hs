@@ -20,9 +20,10 @@ import           System.FilePath ((</>))
 import           Text.Printf
 
 import           BayesStack.Models.Topic.CitationInfluence
-import           SerializeText
-import           ReadData
 import           FormatMultinom
+import           Numeric.Log
+import           ReadData
+import           SerializeText
 
 data Opts = Opts { nElems   :: Maybe Int
                  , dumper   :: Dumper
@@ -69,11 +70,13 @@ readDumper "influences" = Just $ \opts nd m showItem showNode ->
 readDumper "edge-mixtures" = Just $ \opts nd m showItem showNode ->
     let showArc (Arc (Citing d, Cited c)) = showNode d <> " -> " <> showNode c
         formatMixture a =
-            foldMap (\(t,p)->"\t" <> showTopic t <> "\t" <> formatProb p <> "\n")
-            $ maybe id take (nElems opts)
-            $ sortBy (flip compare `on` snd)
-            $ map (\t->(t, arcTopicMixture nd m a t))
-            $ S.toList $ dTopics nd
+            let ps = sortBy (flip compare `on` snd)
+                   $ map (\t->(t, arcTopicMixture nd m a t))
+                   $ S.toList $ dTopics nd
+                norm = Numeric.Log.sum $ map snd ps
+            in foldMap (\(t,p)->"\t" <> showTopic t <> "\t" <> formatProb p <> "\n")
+               $ maybe id take (nElems opts)
+               $ map (\(t,p)->(t, p / norm)) ps
     in foldMap (\a->"\n" <> showArc a <> "\n" <> formatMixture a)
        $ S.toList $ dArcs nd
 
