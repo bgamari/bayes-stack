@@ -9,6 +9,7 @@ module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
                            , decMultinom, incMultinom
                            , prettyMultinom
                            , updatePrior
+                           , obsProb
                              -- * Parameter estimation
                            , estimatePrior, reestimatePriors, reestimateSymPriors
                              -- * Convenience functions
@@ -21,7 +22,7 @@ import qualified Data.EnumMap as EM
 import Data.Sequence (Seq)
 import qualified Data.Sequence as SQ
 
-import qualified Data.Foldable
+import qualified Data.Foldable as Foldable
 import Data.Foldable (toList, Foldable, foldMap)
 import Data.Function (on)
 
@@ -122,6 +123,22 @@ dirMultiFromAlpha alpha = DirMulti { dmAlpha = alpha
                                    , dmTotal = 0
                                    , dmDomain = alphaDomain alpha
                                    }
+
+data Acc w = Acc !w !Probability
+
+obsProb :: (Enum a, Real w, Functor f, Foldable f)
+        => Multinom w a -> f (a, w) -> Probability
+obsProb (Multinom {dmProbs=prob}) obs =
+    Foldable.product $ fmap (\(k,w)->(realToFrac $ prob EM.! k)^^w) obs
+  where (^^) :: Real w => Log Double -> w -> Log Double
+        x ^^ y = Log $ realToFrac y * runLog x
+obsProb (DirMulti {dmAlpha=alpha}) obs =
+    let go (Acc w p) (k',w') = Acc (w+w') (p*p')
+           where p' = Log $ checkNaN "obsProb"
+                      $ lnGamma (realToFrac w' + alpha `alphaOf` k')
+    in case Foldable.foldl' go (Acc 0 1) obs of
+         Acc w p -> p / alphaNormalizer alpha
+                    / Log (lnGamma $ realToFrac w + sumAlpha alpha)
 
 dmGetCounts :: (Enum a, Num w) => Multinom w a -> a -> w
 dmGetCounts dm k =
