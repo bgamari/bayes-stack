@@ -119,8 +119,8 @@ getCitedNodes :: NetData -> CitingNode -> Set CitedNode
 getCitedNodes d n = S.map citedNode $ S.filter (\(Arc (citing,_))->citing==n) $ dArcs d
 
 itemsOfCitingNode :: NetData -> CitingNode -> [Item]
-itemsOfCitingNode d u =
-    map snd $ M.elems $ M.filter (\(n,_)->n==u) $ dCitingNodeItems d
+itemsOfCitingNode d (Citing u) =
+    map snd $ M.elems $ M.filter (\(n,_)->n==u) $ dNodeItems d
 
 connectedNodes :: Set Arc -> Set Node
 connectedNodes arcs =
