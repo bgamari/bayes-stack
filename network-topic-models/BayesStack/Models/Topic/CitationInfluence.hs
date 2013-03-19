@@ -99,14 +99,6 @@ data NetData = NetData { dAlphaPsi           :: Double
               deriving (Show, Eq, Generic)
 instance Binary NetData
 
--- FIXME: This really should be memoized
-dCitedNodeItems :: NetData -> Map CitedNodeItem (CitedNode, Item)
-dCitedNodeItems nd =
-    M.mapKeys Cited
-    $ M.map (\(n,i)->(Cited n, i))
-    $ M.filter (\(n,i)->Cited n `S.member` dCitedNodes nd)
-    $ dNodeItems nd
-
 dCitingNodeItems :: NetData -> Map CitingNodeItem (CitingNode, Item)
 dCitingNodeItems nd =
     M.mapKeys Citing
@@ -158,7 +150,7 @@ verifyNetData d = execWriter $ do
             $ tell [show n++" is in dCitingNodeItems yet has no arcs"]
     forM_ (dCitedNodes d) $ \n->
         when (S.null $ getCitingNodes d n)
-            $ tell [show n++" is in dCitedNodeItems yet has no arcs"]
+            $ tell [show n++" is in cited NodeItems yet has no arcs"]
 
 type CitedModelInit = Map CitedNodeItem (Setting CitedUpdateUnit)
 type CitingModelInit = Map CitingNodeItem (Setting CitingUpdateUnit)
@@ -343,11 +335,11 @@ citedProb st (CitedUpdateUnit {uuN'=n', uuX'=x'}) t =
 
 citedUpdateUnits :: NetData -> [CitedUpdateUnit]
 citedUpdateUnits d =
-    map (\(ni',(n',x'))->CitedUpdateUnit { uuNI'      = ni'
-                                         , uuN'       = n'
+    map (\(ni',(n',x'))->CitedUpdateUnit { uuNI'      = Cited ni'
+                                         , uuN'       = Cited n'
                                          , uuX'       = x'
                                          }
-        ) $ M.assocs $ dCitedNodeItems d
+        ) $ M.assocs $ dNodeItems d
 
 setCitedUU :: CitedUpdateUnit -> Maybe Topic -> MState -> MState
 setCitedUU uu@(CitedUpdateUnit {uuN'=n', uuNI'=ni', uuX'=x'}) setting ms =
