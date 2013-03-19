@@ -339,7 +339,9 @@ citedUpdateUnits d =
                                          , uuN'       = Cited n'
                                          , uuX'       = x'
                                          }
-        ) $ M.assocs $ dNodeItems d
+        ) $ M.assocs
+          $ M.filter (\(n,i)->Cited n `S.member` dCitedNodes d)
+          $ dNodeItems d
 
 setCitedUU :: CitedUpdateUnit -> Maybe Topic -> MState -> MState
 setCitedUU uu@(CitedUpdateUnit {uuN'=n', uuNI'=ni', uuX'=x'}) setting ms =
