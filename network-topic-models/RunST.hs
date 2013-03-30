@@ -163,8 +163,8 @@ main = do
                             <*> readEdges (arcsFile args)
     let edges = S.map Edge a
 
+    createSweeps $ samplerOpts args
     let sweepsDir = Sampler.sweepsDir $ samplerOpts args
-    createDirectoryIfMissing False sweepsDir
     encodeFile (sweepsDir </> "item-map") itemMap
     encodeFile (sweepsDir </> "node-map") nodeMap
 

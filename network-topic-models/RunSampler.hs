@@ -1,6 +1,7 @@
 module RunSampler ( SamplerModel (..)
                   , SamplerOpts (..), samplerOpts
                   , runSampler
+                  , createSweeps
                   ) where
 
 import           Options.Applicative
@@ -171,3 +172,10 @@ runSampler opts m uus = do
     processSweepRunning <- atomically $ newTMVar ()
     void $ S.runStateT (forM_ lagNs (samplerIter opts uus processSweepRunning lastMaxV)) m
     atomically $ takeTMVar processSweepRunning
+
+createSweeps :: SamplerOpts -> IO ()
+createSweeps (SamplerOpts {sweepsDir=sweepsDir}) = do
+    exists <- doesDirectoryExist sweepsDir
+    if exists
+      then error "Sweeps directory already exists"
+      else createDirectory sweepsDir
