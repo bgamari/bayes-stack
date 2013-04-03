@@ -128,9 +128,13 @@ main = do
                      Nothing -> return S.empty
     printf "Read %d stopwords\n" (S.size stopWords)
 
-    (nodeItems, (itemMap, nodeMap)) <- termsToItems
-                            . either error id
-                            <$> readNodeItems stopWords (nodesFile args)
+    let parseError s = do
+            putStrLn $ "Error parsing nodes: "++s
+            putStrLn $ "Expected format is:"
+            putStrLn $ "(node)  (term) (weight)  (term) (weight) ..."
+            fail ""
+    (nodeItems, (itemMap, nodeMap)) <- either parseError (return . termsToItems)
+                            =<< readNodeItems stopWords (nodesFile args)
 
     let sweepsDir = Sampler.sweepsDir $ samplerOpts args
     Sampler.createSweeps $ samplerOpts args
