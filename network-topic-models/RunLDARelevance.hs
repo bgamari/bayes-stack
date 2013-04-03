@@ -133,7 +133,7 @@ main = do
                             <$> readNodeItems stopWords (nodesFile args)
 
     let sweepsDir = Sampler.sweepsDir $ samplerOpts args
-    createDirectoryIfMissing False sweepsDir
+    Sampler.createSweeps $ samplerOpts args
     encodeFile (sweepsDir </> "item-map") itemMap
     encodeFile (sweepsDir </> "node-map") nodeMap
 

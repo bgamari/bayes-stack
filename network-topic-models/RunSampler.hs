@@ -7,7 +7,7 @@ module RunSampler ( SamplerModel (..)
 import           Options.Applicative
 import           Data.Monoid ((<>))
 import           System.FilePath.Posix ((</>))
-import           System.Directory (createDirectoryIfMissing)
+import           System.Directory
 
 import           Control.Monad (when, forM_, void)
 import qualified Control.Monad.Trans.State as S

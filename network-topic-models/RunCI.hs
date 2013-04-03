@@ -26,7 +26,6 @@ import           BayesStack.UniqueKey
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
-import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath.Posix ((</>))
 import           Data.Binary
 import qualified Data.ByteString as BS
@@ -172,7 +171,7 @@ main = do
                             <*> readEdges (arcsFile args)
     let arcs = edgesToArcs a
 
-    createSweeps $ samplerOpts args
+    Sampler.createSweeps $ samplerOpts args
     let sweepsDir = Sampler.sweepsDir $ samplerOpts args
     encodeFile (sweepsDir </> "item-map") itemMap
     encodeFile (sweepsDir </> "node-map") nodeMap
