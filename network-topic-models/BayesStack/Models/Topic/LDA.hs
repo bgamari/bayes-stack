@@ -17,7 +17,7 @@ module BayesStack.Models.Topic.LDA
   , modelLikelihood
   ) where
 
-import Prelude hiding (mapM)
+import Prelude hiding (mapM_)
 
 import Data.Set (Set)
 import qualified Data.Set as S
@@ -30,7 +30,7 @@ import Data.Foldable hiding (product)
 import Data.Monoid
 
 import Control.Monad (liftM)
-import Control.Monad.Trans.State
+import Control.Monad.Trans.State.Strict
 import Data.Random
 import Data.Random.Distribution.Categorical (categorical)
 
@@ -41,7 +41,7 @@ import BayesStack.TupleEnum ()
 import BayesStack.Models.Topic.Types
 
 import GHC.Generics
-import Data.Binary
+import Data.Binary (Binary)
 
 data NetData = NetData { dAlphaTheta :: !Double
                        , dAlphaPhi :: !Double
@@ -82,7 +82,12 @@ model d init =
                               $ dTopics d
                    , stT = M.empty
                    }
-    in execState (mapM (\uu->modify $ setUU uu (Just $ M.findWithDefault (Topic 0) (uuNI uu) init)) uus) s
+    in execState (mapM_ (\uu->modify' $ setUU uu (Just $ M.findWithDefault (Topic 0) (uuNI uu) init)) uus) s
+
+modify' :: (s -> s) -> State s ()
+modify' f = do
+    a <- get
+    put $! f a
 
 data MState = MState { stThetas :: !(Map Node (Multinom Int Topic))
                      , stPhis   :: !(Map Topic (Multinom Int Item))
