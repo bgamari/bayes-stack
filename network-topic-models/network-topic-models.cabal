@@ -213,4 +213,19 @@ benchmark lda-benchmark
   type:                exitcode-stdio-1.0
   main-is:             Benchmark.hs
   Ghc-Options:         -H512M -A512M -O2
-  build-depends:       base >=4.6 && <4.8, vector >=0.9 && <0.11, statistics ==0.10.*, bimap ==0.2.*, containers ==0.5.*, transformers ==0.3.*, bayes-stack ==0.2.*, text ==0.11.*, random-fu ==0.2.*, mwc-random ==0.12.*, log-domain >= 0.6, bytestring ==0.10.*, binary >=0.7 && < 0.8, deepseq ==1.3.*, directory, criterion
+  build-depends:       base >=4.6 && <4.8,
+                       vector >=0.9 && <0.11,
+                       statistics ==0.10.*,
+                       bimap ==0.2.*,
+                       containers ==0.5.*,
+                       transformers ==0.3.*,
+                       bayes-stack ==0.2.*,
+                       text ==0.11.*,
+                       random-fu ==0.2.*,
+                       mwc-random ==0.12.*,
+                       log-domain >= 0.6,
+                       bytestring ==0.10.*,
+                       binary >=0.7 && < 0.8,
+                       deepseq ==1.3.*,
+                       directory,
+                       criterion
