@@ -104,9 +104,9 @@ class Binary ms => SamplerModel ms where
 processSweep :: SamplerModel ms => SamplerOpts -> TVar (Log Double) -> Int -> ms -> IO ()
 processSweep opts lastMaxV sweepN m = do
     let l = modelLikelihood m
-    putStr $ printf "Sweep %d: %f\n" sweepN (runLog l)
+    putStr $ printf "Sweep %d: %f\n" sweepN (ln l)
     appendFile (sweepsDir opts </> "likelihood.log")
-        $ printf "%d\t%f\n" sweepN (runLog l)
+        $ printf "%d\t%f\n" sweepN (ln l)
     when (sweepN >= burnin opts) $ do
         newMax <- atomically $ do oldL <- readTVar lastMaxV
                                   if l > oldL then writeTVar lastMaxV l >> return True
@@ -126,8 +126,8 @@ doEstimateHypers opts@(SamplerOpts {hyperEstOpts=HyperEstOpts True burnin lag}) 
             $ appendFile (sweepsDir opts </> "hyperparams.log")
             $ printf "%5d\t%f\t%f\t%s\n"
                   iterN
-                  (runLog $ modelLikelihood m)
-                  (runLog $ modelLikelihood m')
+                  (ln $ modelLikelihood m)
+                  (ln $ modelLikelihood m')
                   (summarizeHypers m')
 doEstimateHypers _ _  = return ()
 

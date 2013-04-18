@@ -77,10 +77,10 @@ alphaNorm :: Enum a => Alpha a -> Log Double
 alphaNorm alpha = normNum / normDenom
   where dim = realToFrac $ SQ.length $ aDomain alpha
         normNum = case alpha of
-                      Alpha {} -> product $ map (\a->Log $ checkNaN ("alphaNorm.normNum(asym) alpha="++show a) $ lnGamma a)
+                      Alpha {} -> product $ map (\a->Exp $ checkNaN ("alphaNorm.normNum(asym) alpha="++show a) $ lnGamma a)
                                   $ EM.elems $ aAlphas alpha
-                      SymAlpha {} -> Log $ checkNaN "alphaNorm.normNum(sym)" $ dim * lnGamma (aAlpha alpha)
-        normDenom = Log $ checkNaN "alphaNorm.normDenom" $ lnGamma $ sumAlpha alpha
+                      SymAlpha {} -> Exp $ checkNaN "alphaNorm.normNum(sym)" $ dim * lnGamma (aAlpha alpha)
+        normDenom = Exp $ checkNaN "alphaNorm.normDenom" $ lnGamma $ sumAlpha alpha
 
 -- | 'alphaDomain a' is the domain of prior 'a'
 alphaDomain :: Enum a => Alpha a -> Seq a

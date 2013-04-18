@@ -131,14 +131,14 @@ obsProb :: (Enum a, Real w, Functor f, Foldable f)
 obsProb (Multinom {dmProbs=prob}) obs =
     Foldable.product $ fmap (\(k,w)->(realToFrac $ prob EM.! k)^^w) obs
   where (^^) :: Real w => Log Double -> w -> Log Double
-        x ^^ y = Log $ realToFrac y * runLog x
+        x ^^ y = Exp $ realToFrac y * ln x
 obsProb (DirMulti {dmAlpha=alpha}) obs =
     let go (Acc w p) (k',w') = Acc (w+w') (p*p')
-           where p' = Log $ checkNaN "obsProb"
+           where p' = Exp $ checkNaN "obsProb"
                       $ lnGamma (realToFrac w' + alpha `alphaOf` k')
     in case Foldable.foldl' go (Acc 0 1) obs of
          Acc w p -> p / alphaNormalizer alpha
-                    / Log (lnGamma $ realToFrac w + sumAlpha alpha)
+                    / Exp (lnGamma $ realToFrac w + sumAlpha alpha)
 {-# INLINE obsProb #-}
 
 dmGetCounts :: (Enum a, Num w) => Multinom w a -> a -> w

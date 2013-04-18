@@ -278,7 +278,7 @@ arcTopicMixture nd m (Arc (d,c)) t =
 
 -- | Geometric mean
 geomMean :: V.Vector (Log Double) -> Log Double
-geomMean = Log . mean . V.map runLog
+geomMean = Exp . mean . V.map ln
 
 -- | The geometric mean of the probabilities of a collection of items under a
 -- given topic mixture.
