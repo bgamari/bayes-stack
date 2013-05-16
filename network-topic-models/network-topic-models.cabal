@@ -129,6 +129,27 @@ executable bayes-stack-ci
                        random-fu ==0.2.*,
                        bayes-stack >= 0.2 && < 0.3
 
+executable bayes-stack-cint
+  main-is:             RunCINT.hs
+  ghc-options:         -threaded
+  build-depends:       base >=4.6 && <4.8,
+                       stm >= 2.4 && < 2.5,
+                       containers >= 0.5 && < 0.6,
+                       deepseq >= 1.3 && < 2.0,
+                       bytestring >= 0.10 && < 0.11,
+                       binary >= 0.7 && < 0.8,
+                       vector >=0.9 && <0.11,
+                       transformers >= 0.3 && < 0.4,
+                       filepath >=1.3 && < 1.4,
+                       directory,
+                       text >= 0.11 && < 0.12,
+                       optparse-applicative >=0.5,
+                       statistics ==0.10.*,
+                       log-domain >= 0.6,
+                       mwc-random >= 0.12 && < 0.13,
+                       random-fu ==0.2.*,
+                       bayes-stack >= 0.2 && < 0.3
+
 executable bayes-stack-dump-lda
   main-is:             DumpLDA.hs
   build-depends:       base >=4.6 && <4.8,
