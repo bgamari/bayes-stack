@@ -1,0 +1,3 @@
+[submodule "network-topic-models/doc/models/tikz-bayesnet"]
+	path = network-topic-models/doc/models/tikz-bayesnet
+	url = git://github.com/jluttine/tikz-bayesnet.git
