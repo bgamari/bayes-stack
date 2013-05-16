@@ -3,6 +3,7 @@
 module BayesStack.Models.Topic.CitationInfluenceNoTopics
   ( -- * Primitives
     NetData(..)
+  , HyperParams(..)
   , MState(..)
   , CitingUpdateUnit
   , ItemSource(..)
@@ -82,14 +83,20 @@ citingNode (Arc (a,_)) = a
 citedNode :: Arc -> CitedNode
 citedNode (Arc (_,b)) = b
 
-data NetData = NetData { dAlphaPsi           :: Double
-                       , dAlphaLambda        :: Double
-                       , dAlphaPhi           :: Double
-                       , dAlphaOmega         :: Double
-                       , dAlphaGammaShared   :: Double
-                       , dAlphaGammaOwn      :: Double
-                       , dAlphaBetaFG        :: Double
-                       , dAlphaBetaBG        :: Double
+data HyperParams = HyperParams
+                   { alphaPsi         :: Double
+                   , alphaLambda      :: Double
+                   , alphaPhi         :: Double
+                   , alphaOmega       :: Double
+                   , alphaGammaShared :: Double
+                   , alphaGammaOwn    :: Double
+                   , alphaBetaFG      :: Double
+                   , alphaBetaBG      :: Double
+                   }
+                 deriving (Show, Eq, Generic)
+instance Binary HyperParams
+
+data NetData = NetData { dHypers             :: HyperParams
                        , dArcs               :: Set Arc
                        , dItems              :: Map Item Double
                        , dNodeItems          :: Map NodeItem (Node, Item)
@@ -180,17 +187,17 @@ model d citingInit =
                      stPsis = let dist n = case toList $ getCitedNodes d n of
                                                []    -> M.empty
                                                nodes -> M.singleton n
-                                                        $ symDirMulti (dAlphaPsi d) nodes
+                                                        $ symDirMulti (alphaPsi $ dHypers d) nodes
                               in foldMap dist citingNodes
-                   , stGammas = let dist = multinom [ (Shared, dAlphaGammaShared d)
-                                                    , (Own, dAlphaGammaOwn d) ]
+                   , stGammas = let dist = multinom [ (Shared, alphaGammaShared $ dHypers d)
+                                                    , (Own, alphaGammaOwn $ dHypers d) ]
                                 in foldMap (\t->M.singleton t dist) citingNodes
-                   , stOmegas = let dist = symDirMulti (dAlphaOmega d) (M.keys $ dItems d)
+                   , stOmegas = let dist = symDirMulti (alphaOmega $ dHypers d) (M.keys $ dItems d)
                                 in foldMap (\t->M.singleton t dist) citingNodes
                    , stCiting = M.empty
 
                    -- Cited model
-                   , stLambdas = let dist = symDirMulti (dAlphaLambda d) (M.keys $ dItems d)
+                   , stLambdas = let dist = symDirMulti (alphaLambda $ dHypers d) (M.keys $ dItems d)
                                  in foldMap (\t->M.singleton t dist) $ dCitedNodes d
                    }
 
@@ -238,6 +245,7 @@ data CitingUpdateUnit = CitingUpdateUnit { uuNI    :: CitingNodeItem
                                          , uuN     :: CitingNode
                                          , uuX     :: Item
                                          , uuCites :: Set CitedNode
+                                         , uuItemWeight :: Double
                                          }
                       deriving (Show, Generic)
 instance Binary CitingUpdateUnit
@@ -255,6 +263,7 @@ citingUpdateUnits d =
                                        , uuN       = n
                                        , uuX       = x
                                        , uuCites   = getCitedNodes d n
+                                       , uuItemWeight = (dItems d M.! x) * alphaBetaFG (dHypers d)
                                        }
         ) $ M.assocs $ dCitingNodeItems d
 
