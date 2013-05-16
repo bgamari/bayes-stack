@@ -49,6 +49,8 @@ data HyperParams = HyperParams
                    , alphaOmega       :: Double
                    , alphaGammaShared :: Double
                    , alphaGammaOwn    :: Double
+                   , alphaBetaFG      :: Double
+                   , alphaBetaBG      :: Double
                    }
                  deriving (Show, Eq)
 
@@ -102,6 +104,14 @@ hyperOpts = HyperParams
                   <> value 0.1
                   <> help "Beta parameter for prior on gamma (own)"
                    )
+    <*> option     ( long "prior-beta-fg"
+                  <> value 0.1
+                  <> help "Beta parameter for prior on language background model (foreground)"
+                   )
+    <*> option     ( long "prior-beta-bg"
+                  <> value 0.1
+                  <> help "Beta parameter for prior on language background model (background)"
+                   )
 
 mapMKeys :: (Ord k, Ord k', Monad m, Applicative m)
          => (a -> m a') -> (k -> m k') -> M.Map k a -> m (M.Map k' a')
@@ -128,6 +138,8 @@ netData hp nodeItems arcs =
             , dAlphaOmega       = alphaOmega hp
             , dAlphaGammaShared = alphaGammaShared hp
             , dAlphaGammaOwn    = alphaGammaOwn hp
+            , dAlphaBetaFG      = alphaBetaFG hp
+            , dAlphaBetaBG      = alphaBetaBG hp
             , dArcs             = arcs
             , dItems            = M.unions $ concatMap (map $ flip M.singleton 1) $ M.elems nodeItems
             , dNodeItems        = M.fromList
