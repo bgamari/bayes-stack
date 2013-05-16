@@ -1,8 +1,9 @@
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric #-}
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric, RecordWildCards #-}
 
 module BayesStack.Models.Topic.LDA
   ( -- * Primitives
     NetData(..)
+  , HyperParams(..)
   , MState(..)
   , LDAUpdateUnit
   , Node(..), Item(..), Topic(..)
@@ -43,8 +44,14 @@ import BayesStack.Models.Topic.Types
 import GHC.Generics
 import Data.Binary (Binary)
 
-data NetData = NetData { dAlphaTheta :: !Double
-                       , dAlphaPhi :: !Double
+data HyperParams = HyperParams
+                   { alphaTheta       :: Double
+                   , alphaPhi         :: Double
+                   }
+                 deriving (Show, Eq, Generic)
+instance Binary HyperParams     
+
+data NetData = NetData { dHypers   :: !HyperParams
                        , dNodes :: !(Set Node)
                        , dItems :: !(Set Item)
                        , dTopics :: !(Set Topic)
@@ -76,12 +83,13 @@ updateUnits' =
 model :: NetData -> ModelInit -> MState
 model d init =
     let uus = updateUnits' d
-        s = MState { stThetas = foldMap (\n->M.singleton n (symDirMulti (dAlphaTheta d) (toList $ dTopics d)))
+        s = MState { stThetas = foldMap (\n->M.singleton n (symDirMulti alphaTheta (toList $ dTopics d)))
                                 $ dNodes d
-                   , stPhis = foldMap (\t->M.singleton t (symDirMulti (dAlphaPhi d) (toList $ dItems d)))
+                   , stPhis = foldMap (\t->M.singleton t (symDirMulti alphaPhi (toList $ dItems d)))
                               $ dTopics d
                    , stT = M.empty
                    }
+        HyperParams {..} = dHypers d
     in execState (mapM_ (\uu->modify' $ setUU uu (Just $ M.findWithDefault (Topic 0) (uuNI uu) init)) uus) s
 
 modify' :: (s -> s) -> State s ()

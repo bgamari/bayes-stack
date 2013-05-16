@@ -40,12 +40,6 @@ data RunOpts = RunOpts { nodesFile       :: FilePath
                        , hyperParams     :: HyperParams
                        }
 
-data HyperParams = HyperParams
-                   { alphaTheta       :: Double
-                   , alphaPhi         :: Double
-                   }
-                 deriving (Show, Eq)
-
 runOpts :: Parser RunOpts
 runOpts = RunOpts
     <$> strOption  ( long "nodes"
@@ -94,8 +88,7 @@ termsToItems nodes =
 
 netData :: HyperParams -> M.Map Node [Item] -> Int -> NetData
 netData hp nodeItems nTopics =
-    NetData { dAlphaTheta       = alphaTheta hp
-            , dAlphaPhi         = alphaPhi hp
+    NetData { dHypers           = hp
             , dItems            = S.unions $ map S.fromList $ M.elems nodeItems
             , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
             , dNodeItems        = M.fromList
