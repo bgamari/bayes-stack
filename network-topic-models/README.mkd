@@ -1,6 +1,7 @@
 # Network topic models for `bayes-stack`
 
-`network-topic-models` implements a few network topic models on top of `bayes-stack`. These include,
+`network-topic-models` implements a few network topic models on top of
+`bayes-stack`. These include,
 
   * LDA [1]
   * Shared taste model [2]
@@ -12,7 +13,9 @@ We adopt the following nomenclature,
   * Item: a word, tag, or other content of a node
   * Edge: a set of two nodes (undirected edge)
   * Arc:  a pair of two nodes (directed edge)
-  
+
+See `doc/models/models.tex` for graphical representation of the
+implemented models.
 
 ## References
 
