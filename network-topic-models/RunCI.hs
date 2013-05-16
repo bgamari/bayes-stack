@@ -43,16 +43,6 @@ data RunOpts = RunOpts { arcsFile        :: FilePath
                        , noClean         :: Bool
                        }
 
-data HyperParams = HyperParams
-                   { alphaPsi         :: Double
-                   , alphaLambda      :: Double
-                   , alphaPhi         :: Double
-                   , alphaOmega       :: Double
-                   , alphaGammaShared :: Double
-                   , alphaGammaOwn    :: Double
-                   }
-                 deriving (Show, Eq)
-
 runOpts = RunOpts
     <$> strOption  ( long "arcs"
                   <> short 'a'
@@ -129,12 +119,7 @@ termsToItems nodes arcs =
 
 netData :: HyperParams -> M.Map Node [Item] -> Set Arc -> Int -> NetData
 netData hp nodeItems arcs nTopics =
-    NetData { dAlphaPsi         = alphaPsi hp
-            , dAlphaLambda      = alphaLambda hp
-            , dAlphaPhi         = alphaPhi hp
-            , dAlphaOmega       = alphaOmega hp
-            , dAlphaGammaShared = alphaGammaShared hp
-            , dAlphaGammaOwn    = alphaGammaOwn hp
+    NetData { dHypers           = hp
             , dArcs             = arcs
             , dItems            = S.unions $ map S.fromList $ M.elems nodeItems
             , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]

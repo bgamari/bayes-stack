@@ -1,8 +1,9 @@
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric, TupleSections #-}
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric, TupleSections, RecordWildCards #-}
 
 module BayesStack.Models.Topic.CitationInfluence
   ( -- * Primitives
     NetData(..)
+  , HyperParams(..)
   , MState(..)
   , CitedUpdateUnit
   , CitingUpdateUnit
@@ -85,12 +86,18 @@ citingNode (Arc (a,_)) = a
 citedNode :: Arc -> CitedNode
 citedNode (Arc (_,b)) = b
 
-data NetData = NetData { dAlphaPsi           :: Double
-                       , dAlphaLambda        :: Double
-                       , dAlphaPhi           :: Double
-                       , dAlphaOmega         :: Double
-                       , dAlphaGammaShared   :: Double
-                       , dAlphaGammaOwn      :: Double
+data HyperParams = HyperParams
+                   { alphaPsi         :: Double
+                   , alphaLambda      :: Double
+                   , alphaPhi         :: Double
+                   , alphaOmega       :: Double
+                   , alphaGammaShared :: Double
+                   , alphaGammaOwn    :: Double
+                   }
+                 deriving (Show, Eq, Generic)
+instance Binary HyperParams
+
+data NetData = NetData { dHypers             :: HyperParams
                        , dArcs               :: Set Arc
                        , dItems              :: Set Item
                        , dTopics             :: Set Topic
@@ -195,23 +202,24 @@ randomInitialize d =
 model :: NetData -> ModelInit -> MState
 model d (ModelInit citedInit citingInit) =
     let citingNodes = dCitingNodes d
+        HyperParams {..} = dHypers d
         s = MState { -- Citing model
                      stPsis = let dist n = case toList $ getCitedNodes d n of
                                                []    -> M.empty
                                                nodes -> M.singleton n
-                                                        $ symDirMulti (dAlphaPsi d) nodes
+                                                        $ symDirMulti alphaPsi nodes
                               in foldMap dist citingNodes
-                   , stPhis = let dist = symDirMulti (dAlphaPhi d) (toList $ dItems d)
+                   , stPhis = let dist = symDirMulti alphaPhi (toList $ dItems d)
                               in foldMap (\t->M.singleton t dist) $ dTopics d
-                   , stGammas = let dist = multinom [ (Shared, dAlphaGammaShared d)
-                                                    , (Own, dAlphaGammaOwn d) ]
+                   , stGammas = let dist = multinom [ (Shared, alphaGammaShared)
+                                                    , (Own, alphaGammaOwn) ]
                                 in foldMap (\t->M.singleton t dist) citingNodes
-                   , stOmegas = let dist = symDirMulti (dAlphaOmega d) (toList $ dTopics d)
+                   , stOmegas = let dist = symDirMulti alphaOmega (toList $ dTopics d)
                                 in foldMap (\t->M.singleton t dist) citingNodes
                    , stCiting = M.empty
 
                    -- Cited model
-                   , stLambdas = let dist = symDirMulti (dAlphaLambda d) (toList $ dTopics d)
+                   , stLambdas = let dist = symDirMulti alphaLambda (toList $ dTopics d)
                                  in foldMap (\t->M.singleton t dist) $ dCitedNodes d
                    , stT' = M.empty
                    }
