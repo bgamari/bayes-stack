@@ -62,11 +62,11 @@ data HyperParams = HyperParams
                  deriving (Show, Eq, Generic)
 instance Binary HyperParams     
 
-data NetData = NetData { dHypers             :: HyperParams
-                       , dEdges              :: Set Edge
-                       , dItems              :: Set Item
-                       , dTopics             :: Set Topic
-                       , dNodeItems          :: Map NodeItem (Node, Item)
+data NetData = NetData { dHypers             :: !HyperParams
+                       , dEdges              :: !(Set Edge)
+                       , dItems              :: !(Set Item)
+                       , dTopics             :: !(Set Topic)
+                       , dNodeItems          :: !(Map NodeItem (Node, Item))
                        }
              deriving (Show, Eq, Generic)
 instance Binary NetData
