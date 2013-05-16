@@ -3,20 +3,6 @@
 \usepackage{tikz}
 \usetikzlibrary{bayesnet}
 
-% name, --, caption, pos
-\newcommand{\nofactor}[4]{
-\node (#1) [factor, #2]  {};
-\node (capt#1) [#4 of #1]{\footnotesize{#3}};
-}
-
-%shapename,  fitlist, caption
-\newcommand{\namedgate}[3]{
-\node (invisgate#1) [rectangle, draw, transparent,  fit=#2] {};
-\node (gatecapt#1) [ above right=0 pt of invisgate#1.north west, xshift=-1pt ] {\footnotesize{#3}};
-\node (#1) [rectangle,draw,dashed, inner sep=2pt, fit=(invisgate#1)(gatecapt#1)]{};
-
-}
-
 \begin{document}
 
 \section{Latent dirichlet allocation}
