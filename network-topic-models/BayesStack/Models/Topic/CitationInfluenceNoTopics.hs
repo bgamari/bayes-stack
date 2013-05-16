@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric, TupleSections #-}
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric, TupleSections, RecordWildCards #-}
 
 module BayesStack.Models.Topic.CitationInfluenceNoTopics
   ( -- * Primitives
@@ -187,19 +187,20 @@ model d citingInit =
                      stPsis = let dist n = case toList $ getCitedNodes d n of
                                                []    -> M.empty
                                                nodes -> M.singleton n
-                                                        $ symDirMulti (alphaPsi $ dHypers d) nodes
+                                                        $ symDirMulti alphaPsi nodes
                               in foldMap dist citingNodes
-                   , stGammas = let dist = multinom [ (Shared, alphaGammaShared $ dHypers d)
-                                                    , (Own, alphaGammaOwn $ dHypers d) ]
+                   , stGammas = let dist = multinom [ (Shared, alphaGammaShared)
+                                                    , (Own, alphaGammaOwn) ]
                                 in foldMap (\t->M.singleton t dist) citingNodes
-                   , stOmegas = let dist = symDirMulti (alphaOmega $ dHypers d) (M.keys $ dItems d)
+                   , stOmegas = let dist = symDirMulti alphaOmega (M.keys $ dItems d)
                                 in foldMap (\t->M.singleton t dist) citingNodes
                    , stCiting = M.empty
 
                    -- Cited model
-                   , stLambdas = let dist = symDirMulti (alphaLambda $ dHypers d) (M.keys $ dItems d)
+                   , stLambdas = let dist = symDirMulti alphaLambda (M.keys $ dItems d)
                                  in foldMap (\t->M.singleton t dist) $ dCitedNodes d
                    }
+        HyperParams {..} = dHypers d
 
         initCitingUU :: CitingUpdateUnit -> State MState ()
         initCitingUU uu = do
@@ -263,9 +264,10 @@ citingUpdateUnits d =
                                        , uuN       = n
                                        , uuX       = x
                                        , uuCites   = getCitedNodes d n
-                                       , uuItemWeight = (dItems d M.! x) * alphaBetaFG (dHypers d)
+                                       , uuItemWeight = (dItems d M.! x) * alphaBetaFG
                                        }
         ) $ M.assocs $ dCitingNodeItems d
+  where HyperParams {..} = dHypers d
 
 citingProb :: MState -> CitingUpdateUnit -> Setting CitingUpdateUnit -> Double
 citingProb st (CitingUpdateUnit {uuN=n, uuX=x}) setting =
