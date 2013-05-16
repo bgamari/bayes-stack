@@ -1,8 +1,9 @@
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric #-}
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric, RecordWildCards #-}
 
 module BayesStack.Models.Topic.SharedTaste
   ( -- * Primitives
     NetData(..)
+  , HyperParams(..)
   , MState(..)
   , STUpdateUnit
   , ItemSource(..)
@@ -50,12 +51,18 @@ data ItemSource = Shared | Own
 instance Binary ItemSource
 instance NFData ItemSource
 
-data NetData = NetData { dAlphaPsi           :: Double
-                       , dAlphaLambda        :: Double
-                       , dAlphaPhi           :: Double
-                       , dAlphaOmega         :: Double
-                       , dAlphaGammaShared   :: Double
-                       , dAlphaGammaOwn      :: Double
+data HyperParams = HyperParams
+                   { alphaPsi         :: Double
+                   , alphaLambda      :: Double
+                   , alphaPhi         :: Double
+                   , alphaOmega       :: Double
+                   , alphaGammaShared :: Double
+                   , alphaGammaOwn    :: Double
+                   }
+                 deriving (Show, Eq, Generic)
+instance Binary HyperParams     
+
+data NetData = NetData { dHypers             :: HyperParams
                        , dEdges              :: Set Edge
                        , dItems              :: Set Item
                        , dTopics             :: Set Topic
@@ -116,19 +123,20 @@ updateUnits = map WrappedUU . updateUnits'
 model :: NetData -> ModelInit -> MState
 model d init =
     let uus = updateUnits' d
-        s = MState { stPsis = let dist n = symDirMulti (dAlphaPsi d) (toList $ getFriends (toList $ dEdges d) n)
+        s = MState { stPsis = let dist n = symDirMulti alphaPsi (toList $ getFriends (toList $ dEdges d) n)
                                in foldMap (\n->M.singleton n $ dist n) $ dNodes d
-                    , stPhis = let dist = symDirMulti (dAlphaPhi d) (toList $ dItems d)
+                    , stPhis = let dist = symDirMulti alphaPhi (toList $ dItems d)
                                in foldMap (\t->M.singleton t dist) $ dTopics d
-                    , stGammas = let dist = multinom [ (Shared, dAlphaGammaShared d)
-                                                     , (Own, dAlphaGammaOwn d) ]
+                    , stGammas = let dist = multinom [ (Shared, alphaGammaShared)
+                                                     , (Own, alphaGammaOwn) ]
                                  in foldMap (\t->M.singleton t dist) $ dNodes d
-                    , stOmegas = let dist = symDirMulti (dAlphaOmega d) (toList $ dTopics d)
+                    , stOmegas = let dist = symDirMulti alphaOmega (toList $ dTopics d)
                                  in foldMap (\t->M.singleton t dist) $ dNodes d
-                    , stLambdas = let dist = symDirMulti (dAlphaLambda d) (toList $ dTopics d)
+                    , stLambdas = let dist = symDirMulti alphaLambda (toList $ dTopics d)
                                   in foldMap (\t->M.singleton t dist) $ dEdges d
                     , stVars = M.empty
                     }
+        HyperParams {..} = dHypers d
         initUU uu = do
             let s = maybe (error "Incomplete initialization") id $ M.lookup (uuNI uu) init
             modify $ setUU uu (Just s)

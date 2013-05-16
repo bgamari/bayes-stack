@@ -41,16 +41,6 @@ data RunOpts = RunOpts { arcsFile        :: FilePath
                        , hyperParams     :: HyperParams
                        }
 
-data HyperParams = HyperParams
-                   { alphaPsi         :: Double
-                   , alphaLambda      :: Double
-                   , alphaPhi         :: Double
-                   , alphaOmega       :: Double
-                   , alphaGammaShared :: Double
-                   , alphaGammaOwn    :: Double
-                   }
-                 deriving (Show, Eq)
-
 runOpts = RunOpts
     <$> strOption  ( long "edges"
                   <> short 'e'
@@ -123,12 +113,7 @@ termsToItems nodes arcs =
 
 netData :: HyperParams -> M.Map Node [Item] -> Set Edge -> Int -> NetData
 netData hp nodeItems edges nTopics =
-    NetData { dAlphaPsi         = alphaPsi hp
-            , dAlphaLambda      = alphaLambda hp
-            , dAlphaPhi         = alphaPhi hp
-            , dAlphaOmega       = alphaOmega hp
-            , dAlphaGammaShared = alphaGammaShared hp
-            , dAlphaGammaOwn    = alphaGammaOwn hp
+    NetData { dHypers           = hp
             , dEdges            = edges
             , dItems            = S.unions $ map S.fromList $ M.elems nodeItems
             , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
