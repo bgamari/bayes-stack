@@ -316,9 +316,9 @@ influence d m u =
     in topicCompatibilities m (itemsOfCitingNode d u) lambdas
 
 -- Cited update unit (LDA-like)
-data CitedUpdateUnit = CitedUpdateUnit { uuNI' :: CitedNodeItem
-                                       , uuN'  :: CitedNode
-                                       , uuX' :: Item
+data CitedUpdateUnit = CitedUpdateUnit { uuNI' :: !CitedNodeItem
+                                       , uuN'  :: !CitedNode
+                                       , uuX' :: !Item
                                        }
                      deriving (Show, Generic)
 instance Binary CitedUpdateUnit
@@ -364,10 +364,10 @@ citedFullCond ms uu = do
 
 
 -- Citing Update unit (Shared Taste-like)
-data CitingUpdateUnit = CitingUpdateUnit { uuNI    :: CitingNodeItem
-                                         , uuN     :: CitingNode
-                                         , uuX     :: Item
-                                         , uuCites :: Set CitedNode
+data CitingUpdateUnit = CitingUpdateUnit { uuNI    :: !CitingNodeItem
+                                         , uuN     :: !CitingNode
+                                         , uuX     :: !Item
+                                         , uuCites :: !(Set CitedNode)
                                          }
                       deriving (Show, Generic)
 instance Binary CitingUpdateUnit
