@@ -24,6 +24,7 @@ source-repository head
 Library
   Exposed-modules:     BayesStack.Types,
                        BayesStack.Gibbs, BayesStack.Gibbs.Concurrent,
+                       BayesStack.Gibbs.Simple,
                        BayesStack.DirMulti, BayesStack.Dirichlet,
                        BayesStack.UniqueKey,
                        BayesStack.TupleEnum,
