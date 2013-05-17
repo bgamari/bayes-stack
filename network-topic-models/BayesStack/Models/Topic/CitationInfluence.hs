@@ -3,6 +3,7 @@
 module BayesStack.Models.Topic.CitationInfluence
   ( -- * Primitives
     NetData(..)
+  , netData
   , HyperParams(..)
   , MState(..)
   , CitedUpdateUnit
@@ -13,7 +14,6 @@ module BayesStack.Models.Topic.CitationInfluence
   , Citing(..), Cited(..)
   , Item(..), Topic(..), NodeItem(..), Node(..)
   , Arc(..), citedNode, citingNode
-  , dCitedNodes, dCitingNodes, getCitingNodes, getCitedNodes
   , setupNodeItems
     -- * Initialization
   , verifyNetData, cleanNetData
@@ -97,33 +97,36 @@ data HyperParams = HyperParams
                  deriving (Show, Eq, Generic)
 instance Binary HyperParams
 
-data NetData = NetData { dHypers             :: HyperParams
-                       , dArcs               :: Set Arc
-                       , dItems              :: Set Item
-                       , dTopics             :: Set Topic
-                       , dNodeItems          :: Map NodeItem (Node, Item)
+data NetData = NetData { dHypers             :: !(HyperParams)
+                       , dArcs               :: !(Set Arc)
+                       , dItems              :: !(Set Item)
+                       , dTopics             :: !(Set Topic)
+                       , dNodeItems          :: !(Map NodeItem (Node, Item))
+                       , dCitingNodes        :: !(Map CitingNode (Set CitedNode))
+                         -- ^ Maps each citing node to the set of nodes cited by it
+                       , dCitedNodes         :: !(Map CitedNode (Set CitingNode))
+                         -- ^ Maps each cited node to the set of nodes citing it
                        }
               deriving (Show, Eq, Generic)
 instance Binary NetData
+
+netData :: HyperParams -> Set Arc -> Map NodeItem (Node,Item) -> Set Topic -> NetData
+netData hypers arcs nodeItems topics =
+    NetData { dHypers       = hypers
+            , dArcs         = arcs
+            , dItems        = foldMap (S.singleton . snd) $ M.elems nodeItems
+            , dTopics       = topics
+            , dNodeItems    = nodeItems
+            , dCitingNodes  = foldMap (\(Arc (a,b))->M.singleton a $ S.singleton b) arcs
+            , dCitedNodes   = foldMap (\(Arc (a,b))->M.singleton b $ S.singleton a) arcs
+            }
 
 dCitingNodeItems :: NetData -> Map CitingNodeItem (CitingNode, Item)
 dCitingNodeItems nd =
     M.mapKeys Citing
     $ M.map (\(n,i)->(Citing n, i))
-    $ M.filter (\(n,i)->Citing n `S.member` dCitingNodes nd)
+    $ M.filter (\(n,i)->Citing n `M.member` dCitingNodes nd)
     $ dNodeItems nd
-
-dCitingNodes :: NetData -> Set CitingNode
-dCitingNodes = S.map citingNode . dArcs
-
-dCitedNodes :: NetData -> Set CitedNode
-dCitedNodes = S.map citedNode . dArcs
-
-getCitingNodes :: NetData -> CitedNode -> Set CitingNode
-getCitingNodes d n = S.map citingNode $ S.filter (\(Arc (_,cited))->cited==n) $ dArcs d
-
-getCitedNodes :: NetData -> CitingNode -> Set CitedNode
-getCitedNodes d n = S.map citedNode $ S.filter (\(Arc (citing,_))->citing==n) $ dArcs d
 
 itemsOfCitingNode :: NetData -> CitingNode -> [Item]
 itemsOfCitingNode d (Citing u) =
@@ -182,7 +185,7 @@ randomInitializeCiting d init = execStateT doInit init
 randomInitCitingUU :: NetData -> CitingNodeItem -> StateT CitingModelInit RVar ()
 randomInitCitingUU d cni@(Citing ni) =
     let (n,_) = dNodeItems d M.! ni
-    in case getCitedNodes d (Citing n) of
+    in case dCitingNodes d M.! Citing n of
            a | S.null a -> do
                t <- lift $ randomElement $ toList $ dTopics d
                modify' $ M.insert cni $ OwnSetting t
@@ -201,10 +204,10 @@ randomInitialize d =
 
 model :: NetData -> ModelInit -> MState
 model d (ModelInit citedInit citingInit) =
-    let citingNodes = dCitingNodes d
+    let citingNodes = M.keys $ dCitingNodes d
         HyperParams {..} = dHypers d
         s = MState { -- Citing model
-                     stPsis = let dist n = case toList $ getCitedNodes d n of
+                     stPsis = let dist n = case toList $ dCitingNodes d M.! n of
                                                []    -> M.empty
                                                nodes -> M.singleton n
                                                         $ symDirMulti alphaPsi nodes
@@ -220,7 +223,7 @@ model d (ModelInit citedInit citingInit) =
 
                    -- Cited model
                    , stLambdas = let dist = symDirMulti alphaLambda (toList $ dTopics d)
-                                 in foldMap (\t->M.singleton t dist) $ dCitedNodes d
+                                 in foldMap (\t->M.singleton t dist) $ M.keys $ dCitedNodes d
                    , stT' = M.empty
                    }
 
@@ -309,7 +312,7 @@ topicCompatibilities m items topics =
 influence :: NetData -> MState -> CitingNode -> Map CitedNode Probability
 influence d m u =
     let lambdas = foldMap (\f->M.singleton f $ stLambdas m M.! f)
-                 $ S.toList $ getCitedNodes d u
+                 $ S.toList $ dCitingNodes d M.! u
     in topicCompatibilities m (itemsOfCitingNode d u) lambdas
 
 -- Cited update unit (LDA-like)
@@ -341,7 +344,7 @@ citedUpdateUnits d =
                                          , uuX'       = x'
                                          }
         ) $ M.assocs
-          $ M.filter (\(n,i)->Cited n `S.member` dCitedNodes d)
+          $ M.filter (\(n,i)->Cited n `M.member` dCitedNodes d)
           $ dNodeItems d
 
 setCitedUU :: CitedUpdateUnit -> Maybe Topic -> MState -> MState
@@ -381,7 +384,7 @@ citingUpdateUnits d =
     map (\(ni,(n,x))->CitingUpdateUnit { uuNI      = ni
                                        , uuN       = n
                                        , uuX       = x
-                                       , uuCites   = getCitedNodes d n
+                                       , uuCites   = dCitingNodes d M.! n
                                        }
         ) $ M.assocs $ dCitingNodeItems d
 

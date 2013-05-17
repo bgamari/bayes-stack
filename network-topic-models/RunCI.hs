@@ -117,18 +117,15 @@ termsToItems nodes arcs =
                 return (a,b)
     in (d', (itemMap, nodeMap))
 
-netData :: HyperParams -> M.Map Node [Item] -> Set Arc -> Int -> NetData
-netData hp nodeItems arcs nTopics =
-    NetData { dHypers           = hp
-            , dArcs             = arcs
-            , dItems            = S.unions $ map S.fromList $ M.elems nodeItems
-            , dTopics           = S.fromList [Topic i | i <- [1..nTopics]]
-            , dNodeItems        = M.fromList
-                                  $ zip [NodeItem i | i <- [0..]]
-                                  $ do (n,items) <- M.assocs nodeItems
-                                       item <- items
-                                       return (n, item)
-            }
+makeNetData :: HyperParams -> M.Map Node [Item] -> Set Arc -> Int -> NetData
+makeNetData hp nodeItems arcs nTopics =
+    netData hp arcs nodeItems' topics
+  where topics = S.fromList [Topic i | i <- [1..nTopics]]
+        nodeItems' = M.fromList
+                     $ zip [NodeItem i | i <- [0..]]
+                     $ do (n,items) <- M.assocs nodeItems
+                          item <- items
+                          return (n, item)
 
 opts = info runOpts
            (  fullDesc
@@ -168,7 +165,7 @@ main = do
 
     withSystemRandom $ \mwc->do
     let nd = (if noClean args then id else cleanNetData)
-             $ netData (hyperParams args) nodeItems arcs (nTopics args)
+             $ makeNetData (hyperParams args) nodeItems arcs (nTopics args)
     mapM_ putStrLn $ verifyNetData (\n->maybe (show n) show $ M.lookup n nodeMap) nd
 
     let nCitingNodes = VU.fromList $ M.elems $ M.unionsWith (+)
