@@ -198,7 +198,8 @@ model d citingInit =
 
                    -- Cited model
                    , stLambdas = let dist = symDirMulti alphaLambda (M.keys $ dItems d)
-                                 in foldMap (\t->M.singleton t dist) $ dCitedNodes d
+                                     lambdas0 = foldMap (\n->M.singleton n dist) $ dCitedNodes d
+                                 in foldl' (\dms (n,x)->M.adjust (incMultinom x) (Cited n) dms) lambdas0 (M.elems $ dNodeItems d)
                    }
         HyperParams {..} = dHypers d
 
