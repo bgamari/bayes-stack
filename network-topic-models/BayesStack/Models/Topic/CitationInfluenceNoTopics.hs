@@ -46,8 +46,8 @@ import           Data.Random.Lift (lift)
 import           Data.Random.Distribution.Categorical (categorical)
 import           Numeric.Log hiding (sum)
 
-import           BayesStack.Core.Types
-import           BayesStack.Core.Gibbs
+import           BayesStack.Types
+import           BayesStack.Gibbs
 import           BayesStack.DirMulti
 import           BayesStack.TupleEnum ()
 import           BayesStack.Models.Topic.Types

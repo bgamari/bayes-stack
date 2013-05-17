@@ -24,7 +24,7 @@ import           System.Random.MWC
 import           Data.Random
 
 import           Numeric.Log
-import           BayesStack.Core
+import           BayesStack.Gibbs.Concurrent
 
 data SamplerOpts = SamplerOpts { burnin          :: Int
                                , lag             :: Int

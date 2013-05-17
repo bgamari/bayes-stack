@@ -21,7 +21,7 @@ import           System.Directory
 import           System.FilePath ((</>), takeDirectory)
 import           Text.Printf
 
-import           BayesStack.Core.Types
+import           BayesStack.Types
 import           BayesStack.DirMulti
 import           BayesStack.Models.Topic.LDARelevance
 import           SerializeText
