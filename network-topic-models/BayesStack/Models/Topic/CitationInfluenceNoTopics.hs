@@ -184,18 +184,18 @@ randomInitialize d = randomInitializeCiting d M.empty
 
 model :: NetData -> ModelInit -> MState
 model d citingInit =
-    let citingNodes = dCitingNodes d
+    let citingNodes = M.keys $ dCitingNodes d
         s = MState { -- Citing model
                      stPsis = let dist n = case toList $ dCitingNodes d M.! n of
                                                []    -> M.empty
                                                nodes -> M.singleton n
                                                         $ symDirMulti alphaPsi nodes
-                              in foldMap dist $ M.keys $ dCitingNodes d
+                              in foldMap dist citingNodes
                    , stGammas = let dist = multinom [ (Shared, alphaGammaShared)
                                                     , (Own, alphaGammaOwn) ]
-                                in foldMap (\t->M.singleton t dist) $ M.keys citingNodes
+                                in foldMap (\t->M.singleton t dist) citingNodes
                    , stOmegas = let dist = symDirMulti alphaOmega (M.keys $ dItems d)
-                                in foldMap (\t->M.singleton t dist) $ M.keys citingNodes
+                                in foldMap (\t->M.singleton t dist) citingNodes
                    , stCiting = M.empty
 
                    -- Cited model
@@ -267,7 +267,7 @@ citingUpdateUnits d =
                                        , uuN       = n
                                        , uuX       = x
                                        , uuCites   = dCitingNodes d M.! n
-                                       , uuItemWeight = (dItems d M.! x) * alphaBetaFG
+                                       , uuItemWeight = (dItems d M.! x)
                                        }
         ) $ M.assocs $ dCitingNodeItems d
   where HyperParams {..} = dHypers d
