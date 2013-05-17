@@ -166,6 +166,7 @@ runSampler opts m uus = do
     setNumCapabilities (nCaps opts)
     createDirectoryIfMissing False (sweepsDir opts)
     putStrLn "Starting sampler..."
+    putStrLn $ "Initial likelihood = "++show (ln $ modelLikelihood m)
     putStrLn $ "Burning in for "++show (burnin opts)++" samples"
     let lagNs = maybe [0..] (\n->[0..n `div` lag opts]) $ iterations opts
     lastMaxV <- atomically $ newTVar 0
