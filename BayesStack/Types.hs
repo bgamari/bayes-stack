@@ -1,9 +1,9 @@
 {-# LANGUAGE TypeFamilies, KindSignatures, ConstraintKinds #-}
 
-module BayesStack.Core.Types ( Probability
-                             , HasLikelihood(..)
-                             , FullConditionable(..)
-                             ) where
+module BayesStack.Types ( Probability
+                        , HasLikelihood(..)
+                        , FullConditionable(..)
+                        ) where
 
 import GHC.Prim (Constraint)
 import Numeric.Log

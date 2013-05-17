@@ -33,7 +33,7 @@ import GHC.Generics (Generic)
 import Data.Binary
 import Data.Binary.EnumMap ()
 
-import BayesStack.Core
+import BayesStack.Types
 import BayesStack.Dirichlet
 
 import Numeric.Log hiding (sum)

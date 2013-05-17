@@ -1,10 +1,10 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts, GADTs, CPP #-}
 
-module BayesStack.Core.Gibbs.Concurrent ( gibbsUpdate
-                                        , module BayesStack.Core.Gibbs
-                                        ) where
+module BayesStack.Gibbs.Concurrent ( gibbsUpdate
+                                   , module BayesStack.Gibbs
+                                   ) where
 
-import BayesStack.Core.Gibbs
+import BayesStack.Gibbs
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.DeepSeq

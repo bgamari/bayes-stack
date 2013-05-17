@@ -1,9 +1,9 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts,
              ExistentialQuantification, GADTs, CPP #-}
 
-module BayesStack.Core.Gibbs ( UpdateUnit(..)
-                             , WrappedUpdateUnit(..)
-                             ) where
+module BayesStack.Gibbs ( UpdateUnit(..)
+                        , WrappedUpdateUnit(..)
+                        ) where
 
 import Control.DeepSeq
 import Data.Random

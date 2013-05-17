@@ -22,8 +22,8 @@ source-repository head
   location:             https://github.com/bgamari/bayes-stack.git
 
 Library
-  Exposed-modules:     BayesStack.Core, BayesStack.Core.Types,
-                       BayesStack.Core.Gibbs, BayesStack.Core.Gibbs.Concurrent,
+  Exposed-modules:     BayesStack.Types,
+                       BayesStack.Gibbs, BayesStack.Gibbs.Concurrent,
                        BayesStack.DirMulti, BayesStack.Dirichlet,
                        BayesStack.UniqueKey,
                        BayesStack.TupleEnum,
