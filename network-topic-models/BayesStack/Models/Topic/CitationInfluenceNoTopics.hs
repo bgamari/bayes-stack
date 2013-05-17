@@ -3,6 +3,7 @@
 module BayesStack.Models.Topic.CitationInfluenceNoTopics
   ( -- * Primitives
     NetData(..)
+  , netData
   , HyperParams(..)
   , MState(..)
   , CitingUpdateUnit
@@ -100,9 +101,21 @@ data NetData = NetData { dHypers             :: HyperParams
                        , dArcs               :: Set Arc
                        , dItems              :: Map Item Double
                        , dNodeItems          :: Map NodeItem (Node, Item)
+                       , dCitingNodes        :: Set CitingNode
+                       , dCitedNodes         :: Set CitedNode
                        }
               deriving (Show, Eq, Generic)
 instance Binary NetData
+
+netData :: HyperParams -> Set Arc -> Map Item Double -> Map NodeItem (Node,Item) -> NetData
+netData hypers arcs items nodeItems =
+    NetData { dHypers       = hypers
+            , dArcs         = arcs
+            , dItems        = items
+            , dNodeItems    = nodeItems
+            , dCitingNodes  = S.map citingNode arcs
+            , dCitedNodes   = S.map citedNode arcs
+            }
 
 dCitingNodeItems :: NetData -> Map CitingNodeItem (CitingNode, Item)
 dCitingNodeItems nd =
@@ -110,12 +123,6 @@ dCitingNodeItems nd =
     $ M.map (\(n,i)->(Citing n, i))
     $ M.filter (\(n,i)->Citing n `S.member` dCitingNodes nd)
     $ dNodeItems nd
-
-dCitingNodes :: NetData -> Set CitingNode
-dCitingNodes = S.map citingNode . dArcs
-
-dCitedNodes :: NetData -> Set CitedNode
-dCitedNodes = S.map citedNode . dArcs
 
 getCitingNodes :: NetData -> CitedNode -> Set CitingNode
 getCitingNodes d n = S.map citingNode $ S.filter (\(Arc (_,cited))->cited==n) $ dArcs d
