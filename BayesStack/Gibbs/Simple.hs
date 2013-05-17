@@ -1,8 +1,8 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, FlexibleContexts, GADTs, CPP #-}
 
-module BayesStack.Gibbs.Concurrent ( gibbsUpdate
-                                   , module BayesStack.Gibbs
-                                   ) where
+module BayesStack.Gibbs.Simple ( gibbsUpdate
+                               , module BayesStack.Gibbs
+                               ) where
 
 import BayesStack.Gibbs
 import Control.Monad.State hiding (lift)
