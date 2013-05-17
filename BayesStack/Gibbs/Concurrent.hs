@@ -23,7 +23,6 @@ updateUnit (WrappedUU unit) stateRef diffQueue = do
     let s = fetchSetting unit modelState
     s' <- lift $ evolveSetting modelState unit
     (s,s') `deepseq` return ()
-    liftIO $ print (unit, s, s')
     when (s /= s') $
         lift $ atomically $ writeTBQueue diffQueue (updateSetting unit s s')
 
