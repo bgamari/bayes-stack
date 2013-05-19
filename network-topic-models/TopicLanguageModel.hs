@@ -22,7 +22,7 @@ import           System.FilePath ((</>), takeDirectory)
 import           Text.Printf
 
 import           BayesStack.Types
-import           BayesStack.DirMulti
+import           BayesStack.Multinomial
 import           BayesStack.Models.Topic.LDARelevance
 import           SerializeText
 import           ReadData

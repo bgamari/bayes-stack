@@ -25,7 +25,7 @@ Library
   Exposed-modules:     BayesStack.Types,
                        BayesStack.Gibbs, BayesStack.Gibbs.Concurrent,
                        BayesStack.Gibbs.Simple,
-                       BayesStack.DirMulti, BayesStack.Dirichlet,
+                       BayesStack.Multinomial, BayesStack.Dirichlet,
                        BayesStack.UniqueKey,
                        BayesStack.TupleEnum,
                        Data.Binary.EnumMap,

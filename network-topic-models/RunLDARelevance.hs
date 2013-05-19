@@ -21,7 +21,7 @@ import           ReadData hiding (readNodeItems)
 import           ReadRelevanceData (readNodeItems)
 import           SerializeText
 import qualified RunSampler as Sampler
-import           BayesStack.DirMulti
+import           BayesStack.Multinomial
 import           BayesStack.Models.Topic.LDARelevance
 import           BayesStack.UniqueKey
 

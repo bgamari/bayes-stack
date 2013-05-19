@@ -18,7 +18,7 @@ import qualified Data.Map.Strict as M
 import           ReadData
 import           SerializeText
 import qualified RunSampler as Sampler
-import           BayesStack.DirMulti
+import           BayesStack.Multinomial
 import           BayesStack.Models.Topic.LDA
 import           BayesStack.UniqueKey
 

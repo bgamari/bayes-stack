@@ -20,7 +20,7 @@ import qualified Data.Map as M
 import           ReadData
 import           SerializeText
 import qualified RunSampler as Sampler
-import           BayesStack.DirMulti
+import           BayesStack.Multinomial
 import           BayesStack.Models.Topic.CitationInfluenceNoTopics
 import           BayesStack.UniqueKey
 

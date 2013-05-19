@@ -13,7 +13,7 @@ import           Data.Text.Lazy.Builder.RealFloat
 
 import qualified Data.Map as M
 
-import           BayesStack.DirMulti
+import           BayesStack.Multinomial
 
 formatMultinom :: (Real w, Ord a, Enum a)
                => (a -> TB.Builder) -> Maybe Int -> Multinom w a -> TB.Builder

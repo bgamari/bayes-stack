@@ -1,20 +1,20 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds, DeriveGeneric, DefaultSignatures #-}
 
-module BayesStack.DirMulti ( -- * Dirichlet/multinomial pair
-                             Multinom, dirMulti, symDirMulti, multinom
-                             -- | Do not do record updates with these
-                           , dmTotal, dmAlpha, dmDomain
-                           , setMultinom, SetUnset (..)
-                           , addMultinom, subMultinom
-                           , decMultinom, incMultinom
-                           , prettyMultinom
-                           , updatePrior
-                           , obsProb
-                             -- * Parameter estimation
-                           , estimatePrior, reestimatePriors, reestimateSymPriors
-                             -- * Convenience functions
-                           , probabilities, decProbabilities
-                           ) where
+module BayesStack.Multinomial ( -- * Dirichlet/multinomial pair
+                                Multinom, dirMulti, symDirMulti, multinom
+                                -- | Do not do record updates with these
+                              , dmTotal, dmAlpha, dmDomain
+                              , setMultinom, SetUnset (..)
+                              , addMultinom, subMultinom
+                              , decMultinom, incMultinom
+                              , prettyMultinom
+                              , updatePrior
+                              , obsProb
+                                -- * Parameter estimation
+                              , estimatePrior, reestimatePriors, reestimateSymPriors
+                                -- * Convenience functions
+                              , probabilities, decProbabilities
+                              ) where
 
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
@@ -42,8 +42,8 @@ import Math.Gamma hiding (p)
 
 -- | Make error handling a bit easier
 checkNaN :: RealFloat a => String -> a -> a
-checkNaN loc x | isNaN x = error $ "BayesStack.DirMulti."++loc++": Not a number"
-checkNaN loc x | isInfinite x = error $ "BayesStack.DirMulti."++loc++": Infinity"
+checkNaN loc x | isNaN x = error $ "BayesStack.Multinomial:"++loc++": Not a number"
+checkNaN loc x | isInfinite x = error $ "BayesStack.Multinomial:"++loc++": Infinity"
 checkNaN _ x = x
 
 maybeInc, maybeDec :: (Num a, Eq a) => Maybe a -> Maybe a

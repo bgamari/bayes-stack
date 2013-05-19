@@ -50,7 +50,7 @@ import           Numeric.Log hiding (sum)
 
 import           BayesStack.Types
 import           BayesStack.Gibbs
-import           BayesStack.DirMulti
+import           BayesStack.Multinomial
 import           BayesStack.TupleEnum ()
 import           BayesStack.Models.Topic.Types
 
