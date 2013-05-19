@@ -304,7 +304,7 @@ citingDomain :: MState -> CitingUpdateUnit -> [Setting CitingUpdateUnit]
 citingDomain ms uu = do
     s <- [Own, Shared]
     case s of
-        Shared -> do c <- S.toList $ uu^.uuCites
+        Shared -> do c <- uu ^. uuCites . to S.toList
                      return $ SharedSetting c
         Own    -> do return $ OwnSetting
 
