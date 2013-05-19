@@ -85,7 +85,6 @@ instance Binary Arc
 data HyperParams = HyperParams
                    { _alphaPsi         :: Double
                    , _alphaLambda      :: Double
-                   , _alphaPhi         :: Double
                    , _alphaOmega       :: Double
                    , _alphaGammaShared :: Double
                    , _alphaGammaOwn    :: Double
