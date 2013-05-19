@@ -267,10 +267,10 @@ model d citingInit =
 
 modelLikelihood :: MState -> Probability
 modelLikelihood model =
-    product $ map likelihood (M.elems $ model ^. stGammas)
-           ++ map likelihood (M.elems $ model ^. stLambdas)
-           ++ map likelihood (M.elems $ model ^. stOmegas)
-           ++ map likelihood (M.elems $ model ^. stPsis)
+    product $ (model ^.. stGammas  . folded . to likelihood)
+           ++ (model ^.. stLambdas . folded . to likelihood)
+           ++ (model ^.. stOmegas  . folded . to likelihood)
+           ++ (model ^.. stPsis    . folded . to likelihood)
 
 instance UpdateUnit CitingUpdateUnit where
     type ModelState CitingUpdateUnit = MState
