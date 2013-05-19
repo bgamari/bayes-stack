@@ -1,6 +1,6 @@
 Name:                bayes-stack
 
-Version:             0.2.0.1
+Version:             0.3.0.0
 Synopsis:            Framework for inferring generative probabilistic models
                      with Gibbs sampling
 Description:         bayes-stack is a framework for inference on generative

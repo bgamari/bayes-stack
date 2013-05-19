@@ -2,7 +2,7 @@
 -- further documentation, see http://haskell.org/cabal/users-guide/
 
 name:                network-topic-models
-version:             0.2.0.1
+version:             0.3.0.0
 synopsis:            A few network topic model implementations for bayes-stack
 description:         Implementations of a few network topic models build upon bayes-stack.
                      The package includes Latent Dirichlet Allocation
