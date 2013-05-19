@@ -117,8 +117,12 @@ netData hypers arcs nodeItems topics =
             , dItems        = foldMap (S.singleton . snd) $ M.elems nodeItems
             , dTopics       = topics
             , dNodeItems    = nodeItems
-            , dCitingNodes  = foldMap (\(Arc (a,b))->M.singleton a $ S.singleton b) arcs
-            , dCitedNodes   = foldMap (\(Arc (a,b))->M.singleton b $ S.singleton a) arcs
+            , dCitingNodes  = M.unionsWith S.union
+                              $ map (\(Arc (a,b))->M.singleton a $ S.singleton b)
+                              $ S.toList arcs
+            , dCitedNodes   = M.unionsWith S.union
+                              $ map (\(Arc (a,b))->M.singleton b $ S.singleton a)
+                              $ S.toList arcs
             }
 
 dCitingNodeItems :: NetData -> Map CitingNodeItem (CitingNode, Item)
