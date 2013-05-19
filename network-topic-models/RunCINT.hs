@@ -136,7 +136,7 @@ opts = info runOpts
            )
 
 edgesToArcs :: Set (Node, Node) -> Set Arc
-edgesToArcs = S.map (\(a,b)->Arc (Citing a, Cited b))
+edgesToArcs = S.map (\(a,b)->Arc (Citing a) (Cited b))
 
 instance Sampler.SamplerModel MState where
     estimateHypers = id -- reestimate -- FIXME
