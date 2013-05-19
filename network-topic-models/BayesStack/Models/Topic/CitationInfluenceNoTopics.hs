@@ -308,11 +308,12 @@ setCitingUU uu@(CitingUpdateUnit {_uuNI=ni, _uuN=n, _uuX=x}) setting ms = execSt
   where
     set = maybe Unset (const Set) setting
     go = case maybe (fetchSetting uu ms) id setting of
-           SharedSetting c    -> do stPsis . isIn n %= setMultinom set c
-                                    stLambdas . isIn c %= setMultinom set x
-                                    stGammas . isIn n %= setMultinom set Shared
-                                    stCiting . at ni .= setting
+           SharedSetting c    -> do stPsis .    at' n %= setMultinom set c
+                                    stLambdas . at' c %= setMultinom set x
+                                    stGammas .  at' n %= setMultinom set Shared
+                                    stCiting .  at ni .= setting
 
-           OwnSetting         -> do stOmegas . isIn n %= setMultinom set x
-                                    stGammas . isIn n %= setMultinom set Own
-                                    stCiting . at ni .= setting
+           OwnSetting         -> do stOmegas .  at' n %= setMultinom set x
+                                    stGammas .  at' n %= setMultinom set Own
+                                    stCiting .  at ni .= setting
+  
