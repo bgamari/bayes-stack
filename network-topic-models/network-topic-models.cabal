@@ -41,7 +41,7 @@ executable bayes-stack-lda
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3
+                       bayes-stack >= 0.3 && < 0.4
 
 executable bayes-stack-lda-rel
   main-is:             RunLDARelevance.hs
@@ -63,7 +63,7 @@ executable bayes-stack-lda-rel
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3
+                       bayes-stack >= 0.3 && < 0.4
 
 executable bayes-stack-topic-language-model
   main-is:             TopicLanguageModel.hs
@@ -85,7 +85,7 @@ executable bayes-stack-topic-language-model
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3
+                       bayes-stack >= 0.3 && < 0.4
 
 executable bayes-stack-st
   main-is:             RunST.hs
@@ -106,7 +106,7 @@ executable bayes-stack-st
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3
+                       bayes-stack >= 0.3 && < 0.4
 
 executable bayes-stack-ci
   main-is:             RunCI.hs
@@ -127,7 +127,7 @@ executable bayes-stack-ci
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3
+                       bayes-stack >= 0.3 && < 0.4
 
 executable bayes-stack-cint
   main-is:             RunCINT.hs
@@ -148,7 +148,7 @@ executable bayes-stack-cint
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3,
+                       bayes-stack >= 0.3 && < 0.4,
                        lens
 
 executable bayes-stack-dump-lda
@@ -169,7 +169,7 @@ executable bayes-stack-dump-lda
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3
+                       bayes-stack >= 0.3 && < 0.4
 
 executable bayes-stack-dump-st
   main-is:             DumpST.hs
@@ -189,7 +189,7 @@ executable bayes-stack-dump-st
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3
+                       bayes-stack >= 0.3 && < 0.4
 
 executable bayes-stack-dump-ci
   main-is:             DumpCI.hs
@@ -209,7 +209,7 @@ executable bayes-stack-dump-ci
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3
+                       bayes-stack >= 0.3 && < 0.4
 
 executable bayes-stack-dump-cint
   main-is:             DumpCINT.hs
@@ -229,7 +229,7 @@ executable bayes-stack-dump-cint
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3,
+                       bayes-stack >= 0.3 && < 0.4,
                        lens
 
 executable bayes-stack-dump-lda-rel
@@ -250,7 +250,7 @@ executable bayes-stack-dump-lda-rel
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3
+                       bayes-stack >= 0.3 && < 0.4
 
 benchmark lda-benchmark
   type:                exitcode-stdio-1.0
@@ -262,7 +262,7 @@ benchmark lda-benchmark
                        bimap ==0.2.*,
                        containers ==0.5.*,
                        transformers ==0.3.*,
-                       bayes-stack ==0.2.*,
+                       bayes-stack >= 0.3 && < 0.4,
                        text ==0.11.*,
                        random-fu ==0.2.*,
                        mwc-random ==0.12.*,
