@@ -12,8 +12,7 @@ module BayesStack.Models.Topic.CitationInfluence
   , CitedNode(..), CitedNodeItem(..)
   , CitingNode(..), CitingNodeItem(..)
   , Citing(..), Cited(..)
-  , Item(..), Topic(..), NodeItem(..), Node(..)
-  , Arc(..), citedNode, citingNode
+  , Item(..), Topic(..), NodeItem(..), Node(..), Arc(..)
   , setupNodeItems
     -- * Initialization
   , verifyNetData, cleanNetData
@@ -74,17 +73,9 @@ type CitingNodeItem = Citing NodeItem
 type CitedNodeItem = Cited NodeItem
 
 -- ^ A directed edge
-newtype Arc = Arc (CitingNode, CitedNode)
+data Arc = Arc {citingNode :: !CitingNode, citedNode :: !CitedNode}
             deriving (Show, Eq, Ord, Generic)
 instance Binary Arc
-
--- ^ The citing node of an arc
-citingNode :: Arc -> CitingNode
-citingNode (Arc (a,_)) = a
-
--- ^ The cited node of an arc
-citedNode :: Arc -> CitedNode
-citedNode (Arc (_,b)) = b
 
 data HyperParams = HyperParams
                    { alphaPsi         :: Double
@@ -118,10 +109,10 @@ netData hypers arcs nodeItems topics =
             , dTopics       = topics
             , dNodeItems    = nodeItems
             , dCitingNodes  = M.unionsWith S.union
-                              $ map (\(Arc (a,b))->M.singleton a $ S.singleton b)
+                              $ map (\(Arc a b)->M.singleton a $ S.singleton b)
                               $ S.toList arcs
             , dCitedNodes   = M.unionsWith S.union
-                              $ map (\(Arc (a,b))->M.singleton b $ S.singleton a)
+                              $ map (\(Arc a b)->M.singleton b $ S.singleton a)
                               $ S.toList arcs
             }
 
@@ -145,7 +136,7 @@ cleanNetData d =
     let nodesWithItems = S.fromList $ map fst $ M.elems $ dNodeItems d
         nodesWithArcs = connectedNodes $ dArcs d
         keptNodes = nodesWithItems `S.intersection` nodesWithArcs
-        keepArc (Arc (Citing citing, Cited cited)) =
+        keepArc (Arc (Citing citing) (Cited cited)) =
             citing `S.member` keptNodes && cited `S.member` keptNodes
     in d { dArcs = S.filter keepArc $ dArcs d
          , dNodeItems = M.filter (\(n,i)->n `S.member` keptNodes) $ dNodeItems d
@@ -154,7 +145,7 @@ cleanNetData d =
 verifyNetData :: (Node -> String) -> NetData -> [String]
 verifyNetData showNode d = execWriter $ do
     let nodesWithItems = S.fromList $ map fst $ M.elems $ dNodeItems d
-    forM_ (dArcs d) $ \(Arc (Citing citing, Cited cited))->do
+    forM_ (dArcs d) $ \(Arc (Citing citing) (Cited cited))->do
         when (cited `S.notMember` nodesWithItems)
             $ tell [showNode cited++" has arc yet has no items"]
         when (citing `S.notMember` nodesWithItems)
@@ -285,7 +276,7 @@ modelLikelihood model =
 
 -- | Mixture of the topics of an edge
 arcTopicMixture :: NetData -> MState -> Arc -> Topic -> Probability
-arcTopicMixture nd m (Arc (d,c)) t =
+arcTopicMixture nd m (Arc d c) t =
     let itemObs = zip (itemsOfCitingNode nd d) (repeat 1)
         phi = stPhis m M.! t
         lambda = stLambdas m M.! c

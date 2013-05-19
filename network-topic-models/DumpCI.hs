@@ -68,7 +68,7 @@ readDumper "influences" = Just $ \opts nd m showItem showNode ->
        $ M.keys $ stGammas m
 
 readDumper "edge-mixtures" = Just $ \opts nd m showItem showNode ->
-    let showArc (Arc (Citing d, Cited c)) = showNode d <> " -> " <> showNode c
+    let showArc (Arc (Citing d) (Cited c)) = showNode d <> " -> " <> showNode c
         formatMixture a =
             let ps = sortBy (flip compare `on` snd)
                    $ map (\t->(t, arcTopicMixture nd m a t))
