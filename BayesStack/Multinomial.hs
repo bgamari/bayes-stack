@@ -77,7 +77,7 @@ setMultinom Unset s = decMultinom s
 -- Optionally, this can include a collapsed Dirichlet prior.
 -- 'Multinom alpha count total' is a multinomial with Dirichlet prior
 -- with symmetric parameter 'alpha', ...
-data Multinom w a = DirMulti { dmAlpha :: !(Alpha a)
+data Multinom w a = DirMulti { dmAlpha :: !(Dirichlet a)
                              , dmCounts :: !(EnumMap a w)
                              , dmTotal :: !w
                              , dmDomain :: !(Seq a)
@@ -117,7 +117,7 @@ dirMulti :: (Num w, Enum a) => [(a,Double)] -> Multinom w a
 dirMulti domain = dirMultiFromAlpha $ asymAlpha $ EM.fromList domain
 
 -- | Create a Dirichlet/multinomial with a given prior
-dirMultiFromAlpha :: (Enum a, Num w) => Alpha a -> Multinom w a
+dirMultiFromAlpha :: (Enum a, Num w) => Dirichlet a -> Multinom w a
 dirMultiFromAlpha alpha = DirMulti { dmAlpha = alpha
                                    , dmCounts = EM.empty
                                    , dmTotal = 0
@@ -177,7 +177,7 @@ prettyMultinom n showA dm@(DirMulti {})  =
             $ take n $ Data.Foldable.toList $ decProbabilities dm)
 
 -- | Update the prior of a Dirichlet/multinomial
-updatePrior :: (Alpha a -> Alpha a) -> Multinom w a -> Multinom w a
+updatePrior :: (Dirichlet a -> Dirichlet a) -> Multinom w a -> Multinom w a
 updatePrior _ (Multinom {}) = error "TODO: updatePrior"
 updatePrior f dm = dm {dmAlpha=f $ dmAlpha dm}
 
@@ -203,7 +203,7 @@ reestimateSymPriors dms =
   in fmap (updatePrior alpha) dms
 
 -- | Estimate the prior alpha from a set of Dirichlet/multinomials
-estimatePrior' :: (Real w, Enum a) => [Multinom w a] -> Alpha a -> Alpha a
+estimatePrior' :: (Real w, Enum a) => [Multinom w a] -> Dirichlet a -> Dirichlet a
 estimatePrior' dms alpha =
   let domain = toList $ dmDomain $ head dms
       f k = let num = sum $ map (\i->digamma (realToFrac (dmGetCounts i k) + alphaOf alpha k)
@@ -221,7 +221,7 @@ estimatePrior' dms alpha =
                  otherwise  -> alphaOf alpha k * num / denom
   in asymAlpha $ foldMap (\k->EM.singleton k (f k)) domain
 
-estimatePrior :: (Real w, Enum a) => Double -> [Multinom w a] -> Alpha a
+estimatePrior :: (Real w, Enum a) => Double -> [Multinom w a] -> Dirichlet a
 estimatePrior tol dms = iter $ dmAlpha $ head dms
   where iter alpha = let alpha' = estimatePrior' dms alpha
                          (_, prec)  = alphaToMeanPrecision alpha
