@@ -6,7 +6,8 @@ module BayesStack.Models.Topic.CitationInfluenceNoTopics
   , dHypers, dArcs, dItems, dNodeItems, dCitingNodes, dCitedNodes
   , netData
   , HyperParams(..)
-  , MState(..)
+  , MState
+  , stGammas, stOmegas, stPsis, stCiting, stLambdas
   , CitingUpdateUnit
   , ItemSource(..)
   , CitedNode(..), CitedNodeItem(..)
