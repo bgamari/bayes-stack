@@ -58,9 +58,9 @@ import           GHC.Generics (Generic)
 import           Data.Binary (Binary)
 import           Control.DeepSeq
 
-isIn :: At m => Index m -> IndexedLens' (Index m) m (IxValue m)
-isIn i = at i . _fromMaybe
-  where _fromMaybe = iso (fromMaybe $ error "isIn: Unexpected Nothing") Just
+at' :: At m => Index m -> IndexedLens' (Index m) m (IxValue m)
+at' i = at i . _fromMaybe
+  where _fromMaybe = iso (fromMaybe $ error "at': Unexpected Nothing") Just
 
 data ItemSource = Shared | Own deriving (Show, Eq, Enum, Ord, Generic)
 instance Binary ItemSource
@@ -173,8 +173,8 @@ citingUpdateUnits d =
     map (\(ni,(n,x))->CitingUpdateUnit { _uuNI      = ni
                                        , _uuN       = n
                                        , _uuX       = x
-                                       , _uuCites   = d^.dCitingNodes . isIn n
-                                       , _uuItemWeight = (d ^. dItems . isIn x)
+                                       , _uuCites   = d^.dCitingNodes . at' n
+                                       , _uuItemWeight = (d ^. dItems . at' x)
                                        }
         ) $ M.assocs $ dCitingNodeItems d
 
@@ -219,8 +219,8 @@ randomInitializeCiting d init = execStateT doInit init
 
 randomInitCitingUU :: NetData -> CitingNodeItem -> StateT ModelInit RVar ()
 randomInitCitingUU d cni@(Citing ni) =
-    let (n,_) = d ^. dNodeItems . isIn ni
-    in case d ^. dCitingNodes . isIn (Citing n) of
+    let (n,_) = d ^. dNodeItems . at' ni
+    in case d ^. dCitingNodes . at' (Citing n) of
            a | S.null a -> do
                modify' $ M.insert cni OwnSetting
 
@@ -239,7 +239,7 @@ model d citingInit =
     let citingNodes = M.keys $ d^.dCitingNodes
         hp = d^.dHypers
         s = MState { -- Citing model
-                     _stPsis = let dist n = case d ^. dCitingNodes . isIn n . to toList of
+                     _stPsis = let dist n = case d ^. dCitingNodes . at' n . to toList of
                                                 []    -> M.empty
                                                 nodes -> M.singleton n
                                                          $ symDirMulti (hp^.alphaPsi) nodes
@@ -275,22 +275,22 @@ modelLikelihood model =
 instance UpdateUnit CitingUpdateUnit where
     type ModelState CitingUpdateUnit = MState
     type Setting CitingUpdateUnit = CitingSetting
-    fetchSetting uu ms = ms ^. stCiting . isIn (uu^.uuNI)
+    fetchSetting uu ms = ms ^. stCiting . at' (uu^.uuNI)
     evolveSetting ms uu = categorical $ citingFullCond (setCitingUU uu Nothing ms) uu
     updateSetting uu _ s' = setCitingUU uu (Just s') . setCitingUU uu Nothing
 
 citingProb :: MState -> CitingUpdateUnit -> Setting CitingUpdateUnit -> Double
 citingProb st (CitingUpdateUnit {_uuN=n, _uuX=x}) setting =
-    let gamma = st ^. stGammas . isIn n
-        omega = st ^. stOmegas . isIn n
-        psi = st ^. stPsis . isIn n
+    let gamma = st ^. stGammas . at' n
+        omega = st ^. stOmegas . at' n
+        psi = st ^. stPsis . at' n
     in case setting of
-        SharedSetting c   -> let lambda = st ^. stLambdas . isIn c
+        SharedSetting c   -> let lambda = st ^. stLambdas . at' c
                              in sampleProb gamma Shared
                               * sampleProb psi c
                               * sampleProb lambda x
         OwnSetting        ->  sampleProb gamma Own
-                              * sampleProb omega x
+                            * sampleProb omega x
 
 citingFullCond :: MState -> CitingUpdateUnit -> [(Double, Setting CitingUpdateUnit)]
 citingFullCond ms uu = map (\s->(citingProb ms uu s, s)) $ citingDomain ms uu
