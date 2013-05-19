@@ -46,10 +46,10 @@ formatProb = formatRealFloat Exponent (Just 3) . realToFrac
 
 readDumper :: String -> Maybe Dumper
 readDumper "psis"   = Just $ \opts nd m showItem showNode ->
-    formatMultinoms (\(Citing n)->showNode n) showB (nElems opts) (m^.stPsis)
+    formatMultinoms (\(Citing n)->showNode n) (\(Cited n)->showNode n) (nElems opts) (m^.stPsis)
 
 readDumper "lambdas"= Just $ \opts nd m showItem showNode ->
-    formatMultinoms (\(Cited n)->showNode n) showB (nElems opts) (m^.stLambdas)
+    formatMultinoms (\(Cited n)->showNode n) showItem (nElems opts) (m^.stLambdas)
 
 readDumper "omegas" = Just $ \opts nd m showItem showNode ->
     formatMultinoms (\(Citing n)->showNode n) showB (nElems opts) (m^.stOmegas)
