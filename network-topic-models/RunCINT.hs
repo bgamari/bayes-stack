@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 
 import           Prelude hiding (mapM)
+import           Control.Lens                 
 
 import           Options.Applicative
 import           Data.Monoid ((<>))
@@ -171,14 +172,14 @@ main = do
 
     let nCitingNodes = VU.fromList $ M.elems $ M.unionsWith (+)
                        $ map (\a->M.singleton (citingNode a) 1)
-                       $ S.toList $ dArcs nd
+                       $ S.toList $ nd^.dArcs
 
         nCitedNodes  = VU.fromList $ M.elems $ M.unionsWith (+)
                        $ map (\a->M.singleton (citedNode a) 1)
-                       $ S.toList $ dArcs nd
+                       $ S.toList $ nd^.dArcs
     printf "After cleaning: %d cited nodes, %d citing nodes, %d arcs, %d node-items\n"
-           (S.size $ S.map citedNode $ dArcs nd) (S.size $ S.map citingNode $ dArcs nd)
-           (S.size $ dArcs nd) (M.size $ dNodeItems nd)
+           (S.size $ S.map citedNode $ nd^.dArcs) (S.size $ S.map citingNode $ nd^.dArcs)
+           (nd ^. dArcs . to S.size) (nd ^. dNodeItems . to M.size)
     printf "In degree:  mean=%3.1f, maximum=%3.1f\n"
            (mean nCitedNodes) (V.maximum nCitedNodes)
     printf "Out degree: mean=%3.1f, maximum=%3.1f\n"

@@ -148,7 +148,8 @@ executable bayes-stack-cint
                        log-domain >= 0.6,
                        mwc-random >= 0.12 && < 0.13,
                        random-fu ==0.2.*,
-                       bayes-stack >= 0.2 && < 0.3
+                       bayes-stack >= 0.2 && < 0.3,
+                       lens
 
 executable bayes-stack-dump-lda
   main-is:             DumpLDA.hs

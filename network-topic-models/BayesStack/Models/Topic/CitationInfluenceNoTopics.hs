@@ -1,8 +1,9 @@
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric, TupleSections, RecordWildCards #-}
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric, TupleSections, RecordWildCards, TemplateHaskell, RankNTypes, FlexibleContexts #-}
 
 module BayesStack.Models.Topic.CitationInfluenceNoTopics
   ( -- * Primitives
-    NetData(..)
+    NetData
+  , dHypers, dArcs, dItems, dNodeItems, dCitingNodes, dCitedNodes
   , netData
   , HyperParams(..)
   , MState(..)
@@ -28,7 +29,9 @@ import qualified Data.Vector as V
 import Statistics.Sample (mean)
 
 import           Prelude hiding (mapM_, sum)
+import           Data.Maybe (fromMaybe)
 
+import           Control.Lens hiding (Setting)
 import           Data.Set (Set)
 import qualified Data.Set as S
 
@@ -52,9 +55,13 @@ import           BayesStack.DirMulti
 import           BayesStack.TupleEnum ()
 import           BayesStack.Models.Topic.Types
 
-import           GHC.Generics
+import           GHC.Generics (Generic)
 import           Data.Binary (Binary)
 import           Control.DeepSeq
+
+isIn :: At m => Index m -> IndexedLens' (Index m) m (IxValue m)
+isIn i = at i . _fromMaybe
+  where _fromMaybe = iso (fromMaybe $ error "isIn: Unexpected Nothing") Just
 
 data ItemSource = Shared | Own deriving (Show, Eq, Enum, Ord, Generic)
 instance Binary ItemSource
@@ -84,50 +91,52 @@ citedNode :: Arc -> CitedNode
 citedNode (Arc (_,b)) = b
 
 data HyperParams = HyperParams
-                   { alphaPsi         :: Double
-                   , alphaLambda      :: Double
-                   , alphaPhi         :: Double
-                   , alphaOmega       :: Double
-                   , alphaGammaShared :: Double
-                   , alphaGammaOwn    :: Double
-                   , alphaBetaFG      :: Double
-                   , alphaBetaBG      :: Double
+                   { _alphaPsi         :: Double
+                   , _alphaLambda      :: Double
+                   , _alphaPhi         :: Double
+                   , _alphaOmega       :: Double
+                   , _alphaGammaShared :: Double
+                   , _alphaGammaOwn    :: Double
+                   , _alphaBetaFG      :: Double
+                   , _alphaBetaBG      :: Double
                    }
                  deriving (Show, Eq, Generic)
 instance Binary HyperParams
+makeLenses ''HyperParams         
 
-data NetData = NetData { dHypers             :: !(HyperParams)
-                       , dArcs               :: !(Set Arc)
-                       , dItems              :: !(Map Item Double)
-                       , dNodeItems          :: !(Map NodeItem (Node, Item))
-                       , dCitingNodes        :: !(Map CitingNode (Set CitedNode))
+data NetData = NetData { _dHypers             :: !(HyperParams)
+                       , _dArcs               :: !(Set Arc)
+                       , _dItems              :: !(Map Item Double)
+                       , _dNodeItems          :: !(Map NodeItem (Node, Item))
+                       , _dCitingNodes        :: !(Map CitingNode (Set CitedNode))
                          -- ^ Maps each citing node to the set of nodes cited by it
-                       , dCitedNodes         :: !(Map CitedNode (Set CitingNode))
+                       , _dCitedNodes         :: !(Map CitedNode (Set CitingNode))
                          -- ^ Maps each cited node to the set of nodes citing it
                        }
               deriving (Show, Eq, Generic)
 instance Binary NetData
+makeLenses ''NetData         
 
 netData :: HyperParams -> Set Arc -> Map Item Double -> Map NodeItem (Node,Item) -> NetData
 netData hypers arcs items nodeItems =
-    NetData { dHypers       = hypers
-            , dArcs         = arcs
-            , dItems        = items
-            , dNodeItems    = nodeItems
-            , dCitingNodes  = foldMap (\(Arc (a,b))->M.singleton a $ S.singleton b) arcs
-            , dCitedNodes   = foldMap (\(Arc (a,b))->M.singleton b $ S.singleton a) arcs
+    NetData { _dHypers       = hypers
+            , _dArcs         = arcs
+            , _dItems        = items
+            , _dNodeItems    = nodeItems
+            , _dCitingNodes  = foldMap (\(Arc (a,b))->M.singleton a $ S.singleton b) arcs
+            , _dCitedNodes   = foldMap (\(Arc (a,b))->M.singleton b $ S.singleton a) arcs
             }
 
 dCitingNodeItems :: NetData -> Map CitingNodeItem (CitingNode, Item)
 dCitingNodeItems nd =
     M.mapKeys Citing
     $ M.map (\(n,i)->(Citing n, i))
-    $ M.filter (\(n,i)->Citing n `M.member` dCitingNodes nd)
-    $ dNodeItems nd
+    $ M.filter (\(n,i)->Citing n `M.member` (nd^.dCitingNodes))
+    $ nd^.dNodeItems
 
 itemsOfCitingNode :: NetData -> CitingNode -> [Item]
 itemsOfCitingNode d (Citing u) =
-    map snd $ M.elems $ M.filter (\(n,_)->n==u) $ dNodeItems d
+    map snd $ M.elems $ M.filter (\(n,_)->n==u) $ d^.dNodeItems
 
 connectedNodes :: Set Arc -> Set Node
 connectedNodes arcs =
@@ -135,24 +144,72 @@ connectedNodes arcs =
 
 cleanNetData :: NetData -> NetData
 cleanNetData d =
-    let nodesWithItems = S.fromList $ map fst $ M.elems $ dNodeItems d
-        nodesWithArcs = connectedNodes $ dArcs d
+    let nodesWithItems = S.fromList $ map fst $ M.elems $ d^.dNodeItems
+        nodesWithArcs = connectedNodes $ d^.dArcs
         keptNodes = nodesWithItems `S.intersection` nodesWithArcs
         keepArc (Arc (Citing citing, Cited cited)) =
             citing `S.member` keptNodes && cited `S.member` keptNodes
-    in d { dArcs = S.filter keepArc $ dArcs d
-         , dNodeItems = M.filter (\(n,i)->n `S.member` keptNodes) $ dNodeItems d
-         }
+        go = do dArcs %= S.filter keepArc
+                dNodeItems %= M.filter (\(n,i)->n `S.member` keptNodes)
+    in execState go d
 
 verifyNetData :: (Node -> String) -> NetData -> [String]
 verifyNetData showNode d = execWriter $ do
-    let nodesWithItems = S.fromList $ map fst $ M.elems $ dNodeItems d
-    forM_ (dArcs d) $ \(Arc (Citing citing, Cited cited))->do
+    let nodesWithItems = S.fromList $ map fst $ M.elems $ d^.dNodeItems
+    forM_ (d^.dArcs) $ \(Arc (Citing citing, Cited cited))->do
         when (cited `S.notMember` nodesWithItems)
             $ tell [showNode cited++" has arc yet has no items"]
         when (citing `S.notMember` nodesWithItems)
             $ tell [showNode citing++" has arc yet has no items"]
 
+-- Citing Update unit (Shared Taste-like)
+data CitingUpdateUnit = CitingUpdateUnit { _uuNI    :: CitingNodeItem
+                                         , _uuN     :: CitingNode
+                                         , _uuX     :: Item
+                                         , _uuCites :: Set CitedNode
+                                         , _uuItemWeight :: Double
+                                         }
+                      deriving (Show, Generic)
+instance Binary CitingUpdateUnit
+makeLenses ''CitingUpdateUnit
+
+citingUpdateUnits :: NetData -> [CitingUpdateUnit]
+citingUpdateUnits d =
+    map (\(ni,(n,x))->CitingUpdateUnit { _uuNI      = ni
+                                       , _uuN       = n
+                                       , _uuX       = x
+                                       , _uuCites   = d^.dCitingNodes . isIn n
+                                       , _uuItemWeight = (d ^. dItems . isIn x)
+                                       }
+        ) $ M.assocs $ dCitingNodeItems d
+
+updateUnits :: NetData -> [WrappedUpdateUnit MState]
+updateUnits d = map WrappedUU (citingUpdateUnits d)
+
+-- | Model State            
+data CitingSetting = OwnSetting
+                   | SharedSetting !CitedNode
+                   deriving (Show, Eq, Generic)
+instance Binary CitingSetting
+instance NFData CitingSetting where
+    rnf (OwnSetting)      = ()
+    rnf (SharedSetting c) = rnf c `seq` ()
+
+data MState = MState { -- Citing model state
+                       _stGammas   :: !(Map CitingNode (Multinom Int ItemSource))
+                     , _stOmegas   :: !(Map CitingNode (Multinom Int Item))
+                     , _stPsis     :: !(Map CitingNode (Multinom Int CitedNode))
+
+                     , _stCiting   :: !(Map CitingNodeItem CitingSetting)
+
+                     -- Cited model state
+                     , _stLambdas  :: !(Map CitedNode (Multinom Int Item))
+                     }
+            deriving (Show, Generic)
+instance Binary MState
+makeLenses ''MState         
+
+-- | Model initialization            
 type ModelInit = Map CitingNodeItem (Setting CitingUpdateUnit)
 
 modify' :: Monad m => (a -> a) -> StateT a m ()
@@ -167,8 +224,8 @@ randomInitializeCiting d init = execStateT doInit init
 
 randomInitCitingUU :: NetData -> CitingNodeItem -> StateT ModelInit RVar ()
 randomInitCitingUU d cni@(Citing ni) =
-    let (n,_) = dNodeItems d M.! ni
-    in case dCitingNodes d M.! Citing n of
+    let (n,_) = d ^. dNodeItems . isIn ni
+    in case d ^. dCitingNodes . isIn (Citing n) of
            a | S.null a -> do
                modify' $ M.insert cni OwnSetting
 
@@ -184,101 +241,56 @@ randomInitialize d = randomInitializeCiting d M.empty
 
 model :: NetData -> ModelInit -> MState
 model d citingInit =
-    let citingNodes = M.keys $ dCitingNodes d
+    let citingNodes = M.keys $ d^.dCitingNodes
+        hp = d^.dHypers
         s = MState { -- Citing model
-                     stPsis = let dist n = case toList $ dCitingNodes d M.! n of
-                                               []    -> M.empty
-                                               nodes -> M.singleton n
-                                                        $ symDirMulti alphaPsi nodes
-                              in foldMap dist citingNodes
-                   , stGammas = let dist = multinom [ (Shared, alphaGammaShared)
-                                                    , (Own, alphaGammaOwn) ]
-                                in foldMap (\t->M.singleton t dist) citingNodes
-                   , stOmegas = let dist = symDirMulti alphaOmega (M.keys $ dItems d)
-                                in foldMap (\t->M.singleton t dist) citingNodes
-                   , stCiting = M.empty
+                     _stPsis = let dist n = case d ^. dCitingNodes . isIn n . to toList of
+                                                []    -> M.empty
+                                                nodes -> M.singleton n
+                                                         $ symDirMulti (hp^.alphaPsi) nodes
+                               in foldMap dist citingNodes
+                   , _stGammas = let dist = multinom [ (Shared, hp^.alphaGammaShared)
+                                                     , (Own, hp^.alphaGammaOwn) ]
+                                 in foldMap (\t->M.singleton t dist) citingNodes
+                   , _stOmegas = let dist = symDirMulti (hp^.alphaOmega) (M.keys $ d^.dItems)
+                                 in foldMap (\t->M.singleton t dist) citingNodes
+                   , _stCiting = M.empty
 
                    -- Cited model
-                   , stLambdas = let dist = symDirMulti alphaLambda (M.keys $ dItems d)
-                                     lambdas0 = foldMap (\n->M.singleton n dist) $ M.keys $ dCitedNodes d
-                                 in foldl' (\dms (n,x)->M.adjust (incMultinom x) (Cited n) dms) lambdas0 (M.elems $ dNodeItems d)
+                   , _stLambdas = let dist = symDirMulti (hp^.alphaLambda) (M.keys $ d^.dItems)
+                                      lambdas0 = foldMap (\n->M.singleton n dist) $ M.keys $ d^.dCitedNodes
+                                  in foldl' (\dms (n,x)->M.adjust (incMultinom x) (Cited n) dms) lambdas0 (M.elems $ d^.dNodeItems)
                    }
-        HyperParams {..} = dHypers d
 
         initCitingUU :: CitingUpdateUnit -> State MState ()
         initCitingUU uu = do
             let err = error $ "CitationInference: Initial value for "++show uu++" not given\n"
-                s = maybe err id $ M.lookup (uuNI uu) citingInit
+                s = maybe err id $ M.lookup (uu^.uuNI) citingInit
             modify' $ setCitingUU uu (Just s)
 
     in execState (mapM_ initCitingUU $ citingUpdateUnits d) s
 
-updateUnits :: NetData -> [WrappedUpdateUnit MState]
-updateUnits d = map WrappedUU (citingUpdateUnits d)
-
-data CitingSetting = OwnSetting
-                   | SharedSetting !CitedNode
-                   deriving (Show, Eq, Generic)
-instance Binary CitingSetting
-instance NFData CitingSetting where
-    rnf (OwnSetting)      = ()
-    rnf (SharedSetting c) = rnf c `seq` ()
-
-data MState = MState { -- Citing model state
-                       stGammas   :: !(Map CitingNode (Multinom Int ItemSource))
-                     , stOmegas   :: !(Map CitingNode (Multinom Int Item))
-                     , stPsis     :: !(Map CitingNode (Multinom Int CitedNode))
-
-                     , stCiting   :: !(Map CitingNodeItem CitingSetting)
-
-                     -- Cited model state
-                     , stLambdas  :: !(Map CitedNode (Multinom Int Item))
-                     }
-            deriving (Show, Generic)
-instance Binary MState
-
 modelLikelihood :: MState -> Probability
 modelLikelihood model =
-    product $ map likelihood (M.elems $ stGammas model)
-           ++ map likelihood (M.elems $ stLambdas model)
-           ++ map likelihood (M.elems $ stOmegas model)
-           ++ map likelihood (M.elems $ stPsis model)
-
--- Citing Update unit (Shared Taste-like)
-data CitingUpdateUnit = CitingUpdateUnit { uuNI    :: CitingNodeItem
-                                         , uuN     :: CitingNode
-                                         , uuX     :: Item
-                                         , uuCites :: Set CitedNode
-                                         , uuItemWeight :: Double
-                                         }
-                      deriving (Show, Generic)
-instance Binary CitingUpdateUnit
+    product $ map likelihood (M.elems $ model ^. stGammas)
+           ++ map likelihood (M.elems $ model ^. stLambdas)
+           ++ map likelihood (M.elems $ model ^. stOmegas)
+           ++ map likelihood (M.elems $ model ^. stPsis)
 
 instance UpdateUnit CitingUpdateUnit where
     type ModelState CitingUpdateUnit = MState
     type Setting CitingUpdateUnit = CitingSetting
-    fetchSetting uu ms = stCiting ms M.! uuNI uu
+    fetchSetting uu ms = ms ^. stCiting . isIn (uu^.uuNI)
     evolveSetting ms uu = categorical $ citingFullCond (setCitingUU uu Nothing ms) uu
     updateSetting uu _ s' = setCitingUU uu (Just s') . setCitingUU uu Nothing
 
-citingUpdateUnits :: NetData -> [CitingUpdateUnit]
-citingUpdateUnits d =
-    map (\(ni,(n,x))->CitingUpdateUnit { uuNI      = ni
-                                       , uuN       = n
-                                       , uuX       = x
-                                       , uuCites   = dCitingNodes d M.! n
-                                       , uuItemWeight = (dItems d M.! x)
-                                       }
-        ) $ M.assocs $ dCitingNodeItems d
-  where HyperParams {..} = dHypers d
-
 citingProb :: MState -> CitingUpdateUnit -> Setting CitingUpdateUnit -> Double
-citingProb st (CitingUpdateUnit {uuN=n, uuX=x}) setting =
-    let gamma = stGammas st M.! n
-        omega = stOmegas st M.! n
-        psi = stPsis st M.! n
+citingProb st (CitingUpdateUnit {_uuN=n, _uuX=x}) setting =
+    let gamma = st ^. stGammas . isIn n
+        omega = st ^. stOmegas . isIn n
+        psi = st ^. stPsis . isIn n
     in case setting of
-        SharedSetting c   -> let lambda = stLambdas st M.! c
+        SharedSetting c   -> let lambda = st ^. stLambdas . isIn c
                              in sampleProb gamma Shared
                               * sampleProb psi c
                               * sampleProb lambda x
@@ -292,19 +304,20 @@ citingDomain :: MState -> CitingUpdateUnit -> [Setting CitingUpdateUnit]
 citingDomain ms uu = do
     s <- [Own, Shared]
     case s of
-        Shared -> do c <- S.toList $ uuCites uu
+        Shared -> do c <- S.toList $ uu^.uuCites
                      return $ SharedSetting c
         Own    -> do return $ OwnSetting
 
 setCitingUU :: CitingUpdateUnit -> Maybe (Setting CitingUpdateUnit) -> MState -> MState
-setCitingUU uu@(CitingUpdateUnit {uuNI=ni, uuN=n, uuX=x}) setting ms =
-    let set = maybe Unset (const Set) setting
-        ms' = case maybe (fetchSetting uu ms) id  setting of
-            SharedSetting c   -> ms { stPsis = M.adjust (setMultinom set c) n $ stPsis ms
-                                    , stLambdas = M.adjust (setMultinom set x) c $ stLambdas ms
-                                    , stGammas = M.adjust (setMultinom set Shared) n $ stGammas ms
-                                    }
-            OwnSetting        -> ms { stOmegas = M.adjust (setMultinom set x) n $ stOmegas ms
-                                    , stGammas = M.adjust (setMultinom set Own) n $ stGammas ms
-                                    }
-    in ms' { stCiting = M.alter (const setting) ni $ stCiting ms' }
+setCitingUU uu@(CitingUpdateUnit {_uuNI=ni, _uuN=n, _uuX=x}) setting ms = execState go ms
+  where
+    set = maybe Unset (const Set) setting
+    go = case maybe (fetchSetting uu ms) id setting of
+           SharedSetting c    -> do stPsis . isIn n %= setMultinom set c
+                                    stLambdas . isIn c %= setMultinom set x
+                                    stGammas . isIn n %= setMultinom set Shared
+                                    stCiting . at ni .= setting
+
+           OwnSetting         -> do stOmegas . isIn n %= setMultinom set x
+                                    stGammas . isIn n %= setMultinom set Own
+                                    stCiting . at ni .= setting
