@@ -110,8 +110,8 @@ instance Sampler.SamplerModel MState where
     estimateHypers = reestimate
     modelLikelihood = modelLikelihood
     summarizeHypers ms =
-        "  phi  : "++show (dmAlpha $ snd $ M.findMin $ stPhis ms)++"\n"++
-        "  theta: "++show (dmAlpha $ snd $ M.findMin $ stThetas ms)++"\n"
+        "  phi  : "++show (prior $ snd $ M.findMin $ stPhis ms)++"\n"++
+        "  theta: "++show (prior $ snd $ M.findMin $ stThetas ms)++"\n"
 
 main :: IO ()
 main = do
