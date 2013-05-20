@@ -51,7 +51,8 @@ import           Numeric.Log hiding (sum)
 
 import           BayesStack.Types
 import           BayesStack.Gibbs
-import           BayesStack.Multinomial
+import qualified BayesStack.Multinomial as Multi
+import           BayesStack.Multinomial (Multinom)
 import           BayesStack.TupleEnum ()
 import           BayesStack.Models.Topic.Types
 
@@ -240,21 +241,25 @@ model d citingInit =
         hp = d^.dHypers
         s = MState { -- Citing model
                      _stPsis = let dist n = case d ^. dCitingNodes . at' n . to toList of
-                                                []    -> M.empty
-                                                nodes -> M.singleton n
-                                                         $ symDirMulti (hp^.alphaPsi) nodes
+                                              []    -> M.empty
+                                              nodes -> M.singleton n
+                                                       $ Multi.fromPrecision nodes
+                                                                             (hp^.alphaPsi)
                                in foldMap dist citingNodes
-                   , _stGammas = let dist = multinom [ (Shared, hp^.alphaGammaShared)
-                                                     , (Own, hp^.alphaGammaOwn) ]
+                   , _stGammas = let dist = Multi.fromConcentrations
+                                              [ (Shared, hp^.alphaGammaShared)
+                                              , (Own, hp^.alphaGammaOwn) ]
                                  in foldMap (\t->M.singleton t dist) citingNodes
-                   , _stOmegas = let dist = symDirMulti (hp^.alphaOmega) (M.keys $ d^.dItems)
+                   , _stOmegas = let dist = Multi.fromPrecision (M.keys $ d^.dItems)
+                                                                (hp^.alphaOmega) 
                                  in foldMap (\t->M.singleton t dist) citingNodes
                    , _stCiting = M.empty
 
                    -- Cited model
-                   , _stLambdas = let dist = symDirMulti (hp^.alphaLambda) (M.keys $ d^.dItems)
+                   , _stLambdas = let dist = Multi.fromPrecision (M.keys $ d^.dItems)
+                                                                 (hp^.alphaLambda)
                                       lambdas0 = foldMap (\n->M.singleton n dist) $ M.keys $ d^.dCitedNodes
-                                  in foldl' (\dms (n,x)->M.adjust (incMultinom x) (Cited n) dms) lambdas0 (M.elems $ d^.dNodeItems)
+                                  in foldl' (\dms (n,x)->M.adjust (Multi.increment x) (Cited n) dms) lambdas0 (M.elems $ d^.dNodeItems)
                    }
 
         initCitingUU :: CitingUpdateUnit -> State MState ()
@@ -286,11 +291,11 @@ citingProb st (CitingUpdateUnit {_uuN=n, _uuX=x}) setting =
         psi = st ^. stPsis . at' n
     in case setting of
         SharedSetting c   -> let lambda = st ^. stLambdas . at' c
-                             in sampleProb gamma Shared
-                              * sampleProb psi c
-                              * sampleProb lambda x
-        OwnSetting        ->  sampleProb gamma Own
-                            * sampleProb omega x
+                             in Multi.sampleProb gamma Shared
+                              * Multi.sampleProb psi c
+                              * Multi.sampleProb lambda x
+        OwnSetting        ->  Multi.sampleProb gamma Own
+                            * Multi.sampleProb omega x
 
 citingFullCond :: MState -> CitingUpdateUnit -> [(Double, Setting CitingUpdateUnit)]
 citingFullCond ms uu = map (\s->(citingProb ms uu s, s)) $ citingDomain ms uu
@@ -306,14 +311,14 @@ citingDomain ms uu = do
 setCitingUU :: CitingUpdateUnit -> Maybe (Setting CitingUpdateUnit) -> MState -> MState
 setCitingUU uu@(CitingUpdateUnit {_uuNI=ni, _uuN=n, _uuX=x}) setting ms = execState go ms
   where
-    set = maybe Unset (const Set) setting
+    set = maybe Multi.Unset (const Multi.Set) setting
     go = case maybe (fetchSetting uu ms) id setting of
-           SharedSetting c    -> do stPsis .    at' n %= setMultinom set c
-                                    stLambdas . at' c %= setMultinom set x
-                                    stGammas .  at' n %= setMultinom set Shared
+           SharedSetting c    -> do stPsis .    at' n %= Multi.set set c
+                                    stLambdas . at' c %= Multi.set set x
+                                    stGammas .  at' n %= Multi.set set Shared
                                     stCiting .  at ni .= setting
 
-           OwnSetting         -> do stOmegas .  at' n %= setMultinom set x
-                                    stGammas .  at' n %= setMultinom set Own
+           OwnSetting         -> do stOmegas .  at' n %= Multi.set set x
+                                    stGammas .  at' n %= Multi.set set Own
                                     stCiting .  at ni .= setting
   
