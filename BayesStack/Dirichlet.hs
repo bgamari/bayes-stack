@@ -8,7 +8,7 @@ module BayesStack.Dirichlet ( -- * Dirichlet parameter
                             , fromMeanPrecision
                               -- * Querying
                             , dimension, normalizer
-                            , alphaOf
+                            , alphaOf, pmf
                             , mean, precision
                             , isSymmetric
                             , symmetrize
@@ -111,6 +111,10 @@ computeNorm alpha = normNum / normDenom
                                        $ dim * lnGamma alpha
         normDenom = Exp $ checkNaN "alphaNorm.normDenom"
                         $ lnGamma $ precision alpha
+
+-- | Probability of the given element being drawn from the given distribution  
+pmf :: Foldable f => Dirichlet a -> f a -> Log Double
+pmf d xs = 1/norm d * getProduct $ foldMap (\x->Product $ x**(alphaOf d x - 1)) xs
 
 normalizer :: Enum a => Dirichlet a -> Log Double
 normalizer = norm
