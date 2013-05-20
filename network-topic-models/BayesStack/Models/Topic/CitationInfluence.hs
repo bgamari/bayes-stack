@@ -108,7 +108,7 @@ netData :: HyperParams -> Set Arc -> Map NodeItem (Node,Item) -> Set Topic -> Ne
 netData hypers arcs nodeItems topics =
     NetData { dHypers       = hypers
             , dArcs         = arcs
-            , dItems        = foldMap (S.singleton . snd) $ M.elems nodeItems
+            , dItems        = S.fromList $ map snd $ M.elems nodeItems
             , dTopics       = topics
             , dNodeItems    = nodeItems
             , dCitingNodes  = M.unionsWith S.union
