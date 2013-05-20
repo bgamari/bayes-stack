@@ -227,8 +227,9 @@ instance Binary MState where
                     => B.Get (Map a (Multinom w b))
             getDist = do prior <- B.get
                          fmap (\counts->foldl' (\dm (k,w)->Multi.add w k dm)
-                              (Multi.fromPrior prior) $ EM.assocs counts)
-                              <$> B.get
+                                               (Multi.fromPrior prior)
+                                        $ EM.assocs counts
+                              ) <$> B.get
 
 -- | Model initialization            
 type ModelInit = Map CitingNodeItem (Setting CitingUpdateUnit)
