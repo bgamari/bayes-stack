@@ -230,11 +230,11 @@ stDomain ms uu = do
 
 modelLikelihood :: MState -> Probability
 modelLikelihood model =
-    product $ map likelihood (M.elems $ stGammas model)
-           ++ map likelihood (M.elems $ stPhis model)
-           ++ map likelihood (M.elems $ stLambdas model)
-           ++ map likelihood (M.elems $ stOmegas model)
-           ++ map likelihood (M.elems $ stPsis model)
+    product (map likelihood $ M.elems $ stGammas model)
+  * product (map likelihood $ M.elems $ stPhis model)
+  * product (map likelihood $ M.elems $ stLambdas model)
+  * product (map likelihood $ M.elems $ stOmegas model)
+  * product (map likelihood $ M.elems $ stPsis model)
 
 -- | The probability of a collections of items under a given topic mixture.
 topicCompatibility :: MState -> [Item] -> Multinom Int Topic -> Probability
