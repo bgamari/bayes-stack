@@ -4,6 +4,7 @@ module BayesStack.Multinomial ( -- * Dirichlet/multinomial pair
                                 Multinom
                                 -- * Construction
                               , fromPrior, fromProbs
+                              , fromPrecision
                                 -- * Querying
                               , total, prior, domain
                               , obsProb
@@ -94,12 +95,16 @@ data Multinom w a = DirMulti { prior  :: !(Dirichlet a)
                   deriving (Show, Eq, Generic)
 instance (Enum a, Binary a, Binary w) => Binary (Multinom w a)
 
--- | Construct a Dirichlet-multinomial distribution         
+-- | Construct a Dirichlet-multinomial distribution with given prior
 fromPrior :: (Num w, Enum a) => Dirichlet a -> Multinom w a
 fromPrior a = DirMulti { prior = a
                        , counts = EM.empty
                        , total = 0
                        }
+
+-- | Construct a Dirichlet-multinomial distribution with symmetric prior
+fromPrecision :: (Num w, Enum a) => [a] -> Double -> Multinom w a
+fromPrecision domain precision = fromPrior $ Dir.fromDomain domain precision
           
 -- | A multinomial without a prior
 fromProbs :: (Num w, Enum a) => [(a,Double)] -> Multinom w a
