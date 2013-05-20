@@ -37,7 +37,8 @@ import Data.Random.Distribution.Categorical (categorical)
 
 import BayesStack.Types
 import BayesStack.Gibbs
-import BayesStack.Multinomial
+import BayesStack.Multinomial (Multinom)
+import qualified BayesStack.Multinomial as Multi
 import BayesStack.TupleEnum ()
 import BayesStack.Models.Topic.Types
 
@@ -83,9 +84,9 @@ updateUnits' =
 model :: NetData -> ModelInit -> MState
 model d init =
     let uus = updateUnits' d
-        s = MState { stThetas = foldMap (\n->M.singleton n (symDirMulti alphaTheta (toList $ dTopics d)))
+        s = MState { stThetas = foldMap (\n->M.singleton n (Multi.fromPrecision (toList $ dTopics d) alphaTheta))
                                 $ dNodes d
-                   , stPhis = foldMap (\t->M.singleton t (symDirMulti alphaPhi (toList $ dItems d)))
+                   , stPhis = foldMap (\t->M.singleton t (Multi.fromPrecision (toList $ dItems d) alphaPhi))
                               $ dTopics d
                    , stT = M.empty
                    }
@@ -114,9 +115,9 @@ instance Binary LDAUpdateUnit
 setUU :: LDAUpdateUnit -> Maybe Topic -> MState -> MState
 setUU uu@(LDAUpdateUnit {uuN=n, uuNI=ni, uuX=x}) setting ms =
     let t = maybe (fetchSetting uu ms) id setting
-        set = maybe Unset (const Set) setting
-    in ms { stPhis = M.adjust (setMultinom set x) t (stPhis ms)
-          , stThetas = M.adjust (setMultinom set t) n (stThetas ms)
+        set = maybe Multi.Unset (const Multi.Set) setting
+    in ms { stPhis = M.adjust (Multi.set set x) t (stPhis ms)
+          , stThetas = M.adjust (Multi.set set t) n (stThetas ms)
           , stT = case setting of Just _  -> M.insert ni t $ stT ms
                                   Nothing -> stT ms
           }
@@ -132,7 +133,8 @@ uuProb :: MState -> LDAUpdateUnit -> Topic -> Double
 uuProb state (LDAUpdateUnit {uuN=n, uuX=x}) t =
     let theta = stThetas state M.! n
         phi = stPhis state M.! t
-    in realToFrac $ sampleProb theta t * sampleProb phi x
+    in realToFrac $ Multi.sampleProb theta t
+                  * Multi.sampleProb phi x
 
 ldaFullCond :: MState -> LDAUpdateUnit -> [(Double, Topic)]
 ldaFullCond ms uu = do
@@ -149,11 +151,11 @@ modelLikelihood model =
 
 -- | Re-estimate phi hyperparameter
 reestimatePhis :: MState -> MState
-reestimatePhis ms = ms { stPhis = reestimateSymPriors $ stPhis ms }
+reestimatePhis ms = ms { stPhis = Multi.reestimateSymPriors $ stPhis ms }
 
 -- | Re-estimate theta hyperparameter
 reestimateThetas :: MState -> MState
-reestimateThetas ms = ms { stThetas = reestimateSymPriors $ stThetas ms }
+reestimateThetas ms = ms { stThetas = Multi.reestimateSymPriors $ stThetas ms }
 
 reestimate :: MState -> MState
 reestimate = reestimatePhis . reestimateThetas
