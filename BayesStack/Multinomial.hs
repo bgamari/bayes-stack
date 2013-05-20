@@ -140,19 +140,18 @@ instance HasLikelihood (Multinom w) where
   likelihood dm = obsProb dm $ EM.assocs $ counts dm
   {-# INLINEABLE likelihood #-}
 
-instance FullConditionable (Multinom w) where
-  type FCContext (Multinom w) a = (Real w, Ord a, Enum a)
-  sampleProb (Multinom {probs=prob}) k = prob EM.! k
-  sampleProb dm@(DirMulti {prior=a}) k =
+sampleProb :: (Real w, Ord a, Enum a) => Multinom w a -> a -> Probability
+sampleProb (Multinom {probs=prob}) k = prob EM.! k
+sampleProb dm@(DirMulti {prior=a}) k =
     let alpha = a `alphaOf` k
         n = realToFrac $ countsOf k dm
         s = realToFrac $ total dm
     in (n + alpha) / (s + Dir.precision a)
-  {-# INLINEABLE sampleProb #-}
+{-# INLINEABLE sampleProb #-}
 
 -- | Tabulated probability mass function
-probabilities :: (Real w, Ord a, Enum a) => Multinom w a -> [(Double, a)]
-probabilities dm = map (\a->(obsProb dm a, a)) $ ES.toList $ domain dm
+probabilities :: (Real w, Ord a, Enum a) => Multinom w a -> [(Probability, a)]
+probabilities dm = map (\a->(sampleProb dm a, a)) $ ES.toList $ domain dm
 {-# INLINEABLE probabilities #-}
 
 -- | Probabilities sorted decreasingly
