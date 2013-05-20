@@ -3,11 +3,13 @@
 module BayesStack.Dirichlet ( -- * Dirichlet parameter
                               Dirichlet
                               -- * Creation
-                            , newS, newA
+                            , fromDim, fromDomain
+                            , fromConcentrations
+                            , fromMeanPrecision
                               -- * Querying
                             , domain, normalizer
                             , alphaOf
-                            , mean, precision, fromMeanPrecision
+                            , mean, precision
                             , symmetrize
                               -- Utilities
                             , prettyPrint
@@ -52,22 +54,33 @@ data Dirichlet a
     deriving (Show, Eq, Generic)
 instance (Enum a, Binary a) => Binary (Dirichlet a)
 
--- | Construct a symmetric Dirichlet distribution from the size of domain.
-newS :: Int -> Double -> Dirichlet a
-newS n alpha
+-- | Construct a symmetric Dirichlet distribution from the dimension of domain.
+fromDim :: Int -> Double -> Dirichlet a
+fromDim n alpha
   | n < 0    = error "BayesStack.Dirichlet.symAlpha: Negative dimension"
   | otherwise = let a = Dir n (Sym alpha) (alpha * fromIntegral n) (computeNorm a)
                 in a
 
+-- | Contruct a symmetric Dirichlet distribution from a domain
+fromDomain :: [a] -> Double -> Dirichlet a
+fromDomain xs a = fromDim (length xs) a
+{-# INLINE fromDomain #-}
+
 -- | Construct an asymmetric Dirichlet from the size of the distribution
-newA :: Enum a => [(a,Double)] -> Dirichlet a
-newA alphas
+fromConcentrations :: Enum a => [(a,Double)] -> Dirichlet a
+fromConcentrations alphas
   | null alphas = error "Dirichlet over null domain is undefined"
   | otherwise = a
     where go (n,alphas,prec) (a,w) = (n+1, EM.insert a w alphas, prec+w)
           (n, alphas', prec) = foldl' go (0, EM.empty, 0) alphas
           a = Dir n (Asym alphas') prec (norm a)
 
+
+-- | Construct an asymmetric Dirichlet from a mean and precision
+fromMeanPrecision :: Enum a => [(a, Double)] -> Double -> Dirichlet a
+fromMeanPrecision mean prec = fromConcentrations $ map (fmap (*prec)) mean
+                  
+{-# INLINE fromMeanPrecision #-}
 -- | Combine Dirichlets with counts @a_i@ and @b_i@ such that @c_i = a_i + b_i@
 -- This is only possible in cases where the domains are equivalent
 add :: Dirichlet a -> Dirichlet a -> Maybe (Dirichlet a)
@@ -126,11 +139,6 @@ setAlphaOf k a (Asym {conc=Asym alphas}) = asymAlpha $ EM.insert k a alphas
 mean :: Enum a => Dirichlet a -> Maybe [(a, Double)]
 mean (Dir {conc=Sym _})                  = Nothing
 mean (Dir {conc=Asym a, precision=prec}) = Just $ EM.toList $ fmap (/ prec) a
-
--- | 'meanPrecisionToAlpha m p' is a prior with mean 'm' and precision 'p'
-fromMeanPrecision :: Enum a => [(a, Double)] -> Double -> Dirichlet a
-fromMeanPrecision mean prec = newA $ map (fmap (*prec)) mean
-{-# INLINE fromMeanPrecision #-}
 
 -- | Symmetrize a Dirichlet distribution such that mean=0 yet preserving precision
 symmetrize :: Enum a => Dirichlet a -> Dirichlet a
