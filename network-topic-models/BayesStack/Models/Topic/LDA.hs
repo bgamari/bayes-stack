@@ -144,8 +144,8 @@ uuDomain ms uu = M.keys $ stPhis ms
 
 modelLikelihood :: MState -> Probability
 modelLikelihood model =
-    product $ map likelihood (M.elems $ stThetas model)
-           ++ map likelihood (M.elems $ stPhis model)
+    product (map likelihood $ M.elems $ stThetas model)
+  * product (map likelihood $ M.elems $ stPhis model)
 
 -- | Re-estimate phi hyperparameter
 reestimatePhis :: MState -> MState
