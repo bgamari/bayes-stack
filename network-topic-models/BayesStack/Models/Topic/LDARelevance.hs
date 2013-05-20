@@ -125,10 +125,10 @@ setUU uu@(LDAUpdateUnit {uuN=n, uuNI=ni, uuX=x, uuW=w}) setting ms =
     let t = maybe (fetchSetting uu ms) id setting
         set = maybe Unset (const Set) setting
         setPhi = case setting of
-                     Just _  -> addMultinom w x
-                     Nothing -> subMultinom w x
+                     Just _  -> Multi.add w x
+                     Nothing -> Multi.subtract w x
     in ms { stPhis = M.adjust setPhi t (stPhis ms)
-          , stThetas = M.adjust (setMultinom set t) n (stThetas ms)
+          , stThetas = M.adjust (Multi.set set t) n (stThetas ms)
           , stT = case setting of Just _  -> M.insert ni t $ stT ms
                                   Nothing -> stT ms
           }
