@@ -14,7 +14,7 @@ import           Statistics.Sample (mean)
 import           Data.Traversable (mapM)
 import qualified Data.Set as S
 import           Data.Set (Set)
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 
 import           ReadData
 import           SerializeText
