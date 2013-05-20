@@ -133,12 +133,13 @@ obsProb (Multinom {probs=prob}) obs =
   where (^^) :: Real w => Log Double -> w -> Log Double
         x ^^ y = Exp $ realToFrac y * ln x
 obsProb (DirMulti {prior=alpha}) obs =
-    let go (Acc w p) (k',w') = Acc (w+w') (p*p')
-           where p' = Exp $ checkNaN "obsProb"
-                      $ lnGamma (realToFrac w' + alpha `alphaOf` k')
-    in case Foldable.foldl' go (Acc 0 1) obs of
+    case Foldable.foldl' go (Acc 0 1) obs of
          Acc w p -> p / Dir.normalizer alpha
                     / Exp (lnGamma $ realToFrac w + Dir.precision alpha)
+  where go (Acc w p) (k',w') = 
+          let p' = Exp $ checkNaN "obsProb"
+                       $ lnGamma (realToFrac w' + alpha `alphaOf` k')
+          in Acc (w+w') (p*p')
 {-# INLINE obsProb #-}
 
 countsOf :: (Enum a, Num w) => a -> Multinom w a -> w
