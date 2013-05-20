@@ -22,6 +22,7 @@ import Prelude hiding (mapM, sum)
 
 import Data.Set (Set)
 import qualified Data.Set as S
+import qualified Data.EnumSet as ES
 
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -39,7 +40,8 @@ import Numeric.Log hiding (sum)
 
 import BayesStack.Types
 import BayesStack.Gibbs
-import BayesStack.Multinomial
+import BayesStack.Multinomial (Multinom)
+import qualified BayesStack.Multinomial as Multi
 import BayesStack.TupleEnum ()
 import BayesStack.Models.Topic.Types
 
@@ -123,16 +125,17 @@ updateUnits = map WrappedUU . updateUnits'
 model :: NetData -> ModelInit -> MState
 model d init =
     let uus = updateUnits' d
-        s = MState { stPsis = let dist n = symDirMulti alphaPsi (toList $ getFriends (toList $ dEdges d) n)
+        s = MState { stPsis = let dist n = Multi.fromPrecision (toList $ getFriends (toList $ dEdges d) n) alphaPsi
                                in foldMap (\n->M.singleton n $ dist n) $ dNodes d
-                    , stPhis = let dist = symDirMulti alphaPhi (toList $ dItems d)
+                    , stPhis = let dist = Multi.fromPrecision (toList $ dItems d) alphaPhi
                                in foldMap (\t->M.singleton t dist) $ dTopics d
-                    , stGammas = let dist = multinom [ (Shared, alphaGammaShared)
-                                                     , (Own, alphaGammaOwn) ]
+                    , stGammas = let dist = Multi.fromConcentrations
+                                              [ (Shared, alphaGammaShared)
+                                              , (Own, alphaGammaOwn) ]
                                  in foldMap (\t->M.singleton t dist) $ dNodes d
-                    , stOmegas = let dist = symDirMulti alphaOmega (toList $ dTopics d)
+                    , stOmegas = let dist = Multi.fromPrecision (toList $ dTopics d) alphaOmega
                                  in foldMap (\t->M.singleton t dist) $ dNodes d
-                    , stLambdas = let dist = symDirMulti alphaLambda (toList $ dTopics d)
+                    , stLambdas = let dist = Multi.fromPrecision (toList $ dTopics d) alphaLambda
                                   in foldMap (\t->M.singleton t dist) $ dEdges d
                     , stVars = M.empty
                     }
@@ -172,21 +175,21 @@ instance Binary STUpdateUnit
 
 setUU :: STUpdateUnit -> Maybe (Setting STUpdateUnit) -> MState -> MState
 setUU uu@(STUpdateUnit {uuNI=ni, uuN=n, uuX=x}) setting ms =
-    let set = maybe Unset (const Set) setting
-        ms' = case maybe (fetchSetting uu ms) id  setting of
+    let set = maybe Multi.Unset (const Multi.Set) setting
+        ms' = case maybe (fetchSetting uu ms) id setting of
             SharedSetting t fship ->
                 let f = maybe (error "Node isn't part of friendship") id
                         $ otherFriend n fship
-                in ms { stPsis = M.adjust (setMultinom set n) f
-                                 $ M.adjust (setMultinom set f) n $ stPsis ms
-                      , stLambdas = M.adjust (setMultinom set t) fship $ stLambdas ms
-                      , stPhis = M.adjust (setMultinom set x) t $ stPhis ms
-                      , stGammas = M.adjust (setMultinom set Shared) n $ stGammas ms
+                in ms { stPsis = M.adjust (Multi.set set n) f
+                                 $ M.adjust (Multi.set set f) n $ stPsis ms
+                      , stLambdas = M.adjust (Multi.set set t) fship $ stLambdas ms
+                      , stPhis = M.adjust (Multi.set set x) t $ stPhis ms
+                      , stGammas = M.adjust (Multi.set set Shared) n $ stGammas ms
                       }
             OwnSetting t ->
-                ms { stOmegas = M.adjust (setMultinom set t) n $ stOmegas ms
-                   , stPhis = M.adjust (setMultinom set x) t $ stPhis ms
-                   , stGammas = M.adjust (setMultinom set Own) n $ stGammas ms
+                ms { stOmegas = M.adjust (Multi.set set t) n $ stOmegas ms
+                   , stPhis = M.adjust (Multi.set set x) t $ stPhis ms
+                   , stGammas = M.adjust (Multi.set set Own) n $ stGammas ms
                    }
     in ms' { stVars = M.alter (const setting) ni $ stVars ms' }
 
@@ -207,14 +210,14 @@ uuProb st (STUpdateUnit {uuN=n, uuX=x}) setting =
                                      lambda = stLambdas st M.! fship
                                      f = maybe (error "Friend isn't friends with node") id
                                          $ otherFriend n fship
-                                 in sampleProb gamma Shared
-                                  * sampleProb psi f
-                                  * sampleProb lambda t
-                                  * sampleProb phi x
+                                 in Multi.sampleProb gamma Shared
+                                  * Multi.sampleProb psi f
+                                  * Multi.sampleProb lambda t
+                                  * Multi.sampleProb phi x
         OwnSetting t -> let phi = stPhis st M.! t
-                        in sampleProb gamma Own
-                         * sampleProb omega t
-                         * sampleProb phi x
+                        in Multi.sampleProb gamma Own
+                         * Multi.sampleProb omega t
+                         * Multi.sampleProb phi x
 
 stFullCond :: MState -> STUpdateUnit -> [(Double, Setting STUpdateUnit)]
 stFullCond ms uu = map (\s->(uuProb ms uu s, s)) $ stDomain ms uu
@@ -239,10 +242,10 @@ modelLikelihood model =
 -- | The probability of a collections of items under a given topic mixture.
 topicCompatibility :: MState -> [Item] -> Multinom Int Topic -> Probability
 topicCompatibility m items lambda =
-    product $ do t <- toList $ dmDomain lambda
+    product $ do t <- ES.toList $ Multi.domain lambda
                  let phi = stPhis m M.! t
                      itemObs = zip items (repeat 1)
-                 return $ realToFrac (sampleProb lambda t) * obsProb phi itemObs
+                 return $ realToFrac (Multi.sampleProb lambda t) * Multi.obsProb phi itemObs
 
 topicCompatibilities :: (Functor f, Foldable f)
                      => MState -> [Item] -> f (Multinom Int Topic) -> f Probability
