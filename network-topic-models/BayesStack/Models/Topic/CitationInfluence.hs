@@ -34,6 +34,8 @@ import           Prelude hiding (mapM_, sum)
 import           Data.Set (Set)
 import qualified Data.Set as S
 
+import qualified Data.EnumSet as ES
+
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
@@ -50,7 +52,8 @@ import           Numeric.Log hiding (sum)
 
 import           BayesStack.Types
 import           BayesStack.Gibbs
-import           BayesStack.Multinomial
+import           BayesStack.Multinomial (Multinom)
+import qualified BayesStack.Multinomial as Multi
 import           BayesStack.TupleEnum ()
 import           BayesStack.Models.Topic.Types
 
@@ -205,19 +208,20 @@ model d (ModelInit citedInit citingInit) =
                      stPsis = let dist n = case toList $ dCitingNodes d M.! n of
                                                []    -> M.empty
                                                nodes -> M.singleton n
-                                                        $ symDirMulti alphaPsi nodes
+                                                        $ Multi.fromPrecision nodes alphaPsi
                               in foldMap dist citingNodes
-                   , stPhis = let dist = symDirMulti alphaPhi (toList $ dItems d)
+                   , stPhis = let dist = Multi.fromPrecision (toList $ dItems d) alphaPhi
                               in foldMap (\t->M.singleton t dist) $ dTopics d
-                   , stGammas = let dist = multinom [ (Shared, alphaGammaShared)
-                                                    , (Own, alphaGammaOwn) ]
+                   , stGammas = let dist = Multi.fromConcentrations
+                                             [ (Shared, alphaGammaShared)
+                                             , (Own, alphaGammaOwn) ]
                                 in foldMap (\t->M.singleton t dist) citingNodes
-                   , stOmegas = let dist = symDirMulti alphaOmega (toList $ dTopics d)
+                   , stOmegas = let dist = Multi.fromPrecision (toList $ dTopics d) alphaOmega
                                 in foldMap (\t->M.singleton t dist) citingNodes
                    , stCiting = M.empty
 
                    -- Cited model
-                   , stLambdas = let dist = symDirMulti alphaLambda (toList $ dTopics d)
+                   , stLambdas = let dist = Multi.fromPrecision (toList $ dTopics d) alphaLambda
                                  in foldMap (\t->M.singleton t dist) $ M.keys $ dCitedNodes d
                    , stT' = M.empty
                    }
@@ -280,7 +284,7 @@ arcTopicMixture nd m (Arc d c) t =
     let itemObs = zip (itemsOfCitingNode nd d) (repeat 1)
         phi = stPhis m M.! t
         lambda = stLambdas m M.! c
-    in realToFrac (sampleProb lambda t) * obsProb phi itemObs
+    in realToFrac (Multi.sampleProb lambda t) * Multi.obsProb phi itemObs
 
 -- | Geometric mean
 geomMean :: V.Vector (Log Double) -> Log Double
@@ -291,10 +295,10 @@ geomMean = Exp . mean . V.map ln
 topicCompatibility :: MState -> [Item] -> Multinom Int Topic -> Probability
 topicCompatibility m items lambda =
     geomMean $ V.fromList
-            $ do t <- toList $ dmDomain lambda
+            $ do t <- ES.toList $ Multi.domain lambda
                  let phi = stPhis m M.! t
                      itemObs = zip items (repeat 1)
-                 return $ realToFrac (sampleProb lambda t) * obsProb phi itemObs
+                 return $ realToFrac (Multi.sampleProb lambda t) * Multi.obsProb phi itemObs
 
 -- | Normalized compatibilities with a set of items
 topicCompatibilities :: (Functor f, Foldable f)
@@ -330,7 +334,7 @@ citedProb :: MState -> CitedUpdateUnit -> Setting CitedUpdateUnit -> Double
 citedProb st (CitedUpdateUnit {uuN'=n', uuX'=x'}) t =
     let lambda = stLambdas st M.! n'
         phi = stPhis st M.! t
-    in realToFrac $ sampleProb lambda t * sampleProb phi x'
+    in realToFrac $ Multi.sampleProb lambda t * Multi.sampleProb phi x'
 
 citedUpdateUnits :: NetData -> [CitedUpdateUnit]
 citedUpdateUnits d =
@@ -345,9 +349,9 @@ citedUpdateUnits d =
 setCitedUU :: CitedUpdateUnit -> Maybe Topic -> MState -> MState
 setCitedUU uu@(CitedUpdateUnit {uuN'=n', uuNI'=ni', uuX'=x'}) setting ms =
     let t' = maybe (fetchSetting uu ms) id setting
-        set = maybe Unset (const Set) setting
-    in ms { stLambdas = M.adjust (setMultinom set t') n' (stLambdas ms)
-          , stPhis = M.adjust (setMultinom set x') t' (stPhis ms)
+        set = maybe Multi.Unset (const Multi.Set) setting
+    in ms { stLambdas = M.adjust (Multi.set set t') n' (stLambdas ms)
+          , stPhis = M.adjust (Multi.set set x') t' (stPhis ms)
           , stT' = case setting of Just _  -> M.insert ni' t' $ stT' ms
                                    Nothing -> stT' ms
           }
@@ -391,14 +395,14 @@ citingProb st (CitingUpdateUnit {uuN=n, uuX=x}) setting =
     in case setting of
         SharedSetting t c -> let phi = stPhis st M.! t
                                  lambda = stLambdas st M.! c
-                             in sampleProb gamma Shared
-                              * sampleProb psi c
-                              * sampleProb lambda t
-                              * sampleProb phi x
+                             in Multi.sampleProb gamma Shared
+                              * Multi.sampleProb psi c
+                              * Multi.sampleProb lambda t
+                              * Multi.sampleProb phi x
         OwnSetting t      -> let phi = stPhis st M.! t
-                             in sampleProb gamma Own
-                              * sampleProb omega t
-                              * sampleProb phi x
+                             in Multi.sampleProb gamma Own
+                              * Multi.sampleProb omega t
+                              * Multi.sampleProb phi x
 
 citingFullCond :: MState -> CitingUpdateUnit -> [(Double, Setting CitingUpdateUnit)]
 citingFullCond ms uu = map (\s->(citingProb ms uu s, s)) $ citingDomain ms uu
@@ -414,15 +418,15 @@ citingDomain ms uu = do
 
 setCitingUU :: CitingUpdateUnit -> Maybe (Setting CitingUpdateUnit) -> MState -> MState
 setCitingUU uu@(CitingUpdateUnit {uuNI=ni, uuN=n, uuX=x}) setting ms =
-    let set = maybe Unset (const Set) setting
+    let set = maybe Multi.Unset (const Multi.Set) setting
         ms' = case maybe (fetchSetting uu ms) id  setting of
-            SharedSetting t c -> ms { stPsis = M.adjust (setMultinom set c) n $ stPsis ms
-                                    , stLambdas = M.adjust (setMultinom set t) c $ stLambdas ms
-                                    , stPhis = M.adjust (setMultinom set x) t $ stPhis ms
-                                    , stGammas = M.adjust (setMultinom set Shared) n $ stGammas ms
+            SharedSetting t c -> ms { stPsis = M.adjust (Multi.set set c) n $ stPsis ms
+                                    , stLambdas = M.adjust (Multi.set set t) c $ stLambdas ms
+                                    , stPhis = M.adjust (Multi.set set x) t $ stPhis ms
+                                    , stGammas = M.adjust (Multi.set set Shared) n $ stGammas ms
                                     }
-            OwnSetting t      -> ms { stOmegas = M.adjust (setMultinom set t) n $ stOmegas ms
-                                    , stPhis = M.adjust (setMultinom set x) t $ stPhis ms
-                                    , stGammas = M.adjust (setMultinom set Own) n $ stGammas ms
+            OwnSetting t      -> ms { stOmegas = M.adjust (Multi.set set t) n $ stOmegas ms
+                                    , stPhis = M.adjust (Multi.set set x) t $ stPhis ms
+                                    , stGammas = M.adjust (Multi.set set Own) n $ stGammas ms
                                     }
     in ms' { stCiting = M.alter (const setting) ni $ stCiting ms' }
