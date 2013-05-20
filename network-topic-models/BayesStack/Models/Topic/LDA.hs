@@ -104,9 +104,9 @@ data MState = MState { stThetas :: !(Map Node (Multinom Int Topic))
             deriving (Show, Generic)
 instance Binary MState
 
-data LDAUpdateUnit = LDAUpdateUnit { uuNI :: NodeItem
-                                   , uuN  :: Node
-                                   , uuX  :: Item
+data LDAUpdateUnit = LDAUpdateUnit { uuNI :: !NodeItem
+                                   , uuN  :: !Node
+                                   , uuX  :: !Item
                                    }
                    deriving (Show, Generic)
 instance Binary LDAUpdateUnit
