@@ -38,7 +38,8 @@ import Data.Random.Distribution.Categorical (categorical)
 
 import BayesStack.Types
 import BayesStack.Gibbs
-import BayesStack.Multinomial
+import qualified BayesStack.Multinomial
+import BayesStack.Multinomial as Multi
 import BayesStack.TupleEnum ()
 import BayesStack.Models.Topic.Types
 
@@ -90,10 +91,10 @@ updateUnits' nd =
 model :: NetData -> ModelInit -> MState
 model d init =
     let uus = updateUnits' d
-        s = MState { stThetas = foldMap (\n->M.singleton n (symDirMulti alphaTheta (toList $ dTopics d)))
-                                $ dNodes d
-                   , stPhis = foldMap (\t->M.singleton t (symDirMulti alphaPhi (M.keys $ dItems d)))
-                              $ dTopics d
+        s = MState { stThetas = let dist = Multi.fromPrecision (toList $ dTopics d) alphaTheta
+                                in foldMap (\n->M.singleton n dist) $ dNodes d
+                   , stPhis = let dist = Multi.fromPrecision (M.keys $ dItems d) alphaPhi
+                              in foldMap (\t->M.singleton t dist) $ dTopics d
                    , stT = M.empty
                    }
         HyperParams {..} = dHypers d
