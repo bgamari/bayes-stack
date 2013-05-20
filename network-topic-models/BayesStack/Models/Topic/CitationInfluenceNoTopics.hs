@@ -38,6 +38,9 @@ import qualified Data.Set as S
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 
+import           Data.EnumMap (EnumMap)
+import qualified Data.EnumMap as EM
+                 
 import           Data.Foldable hiding (product)
 import           Control.Applicative ((<$>), (<*>))
 import           Control.Monad (when)
@@ -58,6 +61,7 @@ import           BayesStack.Models.Topic.Types
 
 import           GHC.Generics (Generic)
 import           Data.Binary (Binary)
+import qualified Data.Binary as B                 
 import           Control.DeepSeq
 
 at' :: At m => Index m -> IndexedLens' (Index m) m (IxValue m)
@@ -202,8 +206,29 @@ data MState = MState { -- Citing model state
                      , _stLambdas  :: !(Map CitedNode (Multinom Int Item))
                      }
             deriving (Show, Generic)
-instance Binary MState
 makeLenses ''MState         
+instance Binary MState where
+    put ms = do putDist $ ms^.stGammas
+                putDist $ ms^.stOmegas
+                putDist $ ms^.stPsis
+                putDist $ ms^.stLambdas
+                B.put $ ms^.stCiting
+      where putDist :: (Binary a, Binary w, Binary b, Enum b)
+                    => Map a (Multinom w b) -> B.Put
+            putDist a = do B.put $ Multi.prior $ head $ M.elems a
+                           B.put $ fmap Multi.counts a
+    get = do gammas  <- getDist
+             omegas  <- getDist
+             psis    <- getDist
+             lambdas <- getDist
+             citing <- B.get
+             return $ MState gammas omegas psis citing lambdas
+      where getDist :: (Binary a, Binary w, Num w, Eq w, Binary b, Enum b, Ord b)
+                    => B.Get (Map a (Multinom w b))
+            getDist = do prior <- B.get
+                         fmap (\counts->foldl' (\dm (k,w)->Multi.add w k dm)
+                              (Multi.fromPrior prior) $ EM.assocs counts)
+                              <$> B.get
 
 -- | Model initialization            
 type ModelInit = Map CitingNodeItem (Setting CitingUpdateUnit)
@@ -272,10 +297,10 @@ model d citingInit =
 
 modelLikelihood :: MState -> Probability
 modelLikelihood model = 
-    product $ map likelihood (views stGammas  M.elems model)
-           ++ map likelihood (views stLambdas M.elems model)
-           ++ map likelihood (views stOmegas  M.elems model)
-           ++ map likelihood (views stPsis    M.elems model)
+    product (model ^.. stGammas  . folded . to likelihood)
+  * product (model ^.. stLambdas . folded . to likelihood)
+  * product (model ^.. stOmegas  . folded . to likelihood)
+  * product (model ^.. stPsis    . folded . to likelihood)
 
 instance UpdateUnit CitingUpdateUnit where
     type ModelState CitingUpdateUnit = MState
