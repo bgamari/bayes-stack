@@ -1,9 +1,9 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds, DeriveGeneric, DefaultSignatures #-}
 
 module BayesStack.Multinomial ( -- * Dirichlet/multinomial pair
-                                Multinom, dirMulti, symDirMulti, multinom
+                                Multinom, fromPrior, fromProbs
                                 -- | Do not do record updates with these
-                              , dmTotal, dmAlpha, dmDomain
+                              , total, prior, domain
                               , setMultinom, SetUnset (..)
                               , addMultinom, subMultinom
                               , decMultinom, incMultinom
@@ -19,12 +19,13 @@ module BayesStack.Multinomial ( -- * Dirichlet/multinomial pair
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
 
-import Data.Sequence (Seq)
-import qualified Data.Sequence as SQ
+import Data.EnumSet (EnumSet)
+import qualified Data.EnumSet as ES
 
 import qualified Data.Foldable as Foldable
 import Data.Foldable (toList, Foldable, foldMap)
 import Data.Function (on)
+import Data.List (sortBy)
 
 import Text.PrettyPrint
 import Text.Printf
@@ -34,7 +35,8 @@ import Data.Binary
 import Data.Binary.EnumMap ()
 
 import BayesStack.Types
-import BayesStack.Dirichlet
+import BayesStack.Dirichlet (Dirichlet, alphaOf)
+import qualified BayesStack.Dirichlet as Dir
 
 import Numeric.Log hiding (sum)
 import Numeric.Digamma
@@ -62,10 +64,10 @@ incMultinom k = addMultinom 1 k
 
 subMultinom, addMultinom :: (Num w, Eq w, Ord a, Enum a)
                          => w -> a -> Multinom w a -> Multinom w a
-subMultinom w k dm = dm { dmCounts = EM.alter maybeDec k $ dmCounts dm
-                        , dmTotal = dmTotal dm - w }
-addMultinom w k dm = dm { dmCounts = EM.alter maybeInc k $ dmCounts dm
-                        , dmTotal = dmTotal dm + w }
+subMultinom w k dm = dm { counts = EM.alter maybeDec k $ counts dm
+                        , total = total dm - w }
+addMultinom w k dm = dm { counts = EM.alter maybeInc k $ counts dm
+                        , total = total dm + w }
 
 data SetUnset = Set | Unset
 
@@ -77,101 +79,87 @@ setMultinom Unset s = decMultinom s
 -- Optionally, this can include a collapsed Dirichlet prior.
 -- 'Multinom alpha count total' is a multinomial with Dirichlet prior
 -- with symmetric parameter 'alpha', ...
-data Multinom w a = DirMulti { dmAlpha :: !(Dirichlet a)
-                             , dmCounts :: !(EnumMap a w)
-                             , dmTotal :: !w
-                             , dmDomain :: !(Seq a)
+data Multinom w a = DirMulti { prior  :: !(Dirichlet a)
+                             , counts :: !(EnumMap a w)
+                             , total  :: !w
                              }
-                  | Multinom { dmProbs :: !(EnumMap a Double)
-                             , dmCounts :: !(EnumMap a w)
-                             , dmTotal :: !w
-                             , dmDomain :: !(Seq a)
+                  | Multinom { probs  :: !(EnumMap a Double)
+                             , counts :: !(EnumMap a w)
+                             , total  :: !w
                              }
                   deriving (Show, Eq, Generic)
 instance (Enum a, Binary a, Binary w) => Binary (Multinom w a)
 
--- | 'symMultinomFromPrecision d p' is a symmetric Dirichlet/multinomial over a
--- domain 'd' with precision 'p'
-symDirMultiFromPrecision :: (Num w, Enum a) => [a] -> DirPrecision -> Multinom w a
-symDirMultiFromPrecision domain prec = symDirMulti (0.5*prec) domain
-
--- | 'dirMultiFromMeanPrecision m p' is an asymmetric Dirichlet/multinomial
--- over a domain 'd' with mean 'm' and precision 'p'
-dirMultiFromPrecision :: (Num w, Enum a) => DirMean a -> DirPrecision -> Multinom w a
-dirMultiFromPrecision m p = dirMultiFromAlpha $ meanPrecisionToAlpha m p
-
--- | Create a symmetric Dirichlet/multinomial
-symDirMulti :: (Num w, Enum a) => Double -> [a] -> Multinom w a
-symDirMulti alpha domain = dirMultiFromAlpha $ symAlpha domain alpha
-
+-- | Construct a Dirichlet-multinomial distribution         
+fromPrior :: (Num w, Enum a) => Dirichlet a -> Multinom w a
+fromPrior a = DirMulti { prior = a
+                       , counts = EM.empty
+                       , total = 0
+                       }
+          
 -- | A multinomial without a prior
-multinom :: (Num w, Enum a) => [(a,Double)] -> Multinom w a
-multinom probs = Multinom { dmProbs = EM.fromList probs
-                          , dmCounts = EM.empty
-                          , dmTotal = 0
-                          , dmDomain = SQ.fromList $ map fst probs
-                          }
+fromProbs :: (Num w, Enum a) => [(a,Double)] -> Multinom w a
+fromProbs probs = Multinom { probs = EM.fromList probs
+                           , counts = EM.empty
+                           , total = 0
+                           }
 
--- | Create an asymmetric Dirichlet/multinomial from items and alphas
-dirMulti :: (Num w, Enum a) => [(a,Double)] -> Multinom w a
-dirMulti domain = dirMultiFromAlpha $ asymAlpha $ EM.fromList domain
-
--- | Create a Dirichlet/multinomial with a given prior
-dirMultiFromAlpha :: (Enum a, Num w) => Dirichlet a -> Multinom w a
-dirMultiFromAlpha alpha = DirMulti { dmAlpha = alpha
-                                   , dmCounts = EM.empty
-                                   , dmTotal = 0
-                                   , dmDomain = alphaDomain alpha
-                                   }
+-- | The domain          
+domain :: Enum a => Multinom w a -> EnumSet a
+domain a@(DirMulti {}) = Dir.domain $ prior a
+domain a@(Multinom {}) = EM.keysSet $ probs a
 
 data Acc w = Acc !w !Probability
 
 obsProb :: (Enum a, Real w, Functor f, Foldable f)
         => Multinom w a -> f (a, w) -> Probability
-obsProb (Multinom {dmProbs=prob}) obs =
+obsProb (Multinom {probs=prob}) obs =
     Foldable.product $ fmap (\(k,w)->(realToFrac $ prob EM.! k)^^w) obs
   where (^^) :: Real w => Log Double -> w -> Log Double
         x ^^ y = Exp $ realToFrac y * ln x
-obsProb (DirMulti {dmAlpha=alpha}) obs =
+obsProb (DirMulti {prior=alpha}) obs =
     let go (Acc w p) (k',w') = Acc (w+w') (p*p')
            where p' = Exp $ checkNaN "obsProb"
                       $ lnGamma (realToFrac w' + alpha `alphaOf` k')
     in case Foldable.foldl' go (Acc 0 1) obs of
-         Acc w p -> p / alphaNormalizer alpha
-                    / Exp (lnGamma $ realToFrac w + sumAlpha alpha)
+         Acc w p -> p / Dir.normalizer alpha
+                    / Exp (lnGamma $ realToFrac w + Dir.precision alpha)
 {-# INLINE obsProb #-}
 
-dmGetCounts :: (Enum a, Num w) => Multinom w a -> a -> w
-dmGetCounts dm k =
-  EM.findWithDefault 0 k (dmCounts dm)
+countsOf :: (Enum a, Num w) => a -> Multinom w a -> w
+countsOf k dm =
+  EM.findWithDefault 0 k (counts dm)
 
 instance HasLikelihood (Multinom w) where
   type LContext (Multinom w) a = (Real w, Ord a, Enum a)
-  likelihood dm = obsProb dm $ EM.assocs $ dmCounts dm
+  likelihood dm = obsProb dm $ EM.assocs $ counts dm
   {-# INLINEABLE likelihood #-}
 
 instance FullConditionable (Multinom w) where
   type FCContext (Multinom w) a = (Real w, Ord a, Enum a)
-  sampleProb (Multinom {dmProbs=prob}) k = prob EM.! k
-  sampleProb dm@(DirMulti {dmAlpha=a}) k =
+  sampleProb (Multinom {probs=prob}) k = prob EM.! k
+  sampleProb dm@(DirMulti {prior=a}) k =
     let alpha = a `alphaOf` k
-        n = realToFrac $ dmGetCounts dm k
-        total = realToFrac $ dmTotal dm
-    in (n + alpha) / (total + sumAlpha a)
+        n = realToFrac $ countsOf k dm
+        s = realToFrac $ total dm
+    in (n + alpha) / (s + Dir.precision a)
   {-# INLINEABLE sampleProb #-}
 
+pmf :: (Real w, Enum a, Ord a) => Multinom w a -> a -> Double
+pmf = sampleProb    
+
 {-# INLINEABLE probabilities #-}
-probabilities :: (Real w, Ord a, Enum a) => Multinom w a -> Seq (Double, a)
-probabilities dm = fmap (\a->(sampleProb dm a, a)) $ dmDomain dm -- FIXME
+probabilities :: (Real w, Ord a, Enum a) => Multinom w a -> [(Double, a)]
+probabilities dm = map (\a->(pmf dm a, a)) $ ES.toList $ domain dm
 
 -- | Probabilities sorted decreasingly
-decProbabilities :: (Real w, Ord a, Enum a, Num w) => Multinom w a -> Seq (Double, a)
-decProbabilities = SQ.sortBy (flip (compare `on` fst)) . probabilities
+decProbabilities :: (Real w, Ord a, Enum a, Num w) => Multinom w a -> [(Double, a)]
+decProbabilities = sortBy (flip (compare `on` fst)) . probabilities
 
 prettyMultinom :: (Real w, Ord a, Enum a) => Int -> (a -> String) -> Multinom w a -> Doc
 prettyMultinom _ _ (Multinom {})         = error "TODO: prettyMultinom"
 prettyMultinom n showA dm@(DirMulti {})  =
-  text "DirMulti" <+> parens (text "alpha=" <> prettyAlpha showA (dmAlpha dm))
+  text "DirMulti" <+> parens (text "alpha=" <> Dir.prettyPrint showA (prior dm))
   $$ nest 5 (fsep $ punctuate comma
             $ map (\(p,a)->text (showA a) <> parens (text $ printf "%1.2e" p))
             $ take n $ Data.Foldable.toList $ decProbabilities dm)
@@ -179,7 +167,7 @@ prettyMultinom n showA dm@(DirMulti {})  =
 -- | Update the prior of a Dirichlet/multinomial
 updatePrior :: (Dirichlet a -> Dirichlet a) -> Multinom w a -> Multinom w a
 updatePrior _ (Multinom {}) = error "TODO: updatePrior"
-updatePrior f dm = dm {dmAlpha=f $ dmAlpha dm}
+updatePrior f dm = dm {prior=f $ prior dm}
 
 -- | Relative tolerance in precision for prior estimation
 estimationTol = 1e-8
@@ -187,7 +175,7 @@ estimationTol = 1e-8
 reestimatePriors :: (Foldable f, Functor f, Real w, Enum a)
                  => f (Multinom w a) -> f (Multinom w a)
 reestimatePriors dms =
-  let usableDms = filter (\dm->dmTotal dm > 5) $ toList dms
+  let usableDms = filter (\dm->total dm > 5) $ toList dms
       alpha = case () of
                 _ | length usableDms <= 3 -> id
                 otherwise -> const $ estimatePrior estimationTol usableDms
@@ -196,36 +184,37 @@ reestimatePriors dms =
 reestimateSymPriors :: (Foldable f, Functor f, Real w, Enum a)
                     => f (Multinom w a) -> f (Multinom w a)
 reestimateSymPriors dms =
-  let usableDms = filter (\dm->dmTotal dm > 5) $ toList dms
+  let usableDms = filter (\dm->total dm > 5) $ toList dms
       alpha = case () of
                 _ | length usableDms <= 3 -> id
-                otherwise -> const $ symmetrizeAlpha $ estimatePrior estimationTol usableDms
+                otherwise -> const $ Dir.symmetrize
+                             $ estimatePrior estimationTol usableDms
   in fmap (updatePrior alpha) dms
 
 -- | Estimate the prior alpha from a set of Dirichlet/multinomials
 estimatePrior' :: (Real w, Enum a) => [Multinom w a] -> Dirichlet a -> Dirichlet a
 estimatePrior' dms alpha =
-  let domain = toList $ dmDomain $ head dms
-      f k = let num = sum $ map (\i->digamma (realToFrac (dmGetCounts i k) + alphaOf alpha k)
-                                      - digamma (alphaOf alpha k)
-                                )
-                      $ filter (\i->dmGetCounts i k > 0) dms
-                total i = realToFrac $ sum $ map (\k->dmGetCounts i k) domain
-                sumAlpha = sum $ map (alphaOf alpha) domain
-                denom = sum $ map (\i->digamma (total i + sumAlpha) - digamma sumAlpha) dms
-            in case () of
-                 _ | isNaN num  -> error $ "BayesStack.DirMulti.estimatePrior': num = NaN: "++show (map (\i->(digamma (realToFrac (dmGetCounts i k) + alphaOf alpha k), digamma (alphaOf alpha k))) dms)
-                 _ | denom == 0 -> error "BayesStack.DirMulti.estimatePrior': denom=0"
-                 _ | isInfinite num -> error "BayesStack.DirMulti.estimatePrior': num is infinity "
-                 _ | isNaN (alphaOf alpha k * num / denom) -> error $ "NaN"++show (num, denom)
-                 otherwise  -> alphaOf alpha k * num / denom
-  in asymAlpha $ foldMap (\k->EM.singleton k (f k)) domain
+  let dom = ES.toList $ domain $ head dms
+      go k = let num = sum $ map (\i->digamma (realToFrac (countsOf k i) + alphaOf alpha k)
+                                       - digamma (alphaOf alpha k)
+                                 )
+                       $ filter (\i->countsOf k i > 0) dms
+                 total i = realToFrac $ sum $ map (\k->countsOf k i) dom
+                 sumAlpha = sum $ map (alphaOf alpha) dom
+                 denom = sum $ map (\i->digamma (total i + sumAlpha) - digamma sumAlpha) dms
+             in case () of
+                  _ | isNaN num  -> error $ "BayesStack.DirMulti.estimatePrior': num = NaN: "++show (map (\i->(digamma (realToFrac (countsOf k i) + alphaOf alpha k), digamma (alphaOf alpha k))) dms)
+                  _ | denom == 0 -> error "BayesStack.DirMulti.estimatePrior': denom=0"
+                  _ | isInfinite num -> error "BayesStack.DirMulti.estimatePrior': num is infinity "
+                  _ | isNaN (alphaOf alpha k * num / denom) -> error $ "NaN"++show (num, denom)
+                  otherwise  -> alphaOf alpha k * num / denom
+  in Dir.fromConcentrations $ map (\k->(k, go k)) dom
 
 estimatePrior :: (Real w, Enum a) => Double -> [Multinom w a] -> Dirichlet a
-estimatePrior tol dms = iter $ dmAlpha $ head dms
+estimatePrior tol dms = iter $ prior $ head dms
   where iter alpha = let alpha' = estimatePrior' dms alpha
-                         (_, prec)  = alphaToMeanPrecision alpha
-                         (_, prec') = alphaToMeanPrecision alpha'
+                         prec  = Dir.precision alpha
+                         prec' = Dir.precision alpha'
                      in if abs ((prec' - prec) / prec) > tol
                            then iter alpha'
                            else alpha'
