@@ -7,7 +7,7 @@ module BayesStack.Dirichlet ( -- * Dirichlet parameter
                             , fromConcentrations
                             , fromMeanPrecision
                               -- * Querying
-                            , dimension, normalizer
+                            , domain, dimension, normalizer
                             , alphaOf, pmf
                             , mean, precision
                             , isSymmetric
