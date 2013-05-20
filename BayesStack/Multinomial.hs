@@ -4,9 +4,9 @@ module BayesStack.Multinomial ( -- * Dirichlet/multinomial pair
                                 Multinom, fromPrior, fromProbs
                                 -- | Do not do record updates with these
                               , total, prior, domain
-                              , setMultinom, SetUnset (..)
-                              , addMultinom, subMultinom
-                              , decMultinom, incMultinom
+                              , set, SetUnset (..)
+                              , add, subtract
+                              , increment, decrement
                               , prettyMultinom
                               , updatePrior
                               , obsProb
@@ -16,6 +16,7 @@ module BayesStack.Multinomial ( -- * Dirichlet/multinomial pair
                               , probabilities, decProbabilities
                               ) where
 
+import Prelude hiding (add, subtract)       
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
 
@@ -55,25 +56,25 @@ maybeDec Nothing = error "Can't decrement zero count"
 maybeDec (Just 1) = Nothing
 maybeDec (Just n) = Just (n-1)
 
-{-# INLINEABLE decMultinom #-}
-{-# INLINEABLE incMultinom #-}
-decMultinom, incMultinom :: (Num w, Eq w, Ord a, Enum a)
+{-# INLINEABLE decrement #-}
+{-# INLINEABLE increment #-}
+decrement, increment :: (Num w, Eq w, Ord a, Enum a)
                          => a -> Multinom w a -> Multinom w a
-decMultinom k = subMultinom 1 k
-incMultinom k = addMultinom 1 k
+decrement k = subtract 1 k
+increment k = add 1 k
 
-subMultinom, addMultinom :: (Num w, Eq w, Ord a, Enum a)
+subtract, add :: (Num w, Eq w, Ord a, Enum a)
                          => w -> a -> Multinom w a -> Multinom w a
-subMultinom w k dm = dm { counts = EM.alter maybeDec k $ counts dm
+subtract w k dm = dm { counts = EM.alter maybeDec k $ counts dm
                         , total = total dm - w }
-addMultinom w k dm = dm { counts = EM.alter maybeInc k $ counts dm
+add w k dm = dm { counts = EM.alter maybeInc k $ counts dm
                         , total = total dm + w }
 
 data SetUnset = Set | Unset
 
-setMultinom :: (Num w, Eq w, Enum a, Ord a) => SetUnset -> a -> Multinom w a -> Multinom w a
-setMultinom Set   s = incMultinom s
-setMultinom Unset s = decMultinom s
+set :: (Num w, Eq w, Enum a, Ord a) => SetUnset -> a -> Multinom w a -> Multinom w a
+set Set   s = increment s
+set Unset s = decrement s
 
 -- | 'Multinom a' represents multinomial distribution over domain 'a'.
 -- Optionally, this can include a collapsed Dirichlet prior.
