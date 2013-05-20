@@ -10,6 +10,7 @@ module BayesStack.Dirichlet ( -- * Dirichlet parameter
                             , dimension, normalizer
                             , alphaOf
                             , mean, precision
+                            , isSymmetric
                             , symmetrize
                               -- Utilities
                             , prettyPrint
