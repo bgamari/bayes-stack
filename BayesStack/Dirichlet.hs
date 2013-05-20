@@ -78,7 +78,7 @@ fromConcentrations alphas
   | otherwise = a
     where go (n,alphas,prec) (a,w) = (n+1, EM.insert a w alphas, prec+w)
           (n, alphas', prec) = foldl' go (0, EM.empty, 0) alphas
-          a = Asym n alphas' prec (norm a)
+          a = Asym n alphas' prec (computeNorm a)
 
 -- | Construct an asymmetric Dirichlet from a mean and precision
 fromMeanPrecision :: Enum a => [(a, Double)] -> Double -> Dirichlet a
