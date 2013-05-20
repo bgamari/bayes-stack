@@ -1,19 +1,22 @@
 {-# LANGUAGE TypeFamilies, FlexibleInstances, ConstraintKinds, DeriveGeneric, DefaultSignatures #-}
 
 module BayesStack.Multinomial ( -- * Dirichlet/multinomial pair
-                                Multinom, fromPrior, fromProbs
-                                -- | Do not do record updates with these
+                                Multinom
+                                -- * Construction
+                              , fromPrior, fromProbs
+                                -- * Querying
                               , total, prior, domain
+                              , obsProb
+                                -- * Adding and removing counts
                               , set, SetUnset (..)
                               , add, subtract
                               , increment, decrement
-                              , prettyMultinom
-                              , updatePrior
-                              , obsProb
-                                -- * Parameter estimation
+                                -- * Hyperparameter estimation
                               , estimatePrior, reestimatePriors, reestimateSymPriors
+                              , updatePrior
                                 -- * Convenience functions
                               , probabilities, decProbabilities
+                              , prettyMultinom
                               ) where
 
 import Prelude hiding (add, subtract)       
@@ -112,6 +115,7 @@ domain a@(Multinom {}) = EM.keysSet $ probs a
 
 data Acc w = Acc !w !Probability
 
+-- | Probability of seeing a set of observations
 obsProb :: (Enum a, Real w, Functor f, Foldable f)
         => Multinom w a -> f (a, w) -> Probability
 obsProb (Multinom {probs=prob}) obs =
@@ -146,12 +150,10 @@ instance FullConditionable (Multinom w) where
     in (n + alpha) / (s + Dir.precision a)
   {-# INLINEABLE sampleProb #-}
 
-pmf :: (Real w, Enum a, Ord a) => Multinom w a -> a -> Double
-pmf = sampleProb    
-
-{-# INLINEABLE probabilities #-}
+-- | Tabulated probability mass function
 probabilities :: (Real w, Ord a, Enum a) => Multinom w a -> [(Double, a)]
-probabilities dm = map (\a->(pmf dm a, a)) $ ES.toList $ domain dm
+probabilities dm = map (\a->(obsProb dm a, a)) $ ES.toList $ domain dm
+{-# INLINEABLE probabilities #-}
 
 -- | Probabilities sorted decreasingly
 decProbabilities :: (Real w, Ord a, Enum a, Num w) => Multinom w a -> [(Double, a)]
