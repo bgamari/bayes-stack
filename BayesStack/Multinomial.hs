@@ -140,7 +140,7 @@ instance HasLikelihood (Multinom w) where
   likelihood dm = obsProb dm $ EM.assocs $ counts dm
   {-# INLINEABLE likelihood #-}
 
-sampleProb :: (Real w, Ord a, Enum a) => Multinom w a -> a -> Probability
+sampleProb :: (Real w, Ord a, Enum a) => Multinom w a -> a -> Double
 sampleProb (Multinom {probs=prob}) k = prob EM.! k
 sampleProb dm@(DirMulti {prior=a}) k =
     let alpha = a `alphaOf` k
@@ -150,7 +150,7 @@ sampleProb dm@(DirMulti {prior=a}) k =
 {-# INLINEABLE sampleProb #-}
 
 -- | Tabulated probability mass function
-probabilities :: (Real w, Ord a, Enum a) => Multinom w a -> [(Probability, a)]
+probabilities :: (Real w, Ord a, Enum a) => Multinom w a -> [(Double, a)]
 probabilities dm = map (\a->(sampleProb dm a, a)) $ ES.toList $ domain dm
 {-# INLINEABLE probabilities #-}
 
