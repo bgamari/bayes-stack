@@ -71,9 +71,9 @@ increment k = add 1 k
 subtract, add :: (Num w, Eq w, Ord a, Enum a)
                          => w -> a -> Multinom w a -> Multinom w a
 subtract w k dm = dm { counts = EM.alter maybeDec k $ counts dm
-                        , total = total dm - w }
+                     , total = total dm - w }
 add w k dm = dm { counts = EM.alter maybeInc k $ counts dm
-                        , total = total dm + w }
+                , total = total dm + w }
 
 data SetUnset = Set | Unset
 
