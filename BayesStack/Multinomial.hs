@@ -7,7 +7,7 @@ module BayesStack.Multinomial ( -- * Dirichlet/multinomial pair
                               , fromPrecision
                               , fromConcentrations
                                 -- * Querying
-                              , total, prior, domain
+                              , counts, total, prior, domain
                               , obsProb, sampleProb
                                 -- * Adding and removing counts
                               , set, SetUnset (..)
