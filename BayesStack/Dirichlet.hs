@@ -2,22 +2,24 @@
 
 module BayesStack.Dirichlet ( -- * Dirichlet parameter
                               Dirichlet
-                            , symAlpha, asymAlpha
-                            , alphaDomain, alphaNormalizer, sumAlpha
-                            , DirMean, DirPrecision
-                            , alphaOf, setAlphaOf, setSymAlpha
-                            , alphaToMeanPrecision, meanPrecisionToAlpha
-                            , symmetrizeAlpha
-                            , prettyAlpha
+                              -- * Creation
+                            , newS, newA
+                              -- * Querying
+                            , domain, normalizer
+                            , alphaOf
+                            , mean, precision, fromMeanPrecision
+                            , symmetrize
+                              -- Utilities
+                            , prettyPrint
                             ) where
 
-import Data.Foldable (toList, Foldable, fold)
+import Data.Foldable (toList, Foldable, fold, foldl')
 
 import Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
 
-import Data.Sequence (Seq)
-import qualified Data.Sequence as SQ
+import Data.EnumSet (EnumSet)
+import qualified Data.EnumSet as ES
 
 import Numeric.Log
 import Math.Gamma
@@ -35,119 +37,114 @@ checkNaN loc x | isNaN x = error $ "BayesStack.Dirichlet."++loc++": Not a number
 checkNaN loc x | isInfinite x = error $ "BayesStack.Dirichlet."++loc++": Infinity"
 checkNaN _ x = x
 
+data Concentration a = Sym !Double
+                     | Asym !(EnumMap a Double)
+    deriving (Show, Eq, Generic)
+instance (Enum a, Binary a) => Binary (Concentration a)
+
 -- | A Dirichlet distribution
 data Dirichlet a
-    -- | Symmetric
-    = Sym { aDomain :: Seq a
-        , aAlpha :: !Double
-        , aNorm :: Log Double
-        }
-    -- | Asymmetric
-    | Asym { aAlphas :: EnumMap a Double
-           , aSumAlphas :: !Double
-           , aNorm :: Log Double
-           }
+    = Dir { domain     :: !Int                -- ^ Dimension of domain
+          , conc       :: !(Concentration a)  -- ^ Concentration parameter
+          , precision  :: !Double             -- ^ Sum of alphas
+          , norm       :: Log Double          -- ^ Normalizer
+          }
     deriving (Show, Eq, Generic)
 instance (Enum a, Binary a) => Binary (Dirichlet a)
 
-type DirMean a = EnumMap a Double
-type DirPrecision = Double
+-- | Construct a symmetric Dirichlet distribution from the size of domain.
+newS :: Int -> Double -> Dirichlet a
+newS n alpha
+  | n < 0    = error "BayesStack.Dirichlet.symAlpha: Negative dimension"
+  | otherwise = let a = Dir n (Sym alpha) (alpha * fromIntegral n) (computeNorm a)
+                in a
 
-symAlpha :: Enum a => [a] -> Double -> Dirichlet a
-symAlpha domain _ | null domain = error "Dirichlet over null domain is undefined"
-symAlpha domain alpha = Sym { aDomain = SQ.fromList domain
-                            , aAlpha = alpha
-                            , aNorm = alphaNorm $ symAlpha domain alpha
-                            }
+-- | Construct an asymmetric Dirichlet from the size of the distribution
+newA :: Enum a => [(a,Double)] -> Dirichlet a
+newA alphas
+  | null alphas = error "Dirichlet over null domain is undefined"
+  | otherwise = a
+    where go (n,alphas,prec) (a,w) = (n+1, EM.insert a w alphas, prec+w)
+          (n, alphas', prec) = foldl' go (0, EM.empty, 0) alphas
+          a = Dir n (Asym alphas') prec (norm a)
 
--- | Construct an asymmetric Alpha
-asymAlpha :: Enum a => EnumMap a Double -> Dirichlet a
-asymAlpha alphas | EM.null alphas = error "Dirichlet over null domain is undefined"
-asymAlpha alphas =
-    Asym { aAlphas = alphas
-         , aSumAlphas = Prelude.sum $ EM.elems alphas
-         , aNorm = alphaNorm $ asymAlpha alphas
-         }
-
-setSymAlpha :: Enum a => Double -> Dirichlet a -> Dirichlet a
-setSymAlpha alpha a =
-    let b = (symmetrizeAlpha a) { aAlpha = alpha
-                                , aNorm = alphaNorm b
-                                }
-    in b
+-- | Combine Dirichlets with counts @a_i@ and @b_i@ such that @c_i = a_i + b_i@
+-- This is only possible in cases where the domains are equivalent
+add :: Dirichlet a -> Dirichlet a -> Maybe (Dirichlet a)
+add a b | domain a /= domain b  = Nothing 
+add a b = 
+    let prec = precision a + precision b
+        fromAlphas alphas = let c = Dir (domain a) alphas prec (computeNorm c)
+                            in Just c
+    in case (conc a, conc b) of
+         (Sym x, Sym y)     -> fromAlphas (Sym $ x + y)
+         (Sym x, Asym ys)   -> fromAlphas (Asym $ fmap (+x) ys)
+         (Asym xs, Asym ys) -> fromAlphas (Asym $ EM.unionWith (+) xs ys)
+         (Asym ys, Sym x)   -> add b a
 
 -- | Compute the normalizer of the likelihood involving alphas,
 -- (product_k gamma(alpha_k)) / gamma(sum_k alpha_k)
-alphaNorm :: Enum a => Dirichlet a -> Log Double
-alphaNorm alpha = normNum / normDenom
-  where dim = realToFrac $ SQ.length $ aDomain alpha
-        normNum = case alpha of
-                      Asym {} -> product $ map (\a->Exp $ checkNaN ("alphaNorm.normNum(asym) alpha="++show a) $ lnGamma a)
-                                  $ EM.elems $ aAlphas alpha
-                      Sym {}  -> Exp $ checkNaN "alphaNorm.normNum(sym)" $ dim * lnGamma (aAlpha alpha)
-        normDenom = Exp $ checkNaN "alphaNorm.normDenom" $ lnGamma $ sumAlpha alpha
+-- (used internally)
+computeNorm :: Dirichlet a -> Log Double
+computeNorm alpha = normNum / normDenom
+  where dim = realToFrac $ domain alpha
+        normNum = case conc alpha of
+                    Asym alphas -> product
+                                   $ map (\a->Exp $ checkNaN ("computeNorm alpha="++show a)
+                                                  $ lnGamma a)
+                                   $ EM.elems $ alphas
+                    Sym alpha   -> Exp $ checkNaN "computeNorm"
+                                       $ dim * lnGamma alpha
+        normDenom = Exp $ checkNaN "alphaNorm.normDenom"
+                        $ lnGamma $ precision alpha
 
--- | 'alphaDomain a' is the domain of prior 'a'
-alphaDomain :: Enum a => Dirichlet a -> Seq a
-alphaDomain (Sym {aDomain=d}) = d
-alphaDomain (Asym {aAlphas=a}) = SQ.fromList $ EM.keys a
-{-# INLINE alphaDomain #-}
-
-alphaNormalizer :: Enum a => Dirichlet a -> Log Double
-alphaNormalizer = aNorm
-{-# INLINE alphaNormalizer #-}
+normalizer :: Enum a => Dirichlet a -> Log Double
+normalizer = norm
+{-# INLINE normalizer #-}
 
 -- | 'alphaOf alpha k' is the value of element 'k' in prior 'alpha'
 alphaOf :: Enum a => Dirichlet a -> a -> Double
-alphaOf (Sym {aAlpha=alpha}) = const alpha
-alphaOf (Asym {aAlphas=alphas}) = (alphas EM.!)
+alphaOf (Dir {conc=Sym a}) = const a
+alphaOf (Dir {conc=Asym alphas}) = (alphas EM.!)
 {-# INLINE alphaOf #-}
 
--- | 'sumAlpha alpha' is the sum of all alphas
-sumAlpha :: Enum a => Dirichlet a -> Double
-sumAlpha (Sym {aDomain=domain, aAlpha=alpha}) = realToFrac (SQ.length domain) * alpha
-sumAlpha (Asym {aSumAlphas=sum}) = sum
-{-# INLINE sumAlpha #-}
+-- | Is a Dirichlet symmetric?
+isSymmetric :: Dirichlet a -> Bool
+isSymmetric (Dir {conc=Sym _}) = True
+isSymmetric _                  = False
 
+{-            
 -- | Set a particular alpha element
 setAlphaOf :: Enum a => a -> Double -> Dirichlet a -> Dirichlet a
-setAlphaOf k a alpha@(Sym {}) = setAlphaOf k a $ asymmetrizeAlpha alpha
-setAlphaOf k a (Asym {aAlphas=alphas}) = asymAlpha $ EM.insert k a alphas
+setAlphaOf k a alpha@(Dir {conc=Sym _})  = setAlphaOf k a $ asymmetrizeAlpha alpha
+setAlphaOf k a (Asym {conc=Asym alphas}) = asymAlpha $ EM.insert k a alphas
 {-# INLINE setAlphaOf #-}
+-}    
 
--- | 'alphaToMeanPrecision a' is the mean/precision representation of the prior 'a'
-alphaToMeanPrecision :: Enum a => Dirichlet a -> (DirMean a, DirPrecision)
-alphaToMeanPrecision (Sym {aDomain=dom, aAlpha=alpha}) =
-  let prec = realToFrac (SQ.length dom) * alpha
-  in (EM.fromList $ map (\a->(a, alpha/prec)) $ toList dom, prec)
-alphaToMeanPrecision (Asym {aAlphas=alphas, aSumAlphas=prec}) =
-  (fmap (/prec) alphas, prec)
-{-# INLINE alphaToMeanPrecision #-}
+-- | The mean of a Dirichlet. This isn't possible in the symmetric
+-- case as we don't know the domain.
+mean :: Enum a => Dirichlet a -> Maybe [(a, Double)]
+mean (Dir {conc=Sym _})                  = Nothing
+mean (Dir {conc=Asym a, precision=prec}) = Just $ EM.toList $ fmap (/ prec) a
 
 -- | 'meanPrecisionToAlpha m p' is a prior with mean 'm' and precision 'p'
-meanPrecisionToAlpha :: Enum a => DirMean a -> DirPrecision -> Dirichlet a
-meanPrecisionToAlpha mean prec = asymAlpha $ fmap (*prec) mean
-{-# INLINE meanPrecisionToAlpha #-}
+fromMeanPrecision :: Enum a => [(a, Double)] -> Double -> Dirichlet a
+fromMeanPrecision mean prec = newA $ map (fmap (*prec)) mean
+{-# INLINE fromMeanPrecision #-}
 
--- | Symmetrize a Dirichlet prior (such that mean=0)
-symmetrizeAlpha :: Enum a => Dirichlet a -> Dirichlet a
-symmetrizeAlpha alpha@(Sym {}) = alpha
-symmetrizeAlpha alpha@(Asym {}) =
-  Sym { aDomain = alphaDomain alpha
-           , aAlpha = sumAlpha alpha / realToFrac (EM.size $ aAlphas alpha)
-           , aNorm = alphaNorm $ symmetrizeAlpha alpha
-           }
-
--- | Turn a symmetric alpha into an asymmetric alpha. For internal use.
-asymmetrizeAlpha :: Enum a => Dirichlet a -> Dirichlet a
-asymmetrizeAlpha (Sym {aDomain=domain, aAlpha=alpha}) =
-  asymAlpha $ fold $ fmap (\k->EM.singleton k alpha) domain
-asymmetrizeAlpha alpha@(Asym {}) = alpha
+-- | Symmetrize a Dirichlet distribution such that mean=0 yet preserving precision
+symmetrize :: Enum a => Dirichlet a -> Dirichlet a
+symmetrize alpha@(Dir {conc=Sym _}) = alpha
+symmetrize alpha =
+  let a = alpha { conc = Sym $ precision alpha / realToFrac (domain alpha)
+                , norm = computeNorm a
+                }
+  in a
 
 -- | Pretty-print a Dirichlet prior
-prettyAlpha :: Enum a => (a -> String) -> Dirichlet a -> Doc
-prettyAlpha showA (Sym {aAlpha=alpha}) = text "Symmetric" <+> double alpha
-prettyAlpha showA (Asym {aAlphas=alphas}) =
+prettyPrint :: Enum a => (a -> String) -> Dirichlet a -> Doc
+prettyPrint showA (Dir {conc=Sym alpha}) = text "Symmetric" <+> double alpha
+prettyPrint showA (Dir {conc=Asym alphas}) =
   text "Assymmetric"
   <+> fsep (punctuate comma
            $ map (\(a,alpha)->text (showA a) <> parens (text $ printf "%1.2e" alpha))
