@@ -271,11 +271,11 @@ model d citingInit =
     in execState (mapM_ initCitingUU $ citingUpdateUnits d) s
 
 modelLikelihood :: MState -> Probability
-modelLikelihood model =
-    product $ (model ^.. stGammas  . folded . to likelihood)
-           ++ (model ^.. stLambdas . folded . to likelihood)
-           ++ (model ^.. stOmegas  . folded . to likelihood)
-           ++ (model ^.. stPsis    . folded . to likelihood)
+modelLikelihood model = 
+    product $ map likelihood (views stGammas  M.elems model)
+           ++ map likelihood (views stLambdas M.elems model)
+           ++ map likelihood (views stOmegas  M.elems model)
+           ++ map likelihood (views stPsis    M.elems model)
 
 instance UpdateUnit CitingUpdateUnit where
     type ModelState CitingUpdateUnit = MState
