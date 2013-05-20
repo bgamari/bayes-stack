@@ -113,11 +113,11 @@ domain :: Enum a => Multinom w a -> EnumSet a
 domain a@(DirMulti {}) = Dir.domain $ prior a
 domain a@(Multinom {}) = EM.keysSet $ probs a
 
-data Acc w = Acc !w !Probability
+data Acc w = Acc !w !(Log Double)
 
 -- | Probability of seeing a set of observations
 obsProb :: (Enum a, Real w, Functor f, Foldable f)
-        => Multinom w a -> f (a, w) -> Probability
+        => Multinom w a -> f (a, w) -> Log Double
 obsProb (Multinom {probs=prob}) obs =
     Foldable.product $ fmap (\(k,w)->(realToFrac $ prob EM.! k)^^w) obs
   where (^^) :: Real w => Log Double -> w -> Log Double
