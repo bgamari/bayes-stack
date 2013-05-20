@@ -7,7 +7,7 @@ module BayesStack.Dirichlet ( -- * Dirichlet parameter
                             , fromConcentrations
                             , fromMeanPrecision
                               -- * Querying
-                            , domain, normalizer
+                            , dimension, normalizer
                             , alphaOf
                             , mean, precision
                             , symmetrize
@@ -46,7 +46,7 @@ instance (Enum a, Binary a) => Binary (Concentration a)
 
 -- | A Dirichlet distribution
 data Dirichlet a
-    = Dir { domain     :: !Int                -- ^ Dimension of domain
+    = Dir { dimension  :: !Int                -- ^ Dimension of domain
           , conc       :: !(Concentration a)  -- ^ Concentration parameter
           , precision  :: !Double             -- ^ Sum of alphas
           , norm       :: Log Double          -- ^ Normalizer
@@ -84,10 +84,10 @@ fromMeanPrecision mean prec = fromConcentrations $ map (fmap (*prec)) mean
 -- | Combine Dirichlets with counts @a_i@ and @b_i@ such that @c_i = a_i + b_i@
 -- This is only possible in cases where the domains are equivalent
 add :: Dirichlet a -> Dirichlet a -> Maybe (Dirichlet a)
-add a b | domain a /= domain b  = Nothing 
+add a b | dimension a /= dimension b  = Nothing 
 add a b = 
     let prec = precision a + precision b
-        fromAlphas alphas = let c = Dir (domain a) alphas prec (computeNorm c)
+        fromAlphas alphas = let c = Dir (dimension a) alphas prec (computeNorm c)
                             in Just c
     in case (conc a, conc b) of
          (Sym x, Sym y)     -> fromAlphas (Sym $ x + y)
@@ -100,7 +100,7 @@ add a b =
 -- (used internally)
 computeNorm :: Dirichlet a -> Log Double
 computeNorm alpha = normNum / normDenom
-  where dim = realToFrac $ domain alpha
+  where dim = realToFrac $ dimension alpha
         normNum = case conc alpha of
                     Asym alphas -> product
                                    $ map (\a->Exp $ checkNaN ("computeNorm alpha="++show a)
@@ -144,7 +144,7 @@ mean (Dir {conc=Asym a, precision=prec}) = Just $ EM.toList $ fmap (/ prec) a
 symmetrize :: Enum a => Dirichlet a -> Dirichlet a
 symmetrize alpha@(Dir {conc=Sym _}) = alpha
 symmetrize alpha =
-  let a = alpha { conc = Sym $ precision alpha / realToFrac (domain alpha)
+  let a = alpha { conc = Sym $ precision alpha / realToFrac (dimension alpha)
                 , norm = computeNorm a
                 }
   in a
