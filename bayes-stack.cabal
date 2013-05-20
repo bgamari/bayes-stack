@@ -28,7 +28,7 @@ Library
                        BayesStack.Multinomial, BayesStack.Dirichlet,
                        BayesStack.UniqueKey,
                        BayesStack.TupleEnum,
-                       Data.Binary.EnumMap,
+                       Data.Binary.EnumMap, Data.Binary.EnumSet,
                        Data.Random.Sequence, Data.Sequence.Chunk
 
   Build-depends:       base >=4 && <5,
