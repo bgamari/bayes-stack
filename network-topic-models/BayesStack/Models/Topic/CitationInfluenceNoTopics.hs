@@ -207,29 +207,7 @@ data MState = MState { -- Citing model state
                      }
             deriving (Show, Generic)
 makeLenses ''MState         
-instance Binary MState where
-    put ms = do putDist $ ms^.stGammas
-                putDist $ ms^.stOmegas
-                putDist $ ms^.stPsis
-                putDist $ ms^.stLambdas
-                B.put $ ms^.stCiting
-      where putDist :: (Binary a, Binary w, Binary b, Enum b)
-                    => Map a (Multinom w b) -> B.Put
-            putDist a = do B.put $ Multi.prior $ head $ M.elems a
-                           B.put $ fmap Multi.counts a
-    get = do gammas  <- getDist
-             omegas  <- getDist
-             psis    <- getDist
-             lambdas <- getDist
-             citing <- B.get
-             return $ MState gammas omegas psis citing lambdas
-      where getDist :: (Binary a, Binary w, Num w, Eq w, Binary b, Enum b, Ord b)
-                    => B.Get (Map a (Multinom w b))
-            getDist = do prior <- B.get
-                         fmap (\counts->foldl' (\dm (k,w)->Multi.add w k dm)
-                                               (Multi.fromPrior prior)
-                                        $ EM.assocs counts
-                              ) <$> B.get
+instance Binary MState
 
 -- | Model initialization            
 type ModelInit = Map CitingNodeItem (Setting CitingUpdateUnit)
