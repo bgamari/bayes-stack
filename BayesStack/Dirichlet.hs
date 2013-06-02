@@ -12,8 +12,11 @@ module BayesStack.Dirichlet ( -- * Dirichlet parameter
                             , mean, precision
                             , isSymmetric
                             , symmetrize
-                              -- Utilities
+                              -- * Utilities
                             , prettyPrint
+                              -- * Precision
+                            , Precision(..)
+                            , precisionToDir
                             ) where
 
 import Data.Foldable (toList, Foldable, fold, foldl', foldMap)
@@ -161,3 +164,12 @@ prettyPrint showA (Asym {concs=alphas}) =
   <+> fsep (punctuate comma
            $ map (\(a,alpha)->text (showA a) <> parens (text $ printf "%1.2e" alpha))
            $ take 100 $ EM.toList $ alphas)
+
+-- | This encodes a Dirichlet with unknown domain but known precision
+newtype Precision a = Precision Double
+                    deriving (Show, Eq, Generic)
+instance Binary (Precision a)
+         
+-- | Precision
+precisionToDir :: Enum a => Precision a -> [a] -> Dirichlet a
+precisionToDir (Precision p) = fromPrecision p
