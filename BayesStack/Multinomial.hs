@@ -105,7 +105,7 @@ fromPrior a = DirMulti { prior = a
 
 -- | Construct a Dirichlet-multinomial distribution with symmetric prior
 fromPrecision :: (Num w, Enum a) => [a] -> Double -> Multinom w a
-fromPrecision domain precision = fromPrior $ Dir.fromDomain domain precision
+fromPrecision domain precision = fromPrior $ Dir.fromPrecision precision domain
 
 -- | Construct a Dirichlet-multinomial distribution with asymmetric prior
 fromConcentrations :: (Num w, Enum a) => [(a,Double)] -> Multinom w a

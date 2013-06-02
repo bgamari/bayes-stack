@@ -3,7 +3,7 @@
 module BayesStack.Dirichlet ( -- * Dirichlet parameter
                               Dirichlet
                               -- * Creation
-                            , fromDomain
+                            , fromPrecision
                             , fromConcentrations
                             , fromMeanPrecision
                               -- * Querying
@@ -63,13 +63,13 @@ domain (Sym {_domain=d}) = d
 domain (Asym {concs=c}) = EM.keysSet c
 
 -- | Construct a symmetric Dirichlet distribution from the dimension of domain.
-fromDomain :: Enum a => [a] -> Double -> Dirichlet a
-fromDomain domain alpha =
+fromPrecision :: Enum a => Double -> [a] -> Dirichlet a
+fromPrecision alpha domain =
   let a = Sym n dom alpha (alpha * fromIntegral n) (computeNorm a)
       dom = ES.fromList domain
       n = ES.size dom
   in a
-{-# INLINE fromDomain #-}
+{-# INLINE fromPrecision #-}
 
 -- | Construct an asymmetric Dirichlet from the size of the distribution
 fromConcentrations :: Enum a => [(a,Double)] -> Dirichlet a
