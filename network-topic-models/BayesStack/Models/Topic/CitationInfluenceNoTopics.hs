@@ -360,8 +360,8 @@ modelHypers ms =
   where prior :: Map a (Multinom n b) -> Dirichlet b
         prior = Multi.prior . head . M.elems
 
-storedFromState :: NetData -> MState -> Stored
-storedFromState nd ms = Stored (modelHypers ms) (ms^.stCiting)
+storedFromState :: MState -> Stored
+storedFromState ms = Stored (modelHypers ms) (ms^.stCiting)
 
 stateFromStored :: NetData -> Stored -> MState
 stateFromStored nd s = model (sHyperParams s) nd (sAssignments s)
