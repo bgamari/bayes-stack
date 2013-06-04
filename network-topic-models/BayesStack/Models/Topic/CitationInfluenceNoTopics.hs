@@ -88,16 +88,6 @@ data Arc = Arc { citingNode :: !CitingNode, citedNode :: !CitedNode }
             deriving (Show, Eq, Ord, Generic)
 instance Binary Arc
 
-data HyperParams = HyperParams { _alphaPsi            :: !Double
-                               , _alphaLambda         :: !Double
-                               , _alphaOmega          :: !Double
-                               , _alphaGammaShared    :: !Double
-                               , _alphaGammaOwn       :: !Double
-                               }
-                 deriving (Show, Generic)
-instance Binary HyperParams
-makeLenses ''HyperParams         
-         
 data NetData = NetData { _dArcs               :: !(Set Arc)
                        , _dItems              :: !(Map Item Double)
                        , _dNodeItems          :: !(Map NodeItem (Node, Item))
@@ -157,6 +147,29 @@ verifyNetData showNode d = execWriter $ do
             $ tell [showNode cited++" has arc yet has no items"]
         when (citing `S.notMember` nodesWithItems)
             $ tell [showNode citing++" has arc yet has no items"]
+
+-- | A set of model hyperparameters
+data HyperParams = HyperParams { _alphaPsi      :: !Double
+                               , _alphaLambda   :: !(Dirichlet Item)
+                               , _alphaOmega    :: !(Dirichlet Item)
+                               , _alphaGamma    :: !(Dirichlet ItemSource)
+                               }
+                 deriving (Show, Generic)
+instance Binary HyperParams
+makeLenses ''HyperParams         
+
+symHypers :: NetData       -- ^ Network data
+          -> Double        -- ^ Psi precision
+          -> Double        -- ^ Lambda precision
+          -> Double        -- ^ Omega precision
+          -> Double        -- ^ Gamma own concentration
+          -> Double        -- ^ Gamma shared concentration
+          -> HyperParams
+symHypers d psi lambda omega gammaOwn gammaShared =
+    HyperParams psi
+                (Dir.fromPrecision lambda (M.keys $ d ^. dItems))
+                (Dir.fromPrecision omega (M.keys $ d ^. dItems))
+                (Dir.fromConcentrations [(Shared, gammaShared), (Own, gammaOwn)])
 
 -- Citing Update unit (Shared Taste-like)
 data CitingUpdateUnit = CitingUpdateUnit { _uuNI    :: CitingNodeItem
@@ -239,22 +252,18 @@ emptyModel :: HyperParams -> NetData -> MState
 emptyModel hp d =           
     MState { -- Citing model
              _stPsis = let dist n = case d ^. dCitingNodes . at' n . to toList of
-                                        []    -> M.empty
-                                        nodes -> M.singleton n
-                                                 $ Multi.fromPrecision nodes (hp^.alphaPsi)
+                                          []    -> M.empty
+                                          nodes -> M.singleton n
+                                                   $ Multi.fromPrecision nodes (hp^.alphaPsi)
                        in foldMap dist citingNodes
-           , _stGammas = let dist = Multi.fromConcentrations
-                                      [ (Shared, hp^.alphaGammaShared)
-                                      , (Own, hp^.alphaGammaOwn) ]
+           , _stGammas = let dist = Multi.fromPrior (hp ^. alphaGamma)
                          in foldMap (\t->M.singleton t dist) citingNodes
-           , _stOmegas = let dist = Multi.fromPrecision (M.keys $ d^.dItems)
-                                                        (hp^.alphaOmega) 
+           , _stOmegas = let dist = Multi.fromPrior (hp^.alphaOmega)
                          in foldMap (\t->M.singleton t dist) citingNodes
            , _stCiting = M.empty
 
            -- Cited model
-           , _stLambdas = let dist = Multi.fromPrecision (M.keys $ d^.dItems)
-                                                         (hp^.alphaLambda)
+           , _stLambdas = let dist = Multi.fromPrior (hp^.alphaLambda)
                           in foldMap (\n->M.singleton n dist) $ M.keys $ d^.dCitedNodes
            }
   where citingNodes = M.keys $ d ^. dCitingNodes
@@ -326,33 +335,24 @@ setCitingUU uu@(CitingUpdateUnit {_uuNI=ni, _uuN=n, _uuX=x}) setting ms = execSt
 
 -- | The subset of state contained in @Stored@ along with @NetData@ is enough
 -- to reconstitute an @MState@
-data Stored = Stored { sAlphaPsi    :: Precision CitedNode
-                     , sAlphaGamma  :: Dirichlet ItemSource
-                     , sAlphaOmega  :: Dirichlet Item
-                     , sAlphaLambda :: Dirichlet Item
+data Stored = Stored { sHyperParams :: HyperParams
                      , sAssignments :: Map CitingNodeItem CitingSetting
                      }
-            deriving (Show, Eq, Generic)
+            deriving (Show, Generic)
 instance Binary Stored
 
-storedFromState :: NetData -> MState -> Stored
-storedFromState nd ms =
-    Stored (Precision $ Dir.precision $ prior $ ms^.stPsis)
-           (prior $ ms^.stGammas)
-           (prior $ ms^.stOmegas)
-           (prior $ ms^.stLambdas)
-           (ms^.stCiting)
+modelHypers :: MState -> HyperParams
+modelHypers ms =
+    HyperParams { _alphaPsi = Dir.precision $ prior $ ms ^. stPsis
+                , _alphaLambda = prior $ ms ^. stLambdas
+                , _alphaOmega = prior $ ms ^. stOmegas
+                , _alphaGamma = prior $ ms ^. stGammas
+                }
   where prior :: Map a (Multinom n b) -> Dirichlet b
         prior = Multi.prior . head . M.elems
 
-{-
+storedFromState :: NetData -> MState -> Stored
+storedFromState nd ms = Stored (modelHypers ms) (ms^.stCiting)
+
 stateFromStored :: NetData -> Stored -> MState
-stateFromStored nd s =
-    MState { -- Citing model
-             _stPsis = 
-    (Multi.fromPrior $ sAlphaGamma s)
-             (Multi.fromPrior $ sAlphaOmega s)
-             (Multi.fromPrior $ sAlphaPsi s)
-             (Multi.fromPrior $ sAlphaLambda s)
-             (sAssignments s)
-   -} 
+stateFromStored nd s = model (sHyperParams s) nd (sAssignments s)
