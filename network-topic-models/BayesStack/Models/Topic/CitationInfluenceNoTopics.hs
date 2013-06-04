@@ -27,6 +27,10 @@ module BayesStack.Models.Topic.CitationInfluenceNoTopics
   , updateUnits
     -- * Diagnostics
   , modelLikelihood
+    -- * Suscinct state representation
+  , Stored
+  , storedFromState
+  , stateFromStored
   ) where
 
 import qualified Data.Vector as V
