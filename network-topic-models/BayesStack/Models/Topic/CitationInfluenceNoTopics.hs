@@ -1,10 +1,15 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, DeriveGeneric, TupleSections, RecordWildCards, TemplateHaskell, RankNTypes, FlexibleContexts #-}
 
 module BayesStack.Models.Topic.CitationInfluenceNoTopics
-  ( -- * Primitives
+  ( -- * Network data
     NetData
   , dArcs, dItems, dNodeItems, dCitingNodes, dCitedNodes
   , netData
+    -- * Hyperparameters
+  , HyperParams
+  , alphaPsi, alphaLambda, alphaOmega, alphaGamma
+  , symHypers
+    -- * Model state
   , MState
   , stGammas, stOmegas, stPsis, stCiting, stLambdas
   , CitingUpdateUnit
