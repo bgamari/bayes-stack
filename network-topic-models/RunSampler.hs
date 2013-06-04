@@ -1,3 +1,5 @@
+{-# LANGUAGE DefaultSignatures #-}
+
 module RunSampler ( SamplerModel (..)
                   , SamplerOpts (..), samplerOpts
                   , runSampler
@@ -14,7 +16,7 @@ import qualified Control.Monad.Trans.State as S
 import           Control.Monad.IO.Class
 
 import           Data.Binary
-import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BS
 import           Text.Printf
 
 import           Control.Concurrent
@@ -101,6 +103,10 @@ class Binary ms => SamplerModel ms where
     estimateHypers :: ms -> ms
     summarizeHypers :: ms -> String
 
+    encodeSweep :: ms -> BS.ByteString
+    default encodeSweep :: Binary ms => ms -> BS.ByteString
+    encodeSweep = encode
+
 processSweep :: SamplerModel ms => SamplerOpts -> TVar (Log Double) -> Int -> ms -> IO ()
 processSweep opts lastMaxV sweepN m = do
     let l = modelLikelihood m
@@ -113,7 +119,7 @@ processSweep opts lastMaxV sweepN m = do
                                               else return False
         when (newMax && sweepN >= burnin opts) $
             let fname = sweepsDir opts </> printf "%05d.state" sweepN
-            in encodeFile fname m
+            in BS.writeFile fname $ encodeSweep m
 
 doEstimateHypers :: SamplerModel ms => SamplerOpts -> Int -> S.StateT ms IO ()
 doEstimateHypers opts@(SamplerOpts {hyperEstOpts=HyperEstOpts True burnin lag}) iterN
