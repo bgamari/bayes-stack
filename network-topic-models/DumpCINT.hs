@@ -85,8 +85,8 @@ opts = Opts
                     <> help "The sweep number to dump"
                      )
 
-readSweep :: FilePath -> IO MState
-readSweep = decodeFile
+readSweep :: NetData -> FilePath -> IO MState
+readSweep nd fname = stateFromStored nd <$> decodeFile fname
 
 readNetData :: FilePath -> IO NetData
 readNetData = decodeFile
@@ -102,8 +102,8 @@ main = do
     itemMap <- readItemMap $ sweepDir args
     nodeMap <- readNodeMap $ sweepDir args
     m <- case sweepNum args of
-             Nothing -> readSweep =<< getLastSweep (sweepDir args)
-             Just n  -> readSweep $ sweepDir args </> printf "%05d.state" n
+             Nothing -> readSweep nd =<< getLastSweep (sweepDir args)
+             Just n  -> readSweep nd $ sweepDir args </> printf "%05d.state" n
 
     let showItem = showB . (itemMap M.!)
         showNode = showB . (nodeMap M.!)
