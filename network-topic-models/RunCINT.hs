@@ -39,7 +39,7 @@ data RunOpts = RunOpts { arcsFile        :: FilePath
                        , nodesFile       :: FilePath
                        , stopwords       :: Maybe FilePath
                        , samplerOpts     :: Sampler.SamplerOpts
-                       , hyperParams     :: HyperParams
+                       , hyperParams     :: NetData -> HyperParams
                        , noClean         :: Bool
                        }
 
@@ -68,7 +68,8 @@ runOpts = RunOpts
                        <> help "Don't attempt to sanitize input data. Among other things, nodes without friends will not be discarded"
                         )
 
-hyperOpts = HyperParams
+hyperOpts :: Parser (NetData -> HyperParams)
+hyperOpts = (\psi lambda omega gammaS gammaO _ _ nd -> symHypers nd psi lambda omega gammaS gammaO)
     <$> option     ( long "prior-psi"
                   <> value 1
                   <> help "Dirichlet parameter for prior on psi"
@@ -115,9 +116,9 @@ termsToItems nodes arcs =
                 return (a,b)
     in (d', (itemMap, nodeMap))
 
-makeNetData :: HyperParams -> M.Map Node [Item] -> Set Arc -> NetData
-makeNetData hp nodeItems arcs =
-    netData hp arcs items nodeItems'
+makeNetData :: M.Map Node [Item] -> Set Arc -> NetData
+makeNetData nodeItems arcs =
+    netData arcs items nodeItems'
   where items = M.unions $ concatMap (map $ flip M.singleton 1) $ M.elems nodeItems
         nodeItems' = M.fromList
                     $ zip [NodeItem i | i <- [0..]]
@@ -163,7 +164,7 @@ main = do
 
     withSystemRandom $ \mwc->do
     let nd = (if noClean args then id else cleanNetData)
-             $ makeNetData (hyperParams args) nodeItems arcs 
+             $ makeNetData nodeItems arcs 
     mapM_ putStrLn $ verifyNetData (\n->maybe (show n) show $ M.lookup n nodeMap) nd
 
     let nCitingNodes = VU.fromList $ M.elems $ M.unionsWith (+)
@@ -183,6 +184,6 @@ main = do
 
     encodeFile (sweepsDir </> "data") nd
     mInit <- runRVar (randomInitialize nd) mwc
-    let m = model nd mInit
+    let m = model (hyperParams args nd) nd mInit
     Sampler.runSampler (samplerOpts args) m (updateUnits nd)
     return ()
