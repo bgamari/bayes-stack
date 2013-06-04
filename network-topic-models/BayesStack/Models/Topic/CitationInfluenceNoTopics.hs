@@ -48,7 +48,7 @@ import qualified Data.Map.Strict as M
 
 import           Data.EnumMap (EnumMap)
 import qualified Data.EnumMap as EM
-                 
+
 import           Data.Foldable hiding (product)
 import           Control.Applicative ((<$>), (<*>))
 import           Control.Monad (when)
@@ -71,7 +71,7 @@ import           BayesStack.Models.Topic.Types
 
 import           GHC.Generics (Generic)
 import           Data.Binary (Binary)
-import qualified Data.Binary as B                 
+import qualified Data.Binary as B
 import           Control.DeepSeq
 
 at' :: At m => Index m -> IndexedLens' (Index m) m (IxValue m)
@@ -107,7 +107,7 @@ data NetData = NetData { _dArcs               :: !(Set Arc)
                        }
               deriving (Show, Generic)
 instance Binary NetData
-makeLenses ''NetData         
+makeLenses ''NetData
 
 netData :: Set Arc -> Map Item Double -> Map NodeItem (Node,Item) -> NetData
 netData arcs items nodeItems =
@@ -165,7 +165,7 @@ data HyperParams = HyperParams { _alphaPsi      :: !Double
                                }
                  deriving (Show, Generic)
 instance Binary HyperParams
-makeLenses ''HyperParams         
+makeLenses ''HyperParams
 
 symHypers :: NetData       -- ^ Network data
           -> Double        -- ^ Psi precision
@@ -204,7 +204,7 @@ citingUpdateUnits d =
 updateUnits :: NetData -> [WrappedUpdateUnit MState]
 updateUnits d = map WrappedUU (citingUpdateUnits d)
 
--- | Model State            
+-- | Model State
 data CitingSetting = OwnSetting
                    | SharedSetting !CitedNode
                    deriving (Show, Eq, Generic)
@@ -224,10 +224,10 @@ data MState = MState { -- Citing model state
                      , _stLambdas  :: !(Map CitedNode (Multinom Int Item))
                      }
             deriving (Show, Generic)
-makeLenses ''MState         
+makeLenses ''MState
 instance Binary MState
 
--- | Model initialization            
+-- | Model initialization
 type ModelInit = Map CitingNodeItem (Setting CitingUpdateUnit)
 
 modify' :: Monad m => (a -> a) -> StateT a m ()
@@ -258,7 +258,7 @@ randomInitialize :: NetData -> RVar ModelInit
 randomInitialize d = randomInitializeCiting d M.empty
 
 emptyModel :: HyperParams -> NetData -> MState
-emptyModel hp d =           
+emptyModel hp d =
     MState { -- Citing model
              _stPsis = let dist n = case d ^. dCitingNodes . at' n . to toList of
                                           []    -> M.empty
@@ -291,7 +291,7 @@ model hp d citingInit =
                  ) $ emptyModel hp d
 
 modelLikelihood :: MState -> Probability
-modelLikelihood model = 
+modelLikelihood model =
     product (model ^.. stGammas  . folded . to likelihood)
   * product (model ^.. stLambdas . folded . to likelihood)
   * product (model ^.. stOmegas  . folded . to likelihood)
