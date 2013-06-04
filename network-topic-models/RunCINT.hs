@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns, GeneralizedNewtypeDeriving, StandaloneDeriving #-}
 
 import           Prelude hiding (mapM)
-import           Control.Lens                 
+import           Control.Lens
 
 import           Options.Applicative
 import           Data.Monoid ((<>))
@@ -139,6 +139,7 @@ instance Sampler.SamplerModel MState where
     estimateHypers = id -- reestimate -- FIXME
     modelLikelihood = modelLikelihood
     summarizeHypers ms =  "" -- FIXME
+    encodeSweep = encode . storedFromState
 
 main = do
     args <- execParser opts
@@ -164,7 +165,7 @@ main = do
 
     withSystemRandom $ \mwc->do
     let nd = (if noClean args then id else cleanNetData)
-             $ makeNetData nodeItems arcs 
+             $ makeNetData nodeItems arcs
     mapM_ putStrLn $ verifyNetData (\n->maybe (show n) show $ M.lookup n nodeMap) nd
 
     let nCitingNodes = VU.fromList $ M.elems $ M.unionsWith (+)
