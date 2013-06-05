@@ -136,7 +136,7 @@ executable bayes-stack-ci
 
 executable bayes-stack-cint
   main-is:             RunCINT.hs
-  ghc-options:         -threaded
+  ghc-options:         -threaded -with-rtsopts=-K1G
   build-depends:       base >=4.6 && <4.8,
                        stm >= 2.4 && < 2.5,
                        containers >= 0.5 && < 0.6,
@@ -222,6 +222,7 @@ executable bayes-stack-dump-ci
 
 executable bayes-stack-dump-cint
   main-is:             DumpCINT.hs
+  ghc-options:         -with-rtsopts=-K1G
   build-depends:       base >=4.6 && <4.8,
                        stm >= 2.4 && < 2.5,
                        containers >= 0.5 && < 0.6,
